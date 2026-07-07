@@ -39,19 +39,19 @@ jobs:
           - os: windows-latest
             arch: amd64
             artifact_name: gugacode-${{ github.ref_name }}-windows-amd64.zip
-            build_cmd: wails3 build -tags desktop -production
+            build_cmd: wails3 build -tags desktop,production
           - os: ubuntu-latest
             arch: amd64
             artifact_name: gugacode-${{ github.ref_name }}-linux-amd64.tar.gz
-            build_cmd: wails3 build -tags desktop -production
+            build_cmd: wails3 build -tags desktop,production
           - os: macos-latest
             arch: amd64
             artifact_name: gugacode-${{ github.ref_name }}-darwin-amd64.zip
-            build_cmd: wails3 build -tags desktop -production
+            build_cmd: wails3 build -tags desktop,production
           - os: macos-latest
             arch: arm64
             artifact_name: gugacode-${{ github.ref_name }}-darwin-arm64.zip
-            build_cmd: wails3 build -tags desktop -production
+            build_cmd: wails3 build -tags desktop,production
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -72,7 +72,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libgcc-12-dev libstdc++-12-dev pkg-config
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libgcc-12-dev libstdc++-12-dev pkg-config
 
       - name: Install frontend deps
         run: npm ci

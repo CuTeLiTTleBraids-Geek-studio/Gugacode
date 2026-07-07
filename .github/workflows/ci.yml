@@ -163,7 +163,7 @@ jobs:
       - name: Install Linux GUI build deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libgcc-12-dev libstdc++-12-dev pkg-config
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libgcc-12-dev libstdc++-12-dev pkg-config
 
       - name: Install frontend deps
         run: npm ci
@@ -174,4 +174,4 @@ jobs:
         run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha2.111
 
       - name: Wails build
-        run: wails3 build -tags desktop -production
+        run: wails3 build -tags desktop,production
