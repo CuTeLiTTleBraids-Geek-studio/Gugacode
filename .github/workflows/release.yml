@@ -39,19 +39,19 @@ jobs:
           - os: windows-latest
             arch: amd64
             artifact_name: gugacode-${{ github.ref_name }}-windows-amd64.zip
-            build_cmd: wails3 build -tags desktop
+            build_cmd: wails3 build -tags desktop -production
           - os: ubuntu-latest
             arch: amd64
             artifact_name: gugacode-${{ github.ref_name }}-linux-amd64.tar.gz
-            build_cmd: wails3 build -tags desktop
+            build_cmd: wails3 build -tags desktop -production
           - os: macos-latest
             arch: amd64
             artifact_name: gugacode-${{ github.ref_name }}-darwin-amd64.zip
-            build_cmd: wails3 build -tags desktop
+            build_cmd: wails3 build -tags desktop -production
           - os: macos-latest
             arch: arm64
             artifact_name: gugacode-${{ github.ref_name }}-darwin-arm64.zip
-            build_cmd: wails3 build -tags desktop
+            build_cmd: wails3 build -tags desktop -production
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -96,12 +96,19 @@ jobs:
         if: matrix.os != 'windows-latest'
         shell: bash
         run: |
-          # Locate the built binary (wails3 outputs to bin/ by default).
-          BINARY=$(find bin -type f -name "*gugacode*" 2>/dev/null | head -1)
-          if [ -z "$BINARY" ]; then
-            echo "Build binary not found"; exit 1
+          # wails3 outputs to bin/. On macOS the product is a .app bundle;
+          # on Linux it is a single executable. Handle both cases.
+          if [ -d "bin/gugacode.app" ]; then
+            # macOS: package the entire .app bundle
+            tar -czf ${{ matrix.artifact_name }} -C bin gugacode.app
+          else
+            # Linux: package the single binary
+            BINARY=$(find bin -maxdepth 1 -type f -name "*gugacode*" 2>/dev/null | head -1)
+            if [ -z "$BINARY" ]; then
+              echo "Build binary not found"; exit 1
+            fi
+            tar -czf ${{ matrix.artifact_name }} -C bin $(basename "$BINARY")
           fi
-          tar -czf ${{ matrix.artifact_name }} -C $(dirname "$BINARY") $(basename "$BINARY")
 
       - name: Generate SHA256 checksum
         shell: bash

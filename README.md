@@ -133,7 +133,7 @@
 
 ## 下载
 
-主人请前往 [Releases](https://github.com/<your-org>/gugacode/releases) 下载对应平台压缩包咕咕嘎嘎~
+主人请前往 [Releases](https://github.com/CuTeLiTTleBraids-Geek-studio/Gugacode/releases) 下载对应平台压缩包咕咕嘎嘎~
 
 | 平台 | 文件 | 备注 |
 |---|---|---|
@@ -191,7 +191,7 @@ xattr -cr /path/to/gugacode
 go install github.com/wailsapp/wails/v3/cmd/wails3@latest
 
 # 克隆仓库
-git clone https://github.com/<your-org>/gugacode.git
+git clone https://github.com/CuTeLiTTleBraids-Geek-studio/Gugacode.git
 cd gugacode
 
 # 安装前端依赖
