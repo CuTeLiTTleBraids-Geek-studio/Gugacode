@@ -146,17 +146,27 @@ jobs:
           # GitHub Release 下载页可直接看到并下载图标文件。
           if [ -f icon.png ]; then cp icon.png release-assets/icon.png; fi
 
-      - name: Extract Unreleased changelog
+      - name: Extract changelog for this version
         id: changelog
         shell: bash
         run: |
-          # Extract the "## [Unreleased]" section from CHANGELOG.md as the
-          # release notes body. Falls back to the tag name if not found.
+          # Extract the changelog section matching the released version
+          # (e.g. tag v0.1.0 -> section "## [0.1.0]"). Falls back to the
+          # [Unreleased] section if no matching version section is found.
           python3 - <<'PY'
           import os, re, pathlib
           md = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
-          m = re.search(r"## \[Unreleased\](.*?)(?=\n## \[|\Z)", md, re.S)
-          body = m.group(1).strip() if m else ""
+          tag = os.environ.get("GITHUB_REF_NAME", "")
+          version = tag.lstrip("v") if tag else ""
+          body = ""
+          if version:
+              m = re.search(rf"## \[{re.escape(version)}\](.*?)(?=\n## \[|\Z)", md, re.S)
+              if m:
+                  body = m.group(1).strip()
+          if not body:
+              m = re.search(r"## \[Unreleased\](.*?)(?=\n## \[|\Z)", md, re.S)
+              if m:
+                  body = m.group(1).strip()
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"body<<EOF\n{body}\nEOF\n")
           PY
