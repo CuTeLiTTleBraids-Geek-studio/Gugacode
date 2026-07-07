@@ -1,0 +1,123 @@
+# ============================================
+# 构建产物 / Build artifacts
+# ============================================
+
+# Go 二进制文件 / Go binaries
+bin/
+*.exe
+gugacode.exe
+gugacode
+gugacode.app
+miaomiaocode
+miaomiaocode.exe
+nknk-coding
+nknk-coding.exe
+
+# Windows 资源文件（构建时生成）/ Windows syso (generated)
+*.syso
+wails_windows_*.syso
+
+# 前端构建产物 / Frontend build output
+frontend/dist/
+
+# Wails 绑定生成临时目录 / Wails binding temp dirs
+frontend/.bindings-tmp*
+
+# 移动平台生成文件（含机器特定路径）/ Mobile generated
+build/ios/xcode/overlay.json
+build/ios/xcode/gen/
+build/android/overlay.json
+build/android/gen/
+
+# Linux AppImage 构建目录
+build/linux/appimage/build
+
+# Windows NSIS WebView2 安装包
+build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
+
+# Taskfile 缓存 / Taskfile cache
+.task/
+
+# ============================================
+# 用户数据 / User data (绝不提交)
+# ============================================
+
+# 应用运行时生成的用户数据目录 / Runtime user data
+services/gugacode/
+
+# AI 对话历史文件（根目录时间戳 JSON）/ AI conversation history
+[0-9]*-*.json
+
+# ============================================
+# 依赖 / Dependencies
+# ============================================
+
+# Node.js
+node_modules/
+
+# Go vendor（如使用）/ Go vendor (if used)
+vendor/
+
+# Go workspace（如使用）/ Go workspace (if used)
+go.work
+go.work.sum
+
+# ============================================
+# IDE / 编辑器 / IDE & editors
+# ============================================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+
+# ============================================
+# 操作系统文件 / OS files
+# ============================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+$RECYCLE.BIN/
+
+# ============================================
+# 环境与密钥 / Environment & secrets
+# ============================================
+
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ============================================
+# 日志与临时文件 / Logs & temp files
+# ============================================
+
+*.log
+*.tmp
+*.temp
+*.bak
+*.cache
+
+# ============================================
+# 测试覆盖率 / Test coverage
+# ============================================
+
+coverage/
+*.lcov
+*.out
+*.prof
+
+# ============================================
+# 调试工具 / Debug tools (可选保留)
+# ============================================
+
+# 哈希测试调试工具 / Hash debug tool
+tools/hashtest6/

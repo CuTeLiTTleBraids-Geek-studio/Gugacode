@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=gugacode
+Comment=AI-Powered Coding Desktop App for Professional Developers
+# The Exec line includes %u to pass the URL to the application
+Exec=/usr/local/bin/gugacode.exe %u
+Terminal=false
+Type=Application
+Icon=gugacode.exe
+Categories=Utility;
+StartupWMClass=gugacode.exe
+
+ 
