@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  # N-75: Run Go build & test across all three platforms. Wails v3 has
+  # platform-specific code (pty_windows.go, pty_unix.go, shell_exec_*.go,
+  # secrets_{windows,darwin,linux,other}.go) — building only on Ubuntu
+  # leaves Windows/macOS build-tagged files unverified.
+  go-test:
+    name: Go Build & Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Download dependencies
+        run: go mod download
+
+      # N-129: vet both the root package and services. We avoid `./...`
+      # because it would also traverse frontend/node_modules (which
+      # contains third-party Go files like `flatted/golang`) and the
+      # build/android + build/ios scaffolding — not our code to lint.
+      - name: Vet
+        run: go vet ./services/... .
+
+      - name: Build
+        run: go build .
+
+      # N-129: test the root package (main_test.go covers CSP nonce
+      # injection) AND services. The previous `./services/...` skipped
+      # the root. We don't use `./...` for the same reason as Vet.
+      - name: Test
+        run: go test ./services/... .
+
+  # N-128: Go lint. golangci-lint runs vet + a suite of additional linters
+  # (errcheck, ineffassign, staticcheck, unused, etc.) that `go vet` alone
+  # does not cover.
+  go-lint:
+    name: Go Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.61
+          # Scope to project packages: root + services. Avoids traversing
+          # frontend/node_modules and build/ scaffolding.
+          args: --timeout=10m ./services/... .
+
+  # N-75: Frontend checks across all three platforms. Vitest and vue-tsc
+  # are pure JS so they're cross-platform, but running on Windows + macOS
+  # catches any path-separator or platform-API regressions in tests.
+  frontend-test:
+    name: Frontend Check & Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Type check
+        run: npx vue-tsc --noEmit
+        working-directory: frontend
+
+      # N-128: ESLint step. The `lint` script is defined in package.json.
+      - name: Lint
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Test
+        run: npx vitest run
+        working-directory: frontend
+
+  # N-130: Frontend coverage report. Runs on a single platform to keep CI
+  # fast — the cross-platform test job above already verifies correctness.
+  # Uploads the lcov report as an artifact for consumption by external
+  # coverage tools (Codecov, Coveralls, etc.) and prints a text summary
+  # to the job log.
+  frontend-coverage:
+    name: Frontend Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        working-directory: frontend
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/
+          retention-days: 14
+
+  # N-100: Production build via `wails3 build`. `go build .` only compiles
+  # the Go binary; it does NOT exercise the full Wails pipeline (frontend
+  # bundling, asset embedding, binding generation, platform packaging).
+  # A binding mismatch or missing embed.FS path can pass `go build` but
+  # fail `wails3 build`. We run this on a single platform (Ubuntu) to keep
+  # CI fast — the cross-platform Go build is already covered by go-test.
+  wails-build:
+    name: Wails Production Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Linux GUI build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev libgcc-12-dev libstdc++-12-dev pkg-config
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: frontend
+
+      # Match the wails v3 version pinned in go.mod (v3.0.0-alpha2.111).
+      - name: Install wails3 CLI
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0-alpha2.111
+
+      - name: Wails build
+        run: wails3 build -tags desktop,production
