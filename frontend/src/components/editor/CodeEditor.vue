@@ -344,8 +344,14 @@ function applyBreakpointDecorations(
       range: new monaco.Range(b.line, 1, b.line, 1),
       options: {
         isWholeLine: false,
-        glyphMarginClassName: b.verified ? "debug-bp-glyph" : "debug-bp-glyph debug-bp-glyph--unverified",
-        glyphMarginHoverMessage: { value: `Breakpoint L${b.line}` },
+        glyphMarginClassName: b.verified
+          ? "debug-bp-glyph"
+          : "debug-bp-glyph debug-bp-glyph--unverified",
+        glyphMarginHoverMessage: {
+          value: b.verified
+            ? `Breakpoint L${b.line}${b.condition ? ` if ${b.condition}` : ""}`
+            : `Unverified breakpoint L${b.line}${b.message ? `: ${b.message}` : ""} — not bound yet`,
+        },
       },
     }));
     breakpointDecorations = editor.deltaDecorations(breakpointDecorations, decs);
@@ -404,11 +410,12 @@ function scheduleLiveDiagnostics(content: string) {
   }, 900);
   if (lang === "typescript" || lang === "javascript" || lang === "typescriptreact" || lang === "javascriptreact") {
     if (eslintDebounceTimer) clearTimeout(eslintDebounceTimer);
+    // prompt-12 12-C: longer debounce + content hash single-flight (no per-key process storm)
     eslintDebounceTimer = setTimeout(() => {
       void import("@/stores/toolchain").then(({ runToolchainCommandQuiet }) => {
-        void runToolchainCommandQuiet("eslint-file", filePath);
+        void runToolchainCommandQuiet("eslint-file", filePath, content);
       });
-    }, 1200);
+    }, 2000);
   }
 }
 

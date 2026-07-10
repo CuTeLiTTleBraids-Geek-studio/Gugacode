@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-10
+
+### Added (prompt-12 — trusted DAP + live lint + release)
+
+- **12-A** Unverified breakpoint UI (hollow glyph + panel warning) + **Restart** + stop reason display.
+- **12-B** Conditional breakpoints / logpoints + **watch / evaluate**.
+- **12-C** ESLint live lint: 2s debounce, content-hash skip, single-flight (no per-key process storm).
+- **12-E** DAP mock integration contract test (`TestDAP_Contract_*`).
+- **12-F** Node/TS debug MVP: `node --inspect-brk` launch + palette entry.
+- **12-G** Launch configs persisted in localStorage; Debug panel selector.
+- **12-H** Multi-root switch restarts toolchain cwd + gopls/tsserver.
+- **12-I** didChange throttle notes + **perf-baseline measured rows**.
+- **12-J** Test explorer unified Run / Coverage / Debug actions.
+- **12-K/L/M/N** remote-delve doc, InlayHints optional hook, plugin decoupling, support-lts draft.
+- **12-D** Tag **v0.4.0** + `docs/release-v0.4.0.md`.
+
 ### Added (prompt-11 — in-IDE DAP + language depth)
 
 - **11-A In-IDE DAP client** — `dlv dap` + embedded client: breakpoints (F9/glyph), F5 start/continue, step over/in/out, call stack, locals; Debug bottom panel.

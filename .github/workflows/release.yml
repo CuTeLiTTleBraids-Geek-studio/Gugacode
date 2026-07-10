@@ -284,6 +284,23 @@ jobs:
               f.write(f"body<<EOF\n{body}\nEOF\n")
           PY
 
+      # prompt-12: optional SBOM upload when syft is available (best-effort).
+      - name: Generate SBOM (optional)
+        continue-on-error: true
+        shell: bash
+        run: |
+          if command -v syft >/dev/null 2>&1; then
+            syft dir:. -o spdx-json > release-assets/sbom.spdx.json
+            sha256sum release-assets/sbom.spdx.json >> release-assets/SHA256SUMS || true
+          elif [ -x scripts/generate-sbom.sh ]; then
+            bash scripts/generate-sbom.sh release-assets/sbom.spdx.json || true
+            if [ -f release-assets/sbom.spdx.json ]; then
+              sha256sum release-assets/sbom.spdx.json >> release-assets/SHA256SUMS || true
+            fi
+          else
+            echo "syft not installed — skipping SBOM (install for mandatory SBOM in future)"
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -292,5 +309,5 @@ jobs:
           body: ${{ steps.changelog.outputs.body }}
           files: |
             release-assets/*
-          draft: true
+          draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}

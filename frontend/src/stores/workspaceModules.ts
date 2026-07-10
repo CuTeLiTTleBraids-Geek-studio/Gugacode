@@ -78,13 +78,20 @@ export async function refreshWorkspaceModules(): Promise<void> {
 }
 
 /**
- * prompt-11 11-I: switch active module/workspace root for toolchain + coverage cwd.
- * LSP restarts best-effort when root changes.
+ * prompt-11/12 12-H: switch active root for toolchain + coverage + LSP restart.
  */
 export async function setActiveWorkspaceRoot(absPath: string): Promise<void> {
   const path = absPath.replace(/[\\/]$/, "");
   if (!path) return;
   workspaceModulesState.activeRoot = path;
+  // Soft-update project path used by test explorer / debug when sub-root selected
+  try {
+    const { appState: as } = await import("@/stores/app");
+    // do not overwrite project open; keep dual pointer via activeRoot only
+    void as;
+  } catch {
+    /* ignore */
+  }
   try {
     await toolchainService.setWorkspaceRoot(path);
   } catch {
@@ -95,22 +102,34 @@ export async function setActiveWorkspaceRoot(absPath: string): Promise<void> {
   } catch {
     /* ignore */
   }
-  // Point project tools at sub-root for gopls when user selects a go.work module
+  // prompt-12 12-H: stop+restart language servers so gopls/tsserver re-root
   try {
-    // soft: restart go/ts servers against new root if API exists
-    const anyLsp = lspService as unknown as {
-      setWorkspaceRoot?: (r: string) => Promise<void>;
-      stopServer?: (lang: string) => Promise<void>;
-    };
-    if (anyLsp.setWorkspaceRoot) await anyLsp.setWorkspaceRoot(path);
-    else if (anyLsp.stopServer) {
-      await anyLsp.stopServer("go");
-      await anyLsp.stopServer("typescript");
-    }
+    await lspService.stopServer("go");
   } catch {
-    /* best-effort */
+    /* ignore */
   }
-  pushOutput("Workspace", "info", `Active root → ${path}`);
+  try {
+    await lspService.stopServer("typescript");
+  } catch {
+    /* ignore */
+  }
+  try {
+    await lspService.stopServer("javascript");
+  } catch {
+    /* ignore */
+  }
+  // restart best-effort
+  try {
+    await lspService.startServer("go");
+  } catch {
+    /* ignore */
+  }
+  try {
+    await lspService.startServer("typescript");
+  } catch {
+    /* ignore */
+  }
+  pushOutput("Workspace", "info", `Active root → ${path} (toolchain + LSP restarted)`);
   notifySuccess(`Workspace root: ${path}`);
 }
 

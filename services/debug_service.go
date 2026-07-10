@@ -17,14 +17,14 @@ import (
 	"time"
 )
 
-// DebugService provides an in-IDE DAP client over Delve `dlv dap` (prompt-11 11-A).
-// Capabilities: launch package/test, set breakpoints, continue / step, stack frames, locals.
+// DebugService provides an in-IDE DAP client over Delve `dlv dap` (prompt-11/12).
+// Capabilities: breakpoints (condition), F5/Restart, step, stack, locals, watch/evaluate.
 type DebugService struct {
 	mu         sync.Mutex
 	writeMu    sync.Mutex // serializes DAP writes on conn
 	cmd        *exec.Cmd
 	addr       string
-	mode       string // "package" | "test"
+	mode       string // "package" | "test" | "node" | "attach"
 	started    time.Time
 	conn       net.Conn
 	seq        int64
@@ -38,15 +38,35 @@ type DebugService struct {
 	breakpoints []DebugBreakpoint
 	stack       []DebugStackFrame
 	locals      []DebugVariable
+	watches     []string
+	watchValues []DebugVariable
 	cwd         string
+
+	// last launch for Restart (prompt-12 12-A/G)
+	lastLaunch debugLaunchSpec
 }
 
-// DebugBreakpoint is a source breakpoint.
+// debugLaunchSpec remembers how to restart the current configuration.
+type debugLaunchSpec struct {
+	Kind      string // package | test | node
+	Dir       string
+	RunRegex  string
+	Program   string
+	Args      []string
+	Env       map[string]string
+	Mode      string // debug | test
+	StopEntry bool
+}
+
+// DebugBreakpoint is a source breakpoint (prompt-12: condition + verified UI).
 type DebugBreakpoint struct {
-	ID       int    `json:"id"`
-	File     string `json:"file"`
-	Line     int    `json:"line"` // 1-based
-	Verified bool   `json:"verified"`
+	ID         int    `json:"id"`
+	File       string `json:"file"`
+	Line       int    `json:"line"` // 1-based
+	Verified   bool   `json:"verified"`
+	Condition  string `json:"condition,omitempty"`
+	LogMessage string `json:"logMessage,omitempty"` // logpoint text
+	Message    string `json:"message,omitempty"`    // adapter message when unverified
 }
 
 // DebugStackFrame is one stack frame.
@@ -76,12 +96,27 @@ type DebugSessionInfo struct {
 	ThreadID   int    `json:"threadId"`
 }
 
-// DebugStateSnapshot is polled by the frontend for stack/locals/bps.
+// DebugStateSnapshot is polled by the frontend for stack/locals/bps/watches.
 type DebugStateSnapshot struct {
 	Session     DebugSessionInfo  `json:"session"`
 	Breakpoints []DebugBreakpoint `json:"breakpoints"`
 	Stack       []DebugStackFrame `json:"stack"`
 	Locals      []DebugVariable   `json:"locals"`
+	Watches     []DebugVariable   `json:"watches"`
+	StopReason  string            `json:"stopReason"`
+}
+
+// DebugLaunchConfig is a persisted launch profile (prompt-12 12-G).
+type DebugLaunchConfig struct {
+	Name      string            `json:"name"`
+	Kind      string            `json:"kind"` // package | test | node
+	Dir       string            `json:"dir"`
+	Program   string            `json:"program,omitempty"`
+	RunRegex  string            `json:"runRegex,omitempty"`
+	Args      []string          `json:"args,omitempty"`
+	Env       map[string]string `json:"env,omitempty"`
+	StopEntry bool              `json:"stopOnEntry,omitempty"`
+	Mode      string            `json:"mode,omitempty"` // debug | test (delve)
 }
 
 // dapMessage is a subset of the Debug Adapter Protocol message envelope.
@@ -173,25 +208,87 @@ func (d *DebugService) GetState() DebugStateSnapshot {
 	bps := append([]DebugBreakpoint(nil), d.breakpoints...)
 	stack := append([]DebugStackFrame(nil), d.stack...)
 	locals := append([]DebugVariable(nil), d.locals...)
+	watches := append([]DebugVariable(nil), d.watchValues...)
 	return DebugStateSnapshot{
 		Session:     d.sessionLocked(),
 		Breakpoints: bps,
 		Stack:       stack,
 		Locals:      locals,
+		Watches:     watches,
+		StopReason:  d.stopReason,
 	}
 }
 
 // LaunchPackage starts dlv dap and launches a debug session for packageDir.
 func (d *DebugService) LaunchPackage(packageDir string) (DebugSessionInfo, error) {
-	return d.launchDAP(packageDir, "package", "")
+	return d.LaunchWithConfig(DebugLaunchConfig{Kind: "package", Dir: packageDir, Mode: "debug"})
 }
 
 // LaunchTest starts dlv dap and launches a test debug session (-test.run regex).
 func (d *DebugService) LaunchTest(packageDir, runRegex string) (DebugSessionInfo, error) {
-	return d.launchDAP(packageDir, "test", runRegex)
+	return d.LaunchWithConfig(DebugLaunchConfig{Kind: "test", Dir: packageDir, RunRegex: runRegex, Mode: "test"})
 }
 
-func (d *DebugService) launchDAP(packageDir, mode, runRegex string) (DebugSessionInfo, error) {
+// LaunchNode starts a Node/TS debug session via node --inspect-brk (prompt-12 12-F MVP).
+// Uses DAP when possible; falls back to process launch + evaluate via inspector is limited —
+// primary path: node with inspect and client attaches through same DAP framing if adapter present,
+// else launches node --inspect-brk and exposes address for session state.
+func (d *DebugService) LaunchNode(program string, args []string) (DebugSessionInfo, error) {
+	return d.LaunchWithConfig(DebugLaunchConfig{
+		Kind:    "node",
+		Program: program,
+		Args:    args,
+		Dir:     filepath.Dir(program),
+	})
+}
+
+// LaunchWithConfig starts a session from a saved/selected profile (prompt-12 12-G).
+func (d *DebugService) LaunchWithConfig(cfg DebugLaunchConfig) (DebugSessionInfo, error) {
+	kind := cfg.Kind
+	if kind == "" {
+		kind = "package"
+	}
+	switch kind {
+	case "node":
+		return d.launchNode(cfg)
+	default:
+		mode := cfg.Mode
+		if mode == "" {
+			if kind == "test" {
+				mode = "test"
+			} else {
+				mode = "debug"
+			}
+		}
+		return d.launchDAP(cfg.Dir, mode, cfg.RunRegex, cfg)
+	}
+}
+
+// Restart re-launches the last configuration (prompt-12 12-A).
+func (d *DebugService) Restart() (DebugSessionInfo, error) {
+	d.mu.Lock()
+	spec := d.lastLaunch
+	d.mu.Unlock()
+	if spec.Kind == "" && spec.Dir == "" && spec.Program == "" {
+		return DebugSessionInfo{}, fmt.Errorf("no previous launch to restart")
+	}
+	cfg := DebugLaunchConfig{
+		Kind:      spec.Kind,
+		Dir:       spec.Dir,
+		Program:   spec.Program,
+		RunRegex:  spec.RunRegex,
+		Args:      spec.Args,
+		Env:       spec.Env,
+		StopEntry: spec.StopEntry,
+		Mode:      spec.Mode,
+	}
+	if cfg.Kind == "" {
+		cfg.Kind = "package"
+	}
+	return d.LaunchWithConfig(cfg)
+}
+
+func (d *DebugService) launchDAP(packageDir, mode, runRegex string, cfg DebugLaunchConfig) (DebugSessionInfo, error) {
 	if !d.IsAvailable() {
 		return DebugSessionInfo{}, fmt.Errorf("dlv not found on PATH")
 	}
@@ -282,18 +379,24 @@ func (d *DebugService) launchDAP(packageDir, mode, runRegex string) (DebugSessio
 
 	// Launch configuration for Delve DAP.
 	launchArgs := map[string]interface{}{
-		"request": "launch",
-		"mode":    "debug",
-		"program": abs,
-		"cwd":     abs,
-		"stopOnEntry": false,
+		"request":     "launch",
+		"mode":        "debug",
+		"program":     abs,
+		"cwd":         abs,
+		"stopOnEntry": cfg.StopEntry,
 	}
-	if mode == "test" {
+	if mode == "test" || cfg.Kind == "test" {
 		launchArgs["mode"] = "test"
 		launchArgs["program"] = abs
 		if runRegex != "" {
 			launchArgs["args"] = []string{"-test.run", runRegex}
 		}
+	}
+	if len(cfg.Args) > 0 && mode != "test" {
+		launchArgs["args"] = cfg.Args
+	}
+	if len(cfg.Env) > 0 {
+		launchArgs["env"] = cfg.Env
 	}
 	if err := d.dapRequest("launch", launchArgs); err != nil {
 		_ = d.Stop()
@@ -310,6 +413,134 @@ func (d *DebugService) launchDAP(packageDir, mode, runRegex string) (DebugSessio
 		slog.Debug("configurationDone", "err", err)
 	}
 
+	d.mu.Lock()
+	d.lastLaunch = debugLaunchSpec{
+		Kind: cfg.Kind, Dir: abs, RunRegex: runRegex, Mode: mode,
+		Args: cfg.Args, Env: cfg.Env, StopEntry: cfg.StopEntry,
+	}
+	if d.lastLaunch.Kind == "" {
+		if mode == "test" {
+			d.lastLaunch.Kind = "test"
+		} else {
+			d.lastLaunch.Kind = "package"
+		}
+	}
+	d.mu.Unlock()
+
+	return d.GetSession(), nil
+}
+
+// launchNode: MVP Node/TS debug via node --inspect-brk (prompt-12 12-F).
+// Exposes listen address; full CDP UI is progressive — session is tracked like DAP.
+func (d *DebugService) launchNode(cfg DebugLaunchConfig) (DebugSessionInfo, error) {
+	_ = d.Stop()
+	prog := cfg.Program
+	if prog == "" {
+		return DebugSessionInfo{}, fmt.Errorf("node program path required")
+	}
+	if a, err := filepath.Abs(prog); err == nil {
+		prog = a
+	}
+	dir := cfg.Dir
+	if dir == "" {
+		dir = filepath.Dir(prog)
+	}
+	nodeBin, err := exec.LookPath("node")
+	if err != nil {
+		return DebugSessionInfo{}, fmt.Errorf("node not found on PATH")
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return DebugSessionInfo{}, err
+	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+
+	args := []string{fmt.Sprintf("--inspect-brk=127.0.0.1:%d", port), prog}
+	args = append(args, cfg.Args...)
+	cmd := exec.Command(nodeBin, args...)
+	cmd.Dir = dir
+	if len(cfg.Env) > 0 {
+		env := os.Environ()
+		for k, v := range cfg.Env {
+			env = append(env, k+"="+v)
+		}
+		cmd.Env = env
+	}
+	if err := cmd.Start(); err != nil {
+		return DebugSessionInfo{}, err
+	}
+	addr := fmt.Sprintf("127.0.0.1:%d", port)
+	d.mu.Lock()
+	d.cmd = cmd
+	d.addr = addr
+	d.mode = "node"
+	d.cwd = dir
+	d.stopped = true
+	d.stopReason = "entry"
+	d.lastLaunch = debugLaunchSpec{Kind: "node", Program: prog, Dir: dir, Args: cfg.Args, Env: cfg.Env}
+	d.mu.Unlock()
+	go func() {
+		_ = cmd.Wait()
+		d.mu.Lock()
+		if d.cmd == cmd {
+			d.cleanupLocked()
+		}
+		d.mu.Unlock()
+	}()
+	return DebugSessionInfo{
+		Running:    true,
+		Address:    addr,
+		Mode:       "node",
+		Message:    fmt.Sprintf("Node inspect-brk on %s — attach Chrome DevTools or continue MVP session", addr),
+		Stopped:    true,
+		StopReason: "entry",
+	}, nil
+}
+
+// ConnectMockDAP connects to an existing DAP server (tests / attach) and runs launch (prompt-12 12-E).
+func (d *DebugService) ConnectMockDAP(addr string, launchArgs map[string]interface{}) (DebugSessionInfo, error) {
+	_ = d.Stop()
+	conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
+	if err != nil {
+		return DebugSessionInfo{}, err
+	}
+	d.mu.Lock()
+	d.conn = conn
+	d.addr = addr
+	d.mode = "attach"
+	d.pending = make(map[int]chan dapMessage)
+	d.readerDone = make(chan struct{})
+	d.stopped = false
+	bpsCopy := append([]DebugBreakpoint(nil), d.breakpoints...)
+	d.mu.Unlock()
+	go d.readLoop()
+
+	if err := d.dapInitialize(); err != nil {
+		_ = d.Stop()
+		return DebugSessionInfo{}, err
+	}
+	if launchArgs == nil {
+		launchArgs = map[string]interface{}{"request": "launch", "program": "."}
+	}
+	if err := d.dapRequest("launch", launchArgs); err != nil {
+		_ = d.Stop()
+		return DebugSessionInfo{}, err
+	}
+	_ = d.applyAllBreakpoints(bpsCopy)
+	_ = d.dapRequest("configurationDone", map[string]interface{}{})
+	// Wait briefly for stopped event from adapter
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		d.mu.Lock()
+		st := d.stopped
+		d.mu.Unlock()
+		if st {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	_ = d.RefreshStackAndLocals()
 	return d.GetSession(), nil
 }
 
@@ -350,6 +581,11 @@ func (d *DebugService) Stop() error {
 
 // SetBreakpoint adds or updates a source breakpoint (1-based line).
 func (d *DebugService) SetBreakpoint(file string, line int) (DebugBreakpoint, error) {
+	return d.SetBreakpointEx(file, line, "", "")
+}
+
+// SetBreakpointEx sets a breakpoint with optional condition / logpoint (prompt-12 12-B).
+func (d *DebugService) SetBreakpointEx(file string, line int, condition, logMessage string) (DebugBreakpoint, error) {
 	if line < 1 {
 		return DebugBreakpoint{}, fmt.Errorf("invalid line")
 	}
@@ -358,17 +594,21 @@ func (d *DebugService) SetBreakpoint(file string, line int) (DebugBreakpoint, er
 		abs = a
 	}
 	d.mu.Lock()
-	// replace existing same file+line
 	found := false
 	for i, b := range d.breakpoints {
 		if filepath.Clean(b.File) == filepath.Clean(abs) && b.Line == line {
 			found = true
 			d.breakpoints[i].Verified = false
+			d.breakpoints[i].Condition = condition
+			d.breakpoints[i].LogMessage = logMessage
+			d.breakpoints[i].Message = ""
 			break
 		}
 	}
 	if !found {
-		d.breakpoints = append(d.breakpoints, DebugBreakpoint{File: abs, Line: line})
+		d.breakpoints = append(d.breakpoints, DebugBreakpoint{
+			File: abs, Line: line, Condition: condition, LogMessage: logMessage,
+		})
 	}
 	bps := append([]DebugBreakpoint(nil), d.breakpoints...)
 	running := d.conn != nil
@@ -386,7 +626,30 @@ func (d *DebugService) SetBreakpoint(file string, line int) (DebugBreakpoint, er
 			return b, nil
 		}
 	}
-	return DebugBreakpoint{File: abs, Line: line}, nil
+	return DebugBreakpoint{File: abs, Line: line, Condition: condition, LogMessage: logMessage}, nil
+}
+
+// SetBreakpointCondition updates condition on an existing breakpoint (prompt-12 12-B).
+func (d *DebugService) SetBreakpointCondition(file string, line int, condition string) (DebugBreakpoint, error) {
+	abs := file
+	if a, err := filepath.Abs(file); err == nil {
+		abs = a
+	}
+	d.mu.Lock()
+	var logMsg string
+	found := false
+	for _, b := range d.breakpoints {
+		if filepath.Clean(b.File) == filepath.Clean(abs) && b.Line == line {
+			found = true
+			logMsg = b.LogMessage
+			break
+		}
+	}
+	d.mu.Unlock()
+	if !found {
+		return d.SetBreakpointEx(abs, line, condition, "")
+	}
+	return d.SetBreakpointEx(abs, line, condition, logMsg)
 }
 
 // RemoveBreakpoint removes a breakpoint at file:line (1-based).
@@ -620,46 +883,61 @@ func (d *DebugService) dapInitialize() error {
 }
 
 func (d *DebugService) applyAllBreakpoints(bps []DebugBreakpoint) error {
-	byFile := map[string][]int{}
+	byFile := map[string][]DebugBreakpoint{}
 	for _, b := range bps {
 		f := filepath.Clean(b.File)
-		byFile[f] = append(byFile[f], b.Line)
+		byFile[f] = append(byFile[f], b)
 	}
-	// Also clear files that no longer have bps — send empty for known files only.
 	var verified []DebugBreakpoint
-	for file, lines := range byFile {
+	for file, list := range byFile {
 		src := map[string]interface{}{"path": file}
-		bpsArgs := make([]map[string]interface{}, 0, len(lines))
-		for _, ln := range lines {
-			bpsArgs = append(bpsArgs, map[string]interface{}{"line": ln})
+		bpsArgs := make([]map[string]interface{}, 0, len(list))
+		for _, b := range list {
+			arg := map[string]interface{}{"line": b.Line}
+			if b.Condition != "" {
+				arg["condition"] = b.Condition
+			}
+			if b.LogMessage != "" {
+				arg["logMessage"] = b.LogMessage
+			}
+			bpsArgs = append(bpsArgs, arg)
 		}
 		body, err := d.dapRequestBody("setBreakpoints", map[string]interface{}{
 			"source":      src,
 			"breakpoints": bpsArgs,
 		})
 		if err != nil {
-			// keep unverified entries
-			for _, ln := range lines {
-				verified = append(verified, DebugBreakpoint{File: file, Line: ln, Verified: false})
+			for _, b := range list {
+				b.Verified = false
+				b.Message = err.Error()
+				verified = append(verified, b)
 			}
 			continue
 		}
 		var resp struct {
 			Breakpoints []struct {
-				ID       int  `json:"id"`
-				Line     int  `json:"line"`
-				Verified bool `json:"verified"`
+				ID       int    `json:"id"`
+				Line     int    `json:"line"`
+				Verified bool   `json:"verified"`
+				Message  string `json:"message"`
 			} `json:"breakpoints"`
 		}
 		_ = json.Unmarshal(body, &resp)
-		for i, ln := range lines {
-			bp := DebugBreakpoint{File: file, Line: ln}
+		for i, b := range list {
+			bp := b
 			if i < len(resp.Breakpoints) {
 				bp.ID = resp.Breakpoints[i].ID
 				bp.Verified = resp.Breakpoints[i].Verified
+				bp.Message = resp.Breakpoints[i].Message
+				if !bp.Verified && bp.Message == "" {
+					bp.Message = "unverified"
+				}
 				if resp.Breakpoints[i].Line > 0 {
 					bp.Line = resp.Breakpoints[i].Line
 				}
+			} else {
+				bp.Verified = false
+				bp.Message = "no adapter response"
 			}
 			verified = append(verified, bp)
 		}
@@ -668,6 +946,93 @@ func (d *DebugService) applyAllBreakpoints(bps []DebugBreakpoint) error {
 	d.breakpoints = verified
 	d.mu.Unlock()
 	return nil
+}
+
+// Evaluate runs DAP evaluate for expression (watch / REPL) (prompt-12 12-B).
+func (d *DebugService) Evaluate(expression string) (DebugVariable, error) {
+	expr := strings.TrimSpace(expression)
+	if expr == "" {
+		return DebugVariable{}, fmt.Errorf("empty expression")
+	}
+	d.mu.Lock()
+	frameID := 0
+	if len(d.stack) > 0 {
+		frameID = d.stack[0].ID
+	}
+	d.mu.Unlock()
+	body, err := d.dapRequestBody("evaluate", map[string]interface{}{
+		"expression": expr,
+		"frameId":    frameID,
+		"context":    "watch",
+	})
+	if err != nil {
+		return DebugVariable{Name: expr, Value: err.Error(), Type: "error"}, err
+	}
+	var resp struct {
+		Result string `json:"result"`
+		Type   string `json:"type"`
+	}
+	_ = json.Unmarshal(body, &resp)
+	return DebugVariable{Name: expr, Value: resp.Result, Type: resp.Type}, nil
+}
+
+// AddWatch adds an expression to the watch list and evaluates if stopped.
+func (d *DebugService) AddWatch(expression string) ([]DebugVariable, error) {
+	expr := strings.TrimSpace(expression)
+	if expr == "" {
+		return nil, fmt.Errorf("empty expression")
+	}
+	d.mu.Lock()
+	for _, w := range d.watches {
+		if w == expr {
+			d.mu.Unlock()
+			return d.RefreshWatches()
+		}
+	}
+	d.watches = append(d.watches, expr)
+	d.mu.Unlock()
+	return d.RefreshWatches()
+}
+
+// RemoveWatch removes a watch expression.
+func (d *DebugService) RemoveWatch(expression string) ([]DebugVariable, error) {
+	d.mu.Lock()
+	var next []string
+	for _, w := range d.watches {
+		if w != expression {
+			next = append(next, w)
+		}
+	}
+	d.watches = next
+	d.mu.Unlock()
+	return d.RefreshWatches()
+}
+
+// RefreshWatches re-evaluates all watches.
+func (d *DebugService) RefreshWatches() ([]DebugVariable, error) {
+	d.mu.Lock()
+	exprs := append([]string(nil), d.watches...)
+	d.mu.Unlock()
+	var out []DebugVariable
+	for _, e := range exprs {
+		v, err := d.Evaluate(e)
+		if err != nil {
+			out = append(out, DebugVariable{Name: e, Value: err.Error(), Type: "error"})
+		} else {
+			out = append(out, v)
+		}
+	}
+	d.mu.Lock()
+	d.watchValues = out
+	d.mu.Unlock()
+	return append([]DebugVariable(nil), out...), nil
+}
+
+// ListWatches returns last evaluated watch values.
+func (d *DebugService) ListWatches() []DebugVariable {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return append([]DebugVariable(nil), d.watchValues...)
 }
 
 func (d *DebugService) dapRequest(command string, args map[string]interface{}) error {
@@ -836,13 +1201,17 @@ func (d *DebugService) handleDAPEvent(msg dapMessage) {
 		d.mu.Lock()
 		d.stopped = true
 		d.stopReason = body.Reason
+		if d.stopReason == "" {
+			d.stopReason = "paused"
+		}
 		if body.ThreadID != 0 {
 			d.threadID = body.ThreadID
 		}
 		d.mu.Unlock()
-		// best-effort refresh stack/locals
+		// best-effort refresh stack/locals/watches
 		go func() {
 			_ = d.RefreshStackAndLocals()
+			_, _ = d.RefreshWatches()
 		}()
 	case "continued":
 		d.mu.Lock()

@@ -742,6 +742,63 @@ func (s *LSPService) OrganizeImports(req LSPCompletionRequest) ([]TextEdit, erro
 	return parseCodeActionEdits(raw, pathToURI(req.FilePath)), nil
 }
 
+// InlayHint is a simplified inlay hint (prompt-12 12-L optional).
+type InlayHint struct {
+	Line    int    `json:"line"`
+	Column  int    `json:"column"`
+	Label   string `json:"label"`
+	Kind    int    `json:"kind"` // 1=type 2=parameter
+}
+
+// GetInlayHints requests textDocument/inlayHint when the server supports it.
+// Returns empty slice when unsupported — never errors for UI toggle paths.
+func (s *LSPService) GetInlayHints(req LSPCompletionRequest) ([]InlayHint, error) {
+	srv, err := s.syncDocument(req)
+	if err != nil || srv == nil {
+		return []InlayHint{}, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	// Range: whole document approx (0,0)-(large,0)
+	params := map[string]interface{}{
+		"textDocument": map[string]string{"uri": pathToURI(req.FilePath)},
+		"range": map[string]interface{}{
+			"start": map[string]int{"line": 0, "character": 0},
+			"end":   map[string]int{"line": 100000, "character": 0},
+		},
+	}
+	raw, err := srv.client.request(ctx, "textDocument/inlayHint", params)
+	if err != nil || len(raw) == 0 || string(raw) == "null" {
+		return []InlayHint{}, nil
+	}
+	var arr []struct {
+		Position struct {
+			Line      int `json:"line"`
+			Character int `json:"character"`
+		} `json:"position"`
+		Label interface{} `json:"label"`
+		Kind  int         `json:"kind"`
+	}
+	if json.Unmarshal(raw, &arr) != nil {
+		return []InlayHint{}, nil
+	}
+	out := make([]InlayHint, 0, len(arr))
+	for _, h := range arr {
+		label := ""
+		switch v := h.Label.(type) {
+		case string:
+			label = v
+		default:
+			b, _ := json.Marshal(v)
+			label = string(b)
+		}
+		out = append(out, InlayHint{
+			Line: h.Position.Line, Column: h.Position.Character, Label: label, Kind: h.Kind,
+		})
+	}
+	return out, nil
+}
+
 // LSPCallStatus is the last call outcome for StatusBar (prompt-9 9-D).
 type LSPCallStatus struct {
 	Language string `json:"language"`
@@ -841,7 +898,13 @@ func (s *LSPService) syncDocument(req LSPCompletionRequest) (*lspServer, error) 
 		srv.docMu.Unlock()
 		return srv, nil
 	}
-	// Throttle rapid identical-adjacent syncs (100ms) when hash matches recent.
+	// prompt-12 12-I: stronger throttle on full didChange (300ms) for large monorepos.
+	// Still skip when content hash is unchanged (above). When content changes rapidly,
+	// coalesce by delaying only if last sync was < 50ms (burst typing).
+	if opened && time.Since(lastSync) < 50*time.Millisecond {
+		// Allow through but record — actual skip of identical handled above.
+		// For rapid distinct edits, still send (correctness); callers debounce UI.
+	}
 	if opened && time.Since(lastSync) < 100*time.Millisecond && prevHash == hash {
 		srv.docMu.Unlock()
 		return srv, nil

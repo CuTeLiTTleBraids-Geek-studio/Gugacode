@@ -58,9 +58,10 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 | **Rename (F2)** | ✅ 多文件预览 + dirty + Save All | ✅ 同上 |
 | Run test (package / file / cursor) | ✅ go-test-pkg + **Test at Cursor**（含 `t.Run`） | ✅ vitest-file + **cursor**（含 `test.each`） |
 | Signature Help / Organize Imports | ✅ | ✅ + auto-import additionalTextEdits |
-| Delve 调试 | ✅ **内嵌 DAP**（断点/F5/单步/栈/变量；需 `dlv`） | — |
-| Coverage gutter | ✅ `go test -coverprofile`（路径规范化防串） | 🟡 可选 lcov / vitest coverage |
-| 多根 go.work / pnpm workspace UX | 🟡 列表 + 切换 active root（cwd） | 🟡 package workspaces 列表 + 切换 |
+| Delve 调试 | ✅ **内嵌 DAP**：断点（含条件/未 verified 可视化）、F5/Restart、单步、栈、locals、watch（需 `dlv`） | 🟡 Node `inspect-brk` MVP（非完整 Chrome DAP） |
+| Coverage gutter | ✅ `go test -coverprofile`（路径规范化） | 🟡 可选 lcov / vitest coverage |
+| live ESLint | — | ✅ 防抖 + hash 跳过 + 单飞（非每键起进程） |
+| 多根 go.work / pnpm | 🟡 切换 active root 并重启 LSP/工具链 | 🟡 package workspaces 列表 + 切换 |
 
 > *Offline-first desktop IDE for Go and TypeScript/JavaScript, with sandboxed AI agents.*  
 > AI 是加速器；**语言服务正确性优先于再堆 Agent 模式**（见 `docs/prompts/prompt-8.md`）。

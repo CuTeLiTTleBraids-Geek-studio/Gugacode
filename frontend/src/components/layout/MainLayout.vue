@@ -145,6 +145,42 @@ const commands = computed<Command[]>(() => {
       },
     },
     {
+      id: "test-explorer-discover",
+      label: "Tests: Discover (unified Run/Debug/Coverage)",
+      action: () => {
+        void import("@/stores/testExplorer").then(({ discoverTests }) => {
+          void discoverTests().then(() => {
+            void import("@/lib/notifications").then(({ notifySuccess, notifyInfo }) => {
+              void import("@/stores/testExplorer").then(({ testExplorerState }) => {
+                notifySuccess(`Found ${testExplorerState.entries.length} tests`);
+                notifyInfo("Use palette: run/debug/coverage at cursor, or Debug Test at Cursor");
+              });
+            });
+          });
+        });
+      },
+    },
+    {
+      id: "debug-restart",
+      label: "Debug: Restart",
+      action: () => {
+        void import("@/stores/debug").then(({ restartDebugSession }) => {
+          void restartDebugSession();
+        });
+      },
+    },
+    {
+      id: "debug-node",
+      label: "Debug: Node current file (inspect-brk)",
+      action: () => {
+        const path = appState.currentFilePath;
+        if (!path) return;
+        void import("@/stores/debug").then(({ launchNodeProgram }) => {
+          void launchNodeProgram(path, []);
+        });
+      },
+    },
+    {
       id: "workspace-next-root",
       label: "Workspace: Next module root",
       action: () => {

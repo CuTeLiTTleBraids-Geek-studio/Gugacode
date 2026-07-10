@@ -549,11 +549,23 @@ type DebugSessionInfo = {
   stopReason?: string;
   threadId?: number;
 };
+type DebugBp = {
+  id: number;
+  file: string;
+  line: number;
+  verified: boolean;
+  condition?: string;
+  logMessage?: string;
+  message?: string;
+};
+type DebugVar = { name: string; value: string; type: string };
 type DebugStateSnapshot = {
   session: DebugSessionInfo;
-  breakpoints: Array<{ id: number; file: string; line: number; verified: boolean }>;
+  breakpoints: DebugBp[];
   stack: Array<{ id: number; name: string; file: string; line: number; column: number }>;
-  locals: Array<{ name: string; value: string; type: string }>;
+  locals: DebugVar[];
+  watches?: DebugVar[];
+  stopReason?: string;
 };
 
 export const debugService = {
@@ -561,37 +573,28 @@ export const debugService = {
   statusMessage: () => DebugServiceBindings.StatusMessage() as Promise<string>,
   isRunning: () => DebugServiceBindings.IsRunning() as Promise<boolean>,
   getSession: () => DebugServiceBindings.GetSession() as Promise<DebugSessionInfo>,
-  getState: () =>
-    (DebugServiceBindings.GetState
-      ? DebugServiceBindings.GetState()
-      : DebugServiceBindings.GetSession().then((s: DebugSessionInfo) => ({
-          session: s,
-          breakpoints: [],
-          stack: [],
-          locals: [],
-        }))) as Promise<DebugStateSnapshot>,
+  getState: () => DebugServiceBindings.GetState() as Promise<DebugStateSnapshot>,
   launchPackage: (packageDir: string) =>
     DebugServiceBindings.LaunchPackage(packageDir) as Promise<DebugSessionInfo>,
   launchTest: (packageDir: string, runRegex: string) =>
     DebugServiceBindings.LaunchTest(packageDir, runRegex) as Promise<DebugSessionInfo>,
+  launchNode: (program: string, args: string[]) =>
+    DebugServiceBindings.LaunchNode(program, args) as Promise<DebugSessionInfo>,
+  launchWithConfig: (cfg: Record<string, unknown>) =>
+    DebugServiceBindings.LaunchWithConfig(cfg) as Promise<DebugSessionInfo>,
+  restart: () => DebugServiceBindings.Restart() as Promise<DebugSessionInfo>,
   stop: () => DebugServiceBindings.Stop() as Promise<void>,
   setBreakpoint: (file: string, line: number) =>
-    DebugServiceBindings.SetBreakpoint(file, line) as Promise<{
-      id: number;
-      file: string;
-      line: number;
-      verified: boolean;
-    }>,
+    DebugServiceBindings.SetBreakpoint(file, line) as Promise<DebugBp>,
+  setBreakpointEx: (file: string, line: number, condition: string, logMessage: string) =>
+    DebugServiceBindings.SetBreakpointEx(file, line, condition, logMessage) as Promise<DebugBp>,
+  setBreakpointCondition: (file: string, line: number, condition: string) =>
+    DebugServiceBindings.SetBreakpointCondition(file, line, condition) as Promise<DebugBp>,
   removeBreakpoint: (file: string, line: number) =>
     DebugServiceBindings.RemoveBreakpoint(file, line) as Promise<void>,
   toggleBreakpoint: (file: string, line: number) =>
-    DebugServiceBindings.ToggleBreakpoint(file, line) as Promise<
-      Array<{ id: number; file: string; line: number; verified: boolean }>
-    >,
-  listBreakpoints: () =>
-    DebugServiceBindings.ListBreakpoints() as Promise<
-      Array<{ id: number; file: string; line: number; verified: boolean }>
-    >,
+    DebugServiceBindings.ToggleBreakpoint(file, line) as Promise<DebugBp[]>,
+  listBreakpoints: () => DebugServiceBindings.ListBreakpoints() as Promise<DebugBp[]>,
   continue: () => DebugServiceBindings.Continue() as Promise<void>,
   stepOver: () => DebugServiceBindings.StepOver() as Promise<void>,
   stepIn: () => DebugServiceBindings.StepIn() as Promise<void>,
@@ -599,6 +602,14 @@ export const debugService = {
   pause: () => DebugServiceBindings.Pause() as Promise<void>,
   refreshStackAndLocals: () => DebugServiceBindings.RefreshStackAndLocals() as Promise<void>,
   selectFrame: (frameId: number) => DebugServiceBindings.SelectFrame(frameId) as Promise<void>,
+  evaluate: (expression: string) =>
+    DebugServiceBindings.Evaluate(expression) as Promise<DebugVar>,
+  addWatch: (expression: string) =>
+    DebugServiceBindings.AddWatch(expression) as Promise<DebugVar[]>,
+  removeWatch: (expression: string) =>
+    DebugServiceBindings.RemoveWatch(expression) as Promise<DebugVar[]>,
+  refreshWatches: () => DebugServiceBindings.RefreshWatches() as Promise<DebugVar[]>,
+  listWatches: () => DebugServiceBindings.ListWatches() as Promise<DebugVar[]>,
 };
 
 export const coverageService = {

@@ -29,6 +29,17 @@
 - Notebook / 完整 `workspaceFolders` 事件流
 - 默认捆绑 Vue/Volar（应作为可选扩展）
 
+## 与核心语言能力解耦（prompt-12 12-M）
+
+| 能力 | 核心内置 | 插件路径 |
+|---|---|---|
+| Go/TS LSP | ✅ gopls / tsserver 包装 | 可注册额外 provider，勿默认覆盖 formatter |
+| 调试 | ✅ 内嵌 DAP（Delve） | 勿再实现第二套调试器服务 |
+| ESLint | 工具链 quiet lint | 可用扩展增强，但核心已 debounce |
+| Vue/React 深支持 | ❌ 非默认 | **必须**插件化（Volar 等） |
+
+核心卖点保持 **Go + TS/JS + AI 沙箱**；横向实验服务禁止进入默认路径（`architecture-boundaries.md`）。
+
 ## 贡献
 
 新增表面前对照 `docs/architecture-boundaries.md`：优先扩展 LSP / Toolchain / Debug，而非新实验服务。

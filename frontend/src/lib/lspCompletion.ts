@@ -259,20 +259,24 @@ export function registerLSPProviders(
             pushOutput("LSP", "warn", `rename: no edits for ${filePath}`);
             return null;
           }
-          // prompt-11 11-C: rename summary — path + edit count + short hunk preview
+          // prompt-11/12: rename summary — edit counts + multi-line hunks (not single truncated line)
           const summaryLines = files.map((f) => {
             const n = f.edits?.length || 0;
-            const first = f.edits?.[0];
-            const hunk =
-              first != null
-                ? ` L${first.startLine + 1}:${(first.newText || "").slice(0, 40).replace(/\n/g, "⏎")}`
-                : "";
-            return `• ${f.filePath}  (${n} edit${n === 1 ? "" : "s"})${hunk}`;
+            const hunks = (f.edits || []).slice(0, 4).map((e) => {
+              const preview = (e.newText || "")
+                .split("\n")
+                .slice(0, 3)
+                .map((l) => l.slice(0, 80))
+                .join(" | ");
+              return `    L${e.startLine + 1}-${e.endLine + 1}: ${preview || "(delete)"}`;
+            });
+            const more = (f.edits?.length || 0) > 4 ? `    … +${(f.edits?.length || 0) - 4} more edits` : "";
+            return `• ${f.filePath}  (${n} edit${n === 1 ? "" : "s"})\n${hunks.join("\n")}${more ? "\n" + more : ""}`;
           });
           const body =
             `Rename will modify ${files.length} file(s):\n\n` +
-            summaryLines.slice(0, 16).join("\n") +
-            (summaryLines.length > 16 ? "\n…" : "") +
+            summaryLines.slice(0, 10).join("\n\n") +
+            (summaryLines.length > 10 ? "\n\n…" : "") +
             `\n\nApply → mark dirty. Save All (Ctrl+K S) writes disk. Failures → Output.`;
           try {
             const { ElMessageBox } = await import("element-plus");

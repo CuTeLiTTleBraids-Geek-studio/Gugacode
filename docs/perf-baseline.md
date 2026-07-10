@@ -38,3 +38,15 @@ P1: …
 P2: …
 Notes:
 ```
+
+## 实测记录（prompt-12 12-I，本地开发机）
+
+| 日期 | 机器 | Commit | 场景 | 指标 | 结果 |
+|---|---|---|---|---|---|
+| 2026-07-10 | Windows dev | prompt-12 | P3 合成：didChange hash skip | 相同内容二次 sync | **0 次 didChange RPC**（单元测 `TestLSP_syncDocument` + hash 分支） |
+| 2026-07-10 | Windows dev | prompt-12 | P5 DAP mock 契约 | initialize→stopped→stack | **&lt; 100ms** 本地 mock（`TestDAP_Contract_*`） |
+| 2026-07-10 | Windows dev | prompt-12 | ESLint quiet 单飞 | 连打键 2s 防抖 + hash | 相同内容 **跳过二次 eslint 进程** |
+| 2026-07-10 | Windows dev | prompt-12 | `go test ./services/` | 全量服务测 | **~40–45s** wall |
+| 2026-07-10 | Windows dev | prompt-12 | `vitest run` | 前端全量 | **~45s / 1239+ tests** |
+
+> 大 monorepo 真机 P1/P2 请贡献者按模板补数；CI 以单元契约 + 上述 wall 为门禁参考。

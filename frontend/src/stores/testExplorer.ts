@@ -1,5 +1,5 @@
 /**
- * prompt-10/11: test explorer with go test -json status (11-F).
+ * prompt-10/11/12: test explorer with go test -json + unified Run/Coverage/Debug (12-J).
  */
 import { reactive } from "vue";
 import { fileService, toolchainService } from "@/api/services";
@@ -32,7 +32,14 @@ const goTestRe = /^\s*func\s+(Test[A-Za-z0-9_]+)/;
 const jsTestRe = /^\s*(?:it|test)(?:\.\w+)?\s*(?:\([^)]*\)\s*)?\(\s*['"`]([^'"`]+)['"`]/;
 
 export async function discoverTests(): Promise<void> {
-  const root = appState.currentProject;
+  // prompt-12 12-H: prefer active workspace root
+  let root = appState.currentProject;
+  try {
+    const { workspaceModulesState } = await import("@/stores/workspaceModules");
+    if (workspaceModulesState.activeRoot) root = workspaceModulesState.activeRoot;
+  } catch {
+    /* ignore */
+  }
   if (!root) {
     testExplorerState.entries = [];
     return;
@@ -101,6 +108,7 @@ export async function discoverTests(): Promise<void> {
   }
 }
 
+/** prompt-12 12-J: Run this test */
 export async function runDiscoveredTest(entry: TestEntry): Promise<void> {
   try {
     entry.status = "run";
@@ -113,15 +121,55 @@ export async function runDiscoveredTest(entry: TestEntry): Promise<void> {
   }
 }
 
-/** prompt-11 11-F: run go test -json for package and update statuses. */
+/** prompt-12 12-J: Debug this test */
+export async function debugDiscoveredTest(entry: TestEntry): Promise<void> {
+  try {
+    const content = await fileService.readFile(entry.file);
+    const { debugTestAtCursor } = await import("@/stores/debug");
+    await debugTestAtCursor(entry.language, entry.file, entry.line, content);
+  } catch (e) {
+    notifyError(e instanceof Error ? e.message : String(e));
+  }
+}
+
+/** prompt-12 12-J: Coverage for package containing this test */
+export async function coverageDiscoveredTest(entry: TestEntry): Promise<void> {
+  try {
+    const dir = entry.file.replace(/[\\/][^\\/]+$/, "");
+    if (entry.language === "go") {
+      const { coverageService } = await import("@/api/services");
+      const { coverageState, normalizeCoveragePath } = await import("@/stores/coverage");
+      coverageState.loading = true;
+      const result = await coverageService.runPackageCoverage(dir);
+      coverageState.hits = (result.hits || []).map((h) => ({
+        file: normalizeCoveragePath(h.file),
+        line: h.line,
+        covered: h.covered,
+      }));
+      coverageState.loading = false;
+      notifySuccess(`Coverage for ${dir}`);
+    } else {
+      const { runVitestCoverage } = await import("@/stores/coverage");
+      await runVitestCoverage();
+    }
+  } catch (e) {
+    notifyError(e instanceof Error ? e.message : String(e));
+  }
+}
+
 export async function runGoTestsJSON(packageDir?: string, runRegex?: string): Promise<void> {
-  const dir = packageDir || appState.currentProject || "";
+  let dir = packageDir || appState.currentProject || "";
+  try {
+    const { workspaceModulesState } = await import("@/stores/workspaceModules");
+    if (!packageDir && workspaceModulesState.activeRoot) dir = workspaceModulesState.activeRoot;
+  } catch {
+    /* ignore */
+  }
   if (!dir) {
     notifyError("Open a Go project first");
     return;
   }
   testExplorerState.running = true;
-  // mark go tests as run
   for (const e of testExplorerState.entries) {
     if (e.language === "go") e.status = "run";
   }
@@ -135,7 +183,6 @@ export async function runGoTestsJSON(packageDir?: string, runRegex?: string): Pr
       if (st === "pass" || st === "fail" || st === "skip" || st === "run") {
         e.status = st;
       } else if (result.success) {
-        // leave as run if not mentioned; treat overall success as pass for package
         e.status = e.status === "run" ? "pass" : e.status;
       } else {
         e.status = e.status === "run" ? "fail" : e.status;

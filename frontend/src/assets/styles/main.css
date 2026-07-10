@@ -1462,3 +1462,10 @@ html[data-editor-bg] .monaco-editor-background {
 .debug-current-glyph {
   border-left: 4px solid #58a6ff;
 }
+
+/* prompt-12 12-A: unverified breakpoint = hollow amber */
+.debug-bp-glyph--unverified {
+  background: transparent !important;
+  border: 2px solid #e3b341;
+  box-sizing: border-box;
+}
