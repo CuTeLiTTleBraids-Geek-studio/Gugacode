@@ -295,12 +295,12 @@ TS：仅简单 `it(`/`test(`，**describe 嵌套、test.each、 vitest 的 `it.s
 ## 11. 附录
 
 ```
-go test ./services/...  → ok (~41s)
+go test ./services/...  → ok (~39s)
 go test .               → ok
 vitest                  → 1235 passed (54 files)
 check-bindings/docs     → ok
-git tag                 → v0.3.0-alpha
-dirty paths             → ~245
+git tag                 → v0.3.0 (+ v0.3.0-alpha)
+working tree            → clean after release commit
 ```
 
 | 阶段 | 语言 IDE 状态 |

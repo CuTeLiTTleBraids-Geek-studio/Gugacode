@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-10
+
 ### Added (prompt-10 — trusted refactor + debug/coverage MVP)
 
 - **10-A Rename preview + Save All** — multi-file confirm dialog; buffers dirty; `saveAllFiles` command.
