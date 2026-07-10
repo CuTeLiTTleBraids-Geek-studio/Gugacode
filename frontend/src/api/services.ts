@@ -477,6 +477,17 @@ export const toolchainService = {
       goplsVersion: string;
       hasGoWork: boolean;
     }>,
+  setWorkspaceRoot: (root: string) =>
+    ToolchainServiceBindings.SetWorkspaceRoot(root) as Promise<void>,
+  // prompt-11 11-F
+  runGoTestsJSON: (packageDir: string, runRegex: string) =>
+    ToolchainServiceBindings.RunGoTestsJSON(packageDir, runRegex) as Promise<{
+      success: boolean;
+      output: string;
+      events: Array<{ action: string; package?: string; test?: string; output?: string; elapsed?: number }>;
+      statusByTest: Record<string, string>;
+      durationMs: number;
+    }>,
 };
 
 export const lspService = {
@@ -528,33 +539,66 @@ export const lspService = {
     LSPServiceBindings.DidSaveDocument(req) as Promise<void>,
 };
 
-// prompt-10 10-G / 10-H
+// prompt-10/11: Delve DAP client (in-IDE)
+type DebugSessionInfo = {
+  running: boolean;
+  address: string;
+  mode: string;
+  message: string;
+  stopped?: boolean;
+  stopReason?: string;
+  threadId?: number;
+};
+type DebugStateSnapshot = {
+  session: DebugSessionInfo;
+  breakpoints: Array<{ id: number; file: string; line: number; verified: boolean }>;
+  stack: Array<{ id: number; name: string; file: string; line: number; column: number }>;
+  locals: Array<{ name: string; value: string; type: string }>;
+};
+
 export const debugService = {
   isAvailable: () => DebugServiceBindings.IsAvailable() as Promise<boolean>,
   statusMessage: () => DebugServiceBindings.StatusMessage() as Promise<string>,
   isRunning: () => DebugServiceBindings.IsRunning() as Promise<boolean>,
-  getSession: () =>
-    DebugServiceBindings.GetSession() as Promise<{
-      running: boolean;
-      address: string;
-      mode: string;
-      message: string;
-    }>,
+  getSession: () => DebugServiceBindings.GetSession() as Promise<DebugSessionInfo>,
+  getState: () =>
+    (DebugServiceBindings.GetState
+      ? DebugServiceBindings.GetState()
+      : DebugServiceBindings.GetSession().then((s: DebugSessionInfo) => ({
+          session: s,
+          breakpoints: [],
+          stack: [],
+          locals: [],
+        }))) as Promise<DebugStateSnapshot>,
   launchPackage: (packageDir: string) =>
-    DebugServiceBindings.LaunchPackage(packageDir) as Promise<{
-      running: boolean;
-      address: string;
-      mode: string;
-      message: string;
-    }>,
+    DebugServiceBindings.LaunchPackage(packageDir) as Promise<DebugSessionInfo>,
   launchTest: (packageDir: string, runRegex: string) =>
-    DebugServiceBindings.LaunchTest(packageDir, runRegex) as Promise<{
-      running: boolean;
-      address: string;
-      mode: string;
-      message: string;
-    }>,
+    DebugServiceBindings.LaunchTest(packageDir, runRegex) as Promise<DebugSessionInfo>,
   stop: () => DebugServiceBindings.Stop() as Promise<void>,
+  setBreakpoint: (file: string, line: number) =>
+    DebugServiceBindings.SetBreakpoint(file, line) as Promise<{
+      id: number;
+      file: string;
+      line: number;
+      verified: boolean;
+    }>,
+  removeBreakpoint: (file: string, line: number) =>
+    DebugServiceBindings.RemoveBreakpoint(file, line) as Promise<void>,
+  toggleBreakpoint: (file: string, line: number) =>
+    DebugServiceBindings.ToggleBreakpoint(file, line) as Promise<
+      Array<{ id: number; file: string; line: number; verified: boolean }>
+    >,
+  listBreakpoints: () =>
+    DebugServiceBindings.ListBreakpoints() as Promise<
+      Array<{ id: number; file: string; line: number; verified: boolean }>
+    >,
+  continue: () => DebugServiceBindings.Continue() as Promise<void>,
+  stepOver: () => DebugServiceBindings.StepOver() as Promise<void>,
+  stepIn: () => DebugServiceBindings.StepIn() as Promise<void>,
+  stepOut: () => DebugServiceBindings.StepOut() as Promise<void>,
+  pause: () => DebugServiceBindings.Pause() as Promise<void>,
+  refreshStackAndLocals: () => DebugServiceBindings.RefreshStackAndLocals() as Promise<void>,
+  selectFrame: (frameId: number) => DebugServiceBindings.SelectFrame(frameId) as Promise<void>,
 };
 
 export const coverageService = {

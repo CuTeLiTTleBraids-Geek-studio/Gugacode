@@ -116,6 +116,44 @@ const commands = computed<Command[]>(() => {
       },
     },
     {
+      id: "coverage-vitest",
+      label: "Coverage: Vitest (lcov)",
+      action: () => {
+        void import("@/stores/coverage").then(({ runVitestCoverage }) => {
+          void runVitestCoverage();
+        });
+      },
+    },
+    {
+      id: "debug-open-panel",
+      label: "Debug: Open Panel",
+      action: () => {
+        appState.terminalVisible = true;
+        appState.bottomPanelView = "debug";
+        void import("@/stores/debug").then(({ refreshDebugStatus }) => {
+          void refreshDebugStatus();
+        });
+      },
+    },
+    {
+      id: "go-test-json",
+      label: "Go: Test JSON (explorer status)",
+      action: () => {
+        void import("@/stores/testExplorer").then(({ discoverTests, runGoTestsJSON }) => {
+          void discoverTests().then(() => runGoTestsJSON());
+        });
+      },
+    },
+    {
+      id: "workspace-next-root",
+      label: "Workspace: Next module root",
+      action: () => {
+        void import("@/stores/workspaceModules").then(({ selectWorkspaceRootInteractive }) => {
+          void selectWorkspaceRootInteractive();
+        });
+      },
+    },
+    {
       id: "test-at-cursor",
       label: t("mainLayout.commandTestAtCursor"),
       shortcut: "Ctrl+Shift+T",
@@ -137,6 +175,22 @@ const commands = computed<Command[]>(() => {
           const line = Math.max(0, (appState.cursorLine || 1) - 1);
           void import("@/stores/toolchain").then(({ runTestAtCursor }) => {
             void runTestAtCursor(lang, path, line, f.content);
+          });
+        });
+      },
+    },
+    {
+      id: "debug-test-at-cursor",
+      label: "Debug Test at Cursor",
+      action: () => {
+        const path = appState.currentFilePath;
+        if (!path) return;
+        void import("@/stores/editor").then(({ activeFile }) => {
+          const f = activeFile.value;
+          if (!f || !path.endsWith(".go")) return;
+          const line = Math.max(0, (appState.cursorLine || 1) - 1);
+          void import("@/stores/debug").then(({ debugTestAtCursor }) => {
+            void debugTestAtCursor("go", path, line, f.content);
           });
         });
       },

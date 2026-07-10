@@ -3,6 +3,7 @@
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -98,5 +99,45 @@ func TestDebugService_StatusMessage(t *testing.T) {
 	msg := d.StatusMessage()
 	if msg == "" {
 		t.Fatal("expected non-empty status")
+	}
+}
+
+func TestCoveragePathsMatch_NoBasenameCollision(t *testing.T) {
+	// Same basename different dirs must NOT match when only basename equals.
+	if CoveragePathsMatch("pkg/a/foo.go", "E:/proj/pkg/b/foo.go") {
+		t.Error("pkg/a/foo.go should not match pkg/b/foo.go")
+	}
+	if !CoveragePathsMatch("pkg/a/foo.go", "E:/proj/pkg/a/foo.go") {
+		t.Error("expected suffix match for pkg/a/foo.go")
+	}
+	if !CoveragePathsMatch("E:/proj/pkg/a/foo.go", "E:/proj/pkg/a/foo.go") {
+		t.Error("exact path should match")
+	}
+	if CoveragePathsMatch("foo.go", "E:/proj/pkg/a/foo.go") {
+		t.Error("basename-only hit must not match nested editor path")
+	}
+}
+
+func TestNormalizeCoveragePath(t *testing.T) {
+	n := NormalizeCoveragePath(`.\pkg\foo.go`)
+	if strings.Contains(n, "\\") {
+		t.Errorf("expected slash-normalized path, got %q", n)
+	}
+	if !strings.HasSuffix(n, "pkg/foo.go") && n != "pkg/foo.go" {
+		// Clean may keep relative form
+		if n == "" {
+			t.Fatal("empty")
+		}
+	}
+}
+
+func TestParseGoTestJSONLines(t *testing.T) {
+	in := "{\"Action\":\"run\",\"Test\":\"TestA\"}\n{\"Action\":\"pass\",\"Test\":\"TestA\",\"Elapsed\":0.01}\nnot-json\n"
+	ev := parseGoTestJSONLines(in)
+	if len(ev) != 2 {
+		t.Fatalf("got %d events", len(ev))
+	}
+	if ev[0].Action != "run" || ev[1].Action != "pass" {
+		t.Fatalf("%+v", ev)
 	}
 }

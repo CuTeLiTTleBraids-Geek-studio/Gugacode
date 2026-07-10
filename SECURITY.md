@@ -1,11 +1,19 @@
 # Security Policy
 
-## Supported Versions
+## Supported Versions（prompt-11 11-M）
 
-| Version | Supported |
-|---|---|
-| 1.0.x | ✅ |
-| < 1.0 | ❌ |
+| Version | Supported | Notes |
+|---|---|---|
+| **0.4.x** (incl. Unreleased / alpha) | ✅ | 当前开发线；安全修复优先 |
+| **0.3.x** | ✅ | 上一稳定标签 `v0.3.0`；关键修复回移视严重性 |
+| **0.2.x 及更早** | ❌ | 请升级 |
+| 1.0.x | 规划中 | 正式 1.0 后按 semver 支持窗口更新本表 |
+
+### 发版周期
+
+- **Patch**（`0.x.Y`）：按需，含安全与回归修复  
+- **Minor**（`0.X.0`）：功能里程碑（如 prompt 轮次）；附 CHANGELOG + Release 资产  
+- **安全响应**：确认后 48h 内 ACK；高危目标 7 日内修复或缓解说明（见下）
 
 ## Reporting a Vulnerability
 
@@ -37,8 +45,9 @@ The CI workflow (`.github/workflows/ci.yml`) enforces the security measures belo
 | ESLint | `frontend-test` | `npm run lint` on the frontend. |
 | Vitest | `frontend-test` | `npx vitest run` across all three platforms. |
 | `wails3 build` | `wails-build` | Full production build (frontend bundling + asset embedding + bindings). |
+| **npm audit high** | `frontend-test` / `npm-audit` | `npm audit --audit-level=high`（阻断） |
 
-CI runs Go build/test **and** frontend checks on Ubuntu, Windows, and macOS so that platform-specific code (`pty_windows.go`, `secrets_windows.go`, etc.) is verified on its target platform. `npm audit` is recommended before releases but is not yet wired into CI.
+CI runs Go build/test **and** frontend checks on Ubuntu, Windows, and macOS so that platform-specific code (`pty_windows.go`, `secrets_windows.go`, etc.) is verified on its target platform.
 
 ## Security Measures
 

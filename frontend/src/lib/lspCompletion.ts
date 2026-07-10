@@ -259,22 +259,40 @@ export function registerLSPProviders(
             pushOutput("LSP", "warn", `rename: no edits for ${filePath}`);
             return null;
           }
-          // 10-A: confirm multi-file list before applying
-          const paths = files.map((f) => f.filePath);
+          // prompt-11 11-C: rename summary — path + edit count + short hunk preview
+          const summaryLines = files.map((f) => {
+            const n = f.edits?.length || 0;
+            const first = f.edits?.[0];
+            const hunk =
+              first != null
+                ? ` L${first.startLine + 1}:${(first.newText || "").slice(0, 40).replace(/\n/g, "⏎")}`
+                : "";
+            return `• ${f.filePath}  (${n} edit${n === 1 ? "" : "s"})${hunk}`;
+          });
+          const body =
+            `Rename will modify ${files.length} file(s):\n\n` +
+            summaryLines.slice(0, 16).join("\n") +
+            (summaryLines.length > 16 ? "\n…" : "") +
+            `\n\nApply → mark dirty. Save All (Ctrl+K S) writes disk. Failures → Output.`;
           try {
             const { ElMessageBox } = await import("element-plus");
-            await ElMessageBox.confirm(
-              `Rename will modify ${paths.length} file(s):\n\n${paths.slice(0, 12).join("\n")}${paths.length > 12 ? "\n…" : ""}\n\nApply edits and mark dirty? Use Save All (Ctrl+K S) to write disk.`,
-              "Rename preview",
-              { type: "warning", confirmButtonText: "Apply", cancelButtonText: "Cancel" },
-            );
+            await ElMessageBox.confirm(body, "Rename preview", {
+              type: "warning",
+              confirmButtonText: "Apply",
+              cancelButtonText: "Cancel",
+              customClass: "rename-preview-box",
+            });
           } catch {
             return null; // user cancelled
           }
-          const n = await applyWorkspaceEdits(files);
+          const { applied, failed } = await applyWorkspaceEditsDetailed(files);
           const { notifySuccess, notifyWarning } = await import("@/lib/notifications");
-          if (n > 0) {
-            notifySuccess(`Rename applied to ${n} file(s) (dirty — Save All to persist)`);
+          const { pushOutput } = await import("@/stores/output");
+          if (failed.length) {
+            pushOutput("LSP", "error", `rename failed:\n${failed.join("\n")}`);
+            notifyWarning(`Rename: ${applied} ok, ${failed.length} failed (see Output)`);
+          } else if (applied > 0) {
+            notifySuccess(`Rename applied to ${applied} file(s) (dirty — Save All to persist)`);
           } else {
             notifyWarning("Rename could not apply any file edits");
           }
@@ -382,29 +400,39 @@ export async function formatActiveDocument(
 }
 
 /**
- * Apply multi-file rename edits (prompt-9 9-B). Opens files as needed via updateContent/openFile.
+ * Apply multi-file rename edits (prompt-9 9-B / 11-C). Opens files as needed via updateContent/openFile.
  */
 export async function applyWorkspaceEdits(
   files: Array<{ filePath: string; edits: Array<{ startLine: number; startCol: number; endLine: number; endCol: number; newText: string }> }>,
 ): Promise<number> {
+  const { applied } = await applyWorkspaceEditsDetailed(files);
+  return applied;
+}
+
+/** prompt-11 11-C: returns applied count + failed paths for Output. */
+export async function applyWorkspaceEditsDetailed(
+  files: Array<{ filePath: string; edits: Array<{ startLine: number; startCol: number; endLine: number; endCol: number; newText: string }> }>,
+): Promise<{ applied: number; failed: string[] }> {
   let applied = 0;
+  const failed: string[] = [];
   const { openFileFromPath } = await import("@/stores/editor");
   const { fileService } = await import("@/api/services");
   for (const f of files) {
     if (!f.edits?.length) continue;
-    let content = editorState.openFiles.find((o) => o.path === f.filePath)?.content;
-    if (content == null) {
-      try {
+    try {
+      let content = editorState.openFiles.find((o) => o.path === f.filePath)?.content;
+      if (content == null) {
         content = await fileService.readFile(f.filePath);
         await openFileFromPath(f.filePath);
-      } catch {
-        continue;
       }
+      const next = applyTextEditsToContent(content, f.edits);
+      if (updateContent(f.filePath, next)) applied += 1;
+      else failed.push(`${f.filePath}: updateContent failed`);
+    } catch (e) {
+      failed.push(`${f.filePath}: ${e instanceof Error ? e.message : String(e)}`);
     }
-    const next = applyTextEditsToContent(content, f.edits);
-    if (updateContent(f.filePath, next)) applied += 1;
   }
-  return applied;
+  return { applied, failed };
 }
 
 export { closeLSPDocument };

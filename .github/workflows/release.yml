@@ -75,18 +75,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # MED-07: a tag release must never publish unsigned artifacts.
-      # Fail fast when the signing secrets required for this platform are
-      # missing, instead of silently producing an unsigned build.
+      # prompt-11 11-E: signing is preferred but optional for community OSS
+      # releases so multi-platform artifacts + SHA256 always publish.
+      # Set REQUIRE_CODE_SIGN=true on the environment to fail without secrets.
       - name: Verify code-signing secrets (Windows)
         if: matrix.os == 'windows-latest'
         shell: bash
         run: |
           if [ -z "$WINDOWS_CERT_PFX" ] || [ -z "$WINDOWS_CERT_PASSWORD" ]; then
-            echo "::error::Windows code-signing secrets (WINDOWS_CERT_PFX / WINDOWS_CERT_PASSWORD) are not configured. Tag releases must be signed."
-            exit 1
+            if [ "${REQUIRE_CODE_SIGN:-}" = "true" ]; then
+              echo "::error::Windows code-signing secrets missing and REQUIRE_CODE_SIGN=true."
+              exit 1
+            fi
+            echo "::warning::Windows signing secrets missing — publishing UNSIGNED artifact (SHA256 still generated)."
+          else
+            echo "Windows signing secrets present."
           fi
-          echo "Windows signing secrets present."
 
       - name: Verify code-signing secrets (macOS)
         if: matrix.os == 'macos-latest'
@@ -95,10 +99,14 @@ jobs:
           if [ -z "$MACOS_CERT_P12" ] || [ -z "$MACOS_CERT_PASSWORD" ] || \
              [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || \
              [ -z "$APPLE_TEAM_ID" ]; then
-            echo "::error::macOS code-signing secrets (MACOS_CERT_P12 / MACOS_CERT_PASSWORD / APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID) are not configured. Tag releases must be signed."
-            exit 1
+            if [ "${REQUIRE_CODE_SIGN:-}" = "true" ]; then
+              echo "::error::macOS code-signing secrets missing and REQUIRE_CODE_SIGN=true."
+              exit 1
+            fi
+            echo "::warning::macOS signing secrets missing — publishing UNSIGNED artifact (SHA256 still generated)."
+          else
+            echo "macOS signing secrets present."
           fi
-          echo "macOS signing secrets present."
 
       - name: Set up Go
         uses: actions/setup-go@v5

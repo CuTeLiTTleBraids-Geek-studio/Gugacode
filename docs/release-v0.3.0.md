@@ -38,7 +38,18 @@ syft dir:. -o spdx-json > sbom.spdx.json
 ## Tag
 
 - `v0.3.0-alpha` — prompt-9 日用闭环  
-- `v0.3.0` — prompt-10 可信重构 + Debug/Coverage MVP  
+- `v0.3.0` — prompt-10 可信重构 + Coverage MVP  
+- 下一标签：`v0.4.0-alpha` — prompt-11 内嵌 DAP + 诊断/覆盖率深化（见 CHANGELOG Unreleased）
+
+## GitHub Release 自动化（prompt-11 11-E）
+
+推送 `v*.*.*` tag 触发 `.github/workflows/release.yml`：
+
+1. 矩阵构建 Windows / Linux / macOS(amd64+arm64)  
+2. 每产物生成 `.sha256`，汇总 `SHA256SUMS`  
+3. `softprops/action-gh-release`（或等价步骤）挂到 Release 页  
+
+签名：有证书 secrets 则签；缺失时默认仍发布**未签名**产物 + 校验和（设 `REQUIRE_CODE_SIGN=true` 可强制失败）。
 
 ## 安装后 10 分钟
 

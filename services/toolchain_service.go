@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -486,6 +487,95 @@ func findTestNameAtLine(language, content string, line int) string {
 		}
 	}
 	return ""
+}
+
+// GoTestJSONEvent is one line of `go test -json` output (prompt-11 11-F).
+type GoTestJSONEvent struct {
+	Time    string  `json:"time,omitempty"`
+	Action  string  `json:"action"` // run|pass|fail|skip|output|start
+	Package string  `json:"package,omitempty"`
+	Test    string  `json:"test,omitempty"`
+	Output  string  `json:"output,omitempty"`
+	Elapsed float64 `json:"elapsed,omitempty"`
+}
+
+// GoTestJSONResult aggregates structured test run status for the test explorer.
+type GoTestJSONResult struct {
+	Success bool              `json:"success"`
+	Output  string            `json:"output"`
+	Events  []GoTestJSONEvent `json:"events"`
+	// StatusByTest maps "Package::TestName" or TestName → pass|fail|skip|run
+	StatusByTest map[string]string `json:"statusByTest"`
+	DurationMs   int64             `json:"durationMs"`
+}
+
+// RunGoTestsJSON runs `go test -json` in packageDir (prompt-11 11-F).
+func (s *ToolchainService) RunGoTestsJSON(packageDir, runRegex string) (GoTestJSONResult, error) {
+	dir := packageDir
+	if dir == "" {
+		s.mu.Lock()
+		dir = s.workspaceRoot
+		s.mu.Unlock()
+	}
+	if dir == "" {
+		return GoTestJSONResult{Success: false, Output: "no package directory"}, nil
+	}
+	if abs, err := filepath.Abs(dir); err == nil {
+		dir = abs
+	}
+	goBin := s.resolveTool("go")
+	if goBin == "" {
+		return GoTestJSONResult{Success: false, Output: "go not found"}, nil
+	}
+	args := []string{"test", "-json", "-count=1"}
+	if runRegex != "" {
+		args = append(args, "-run", runRegex)
+	}
+	args = append(args, ".")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, goBin, args...)
+	cmd.Dir = dir
+	start := time.Now()
+	out, err := cmd.CombinedOutput()
+	events := parseGoTestJSONLines(string(out))
+	status := map[string]string{}
+	for _, e := range events {
+		if e.Test == "" {
+			continue
+		}
+		key := e.Test
+		if e.Package != "" {
+			key = e.Package + "::" + e.Test
+		}
+		switch e.Action {
+		case "pass", "fail", "skip", "run":
+			status[key] = e.Action
+			status[e.Test] = e.Action
+		}
+	}
+	return GoTestJSONResult{
+		Success:      err == nil,
+		Output:       string(out),
+		Events:       events,
+		StatusByTest: status,
+		DurationMs:   time.Since(start).Milliseconds(),
+	}, nil
+}
+
+func parseGoTestJSONLines(output string) []GoTestJSONEvent {
+	var events []GoTestJSONEvent
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || line[0] != '{' {
+			continue
+		}
+		var e GoTestJSONEvent
+		if json.Unmarshal([]byte(line), &e) == nil && e.Action != "" {
+			events = append(events, e)
+		}
+	}
+	return events
 }
 
 // parseGoTestFailures extracts file:line from go test failure output (9-C/9-J).

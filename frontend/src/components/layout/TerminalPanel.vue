@@ -35,9 +35,10 @@ import {
 } from "@/stores/workflows";
 import { openFileFromPath } from "@/stores/editor";
 import { useI18n } from "@/lib/i18n";
+import DebugPanel from "@/components/layout/DebugPanel.vue";
 import "@xterm/xterm/css/xterm.css";
 
-type PanelView = "terminal" | "output" | "problems" | "tasks" | "workflows";
+type PanelView = "terminal" | "output" | "problems" | "tasks" | "workflows" | "debug";
 
 const { t } = useI18n();
 
@@ -278,7 +279,7 @@ function handleSelectTab(sessionId: string) {
 // N-141: roving tabindex for the panel view tablist. ArrowLeft/ArrowRight
 // move focus and selection among the 5 view tabs (terminal/output/problems/
 // tasks/workflows). Home/End jump to the first/last tab.
-const viewTabs: PanelView[] = ["terminal", "output", "problems", "tasks", "workflows"];
+const viewTabs: PanelView[] = ["terminal", "output", "problems", "debug", "tasks", "workflows"];
 function handleViewTabKeydown(e: KeyboardEvent) {
   const idx = viewTabs.indexOf(activeView.value);
   if (idx < 0) return;
@@ -405,7 +406,14 @@ watch(activeView, (v) => {
 watch(
   () => appState.bottomPanelView,
   (v) => {
-    if (v === "output" || v === "problems" || v === "terminal" || v === "tasks" || v === "workflows") {
+    if (
+      v === "output" ||
+      v === "problems" ||
+      v === "terminal" ||
+      v === "tasks" ||
+      v === "workflows" ||
+      v === "debug"
+    ) {
       activeView.value = v;
       appState.bottomPanelView = "";
     }
@@ -568,6 +576,17 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="terminal-panel__view-tab"
+            :class="{ 'terminal-panel__view-tab--active': activeView === 'debug' }"
+            role="tab"
+            :tabindex="activeView === 'debug' ? 0 : -1"
+            :aria-selected="activeView === 'debug'"
+            @click="activeView = 'debug'"
+          >
+            Debug
+          </button>
+          <button
+            type="button"
+            class="terminal-panel__view-tab"
             :class="{ 'terminal-panel__view-tab--active': activeView === 'tasks' }"
             role="tab"
             :tabindex="activeView === 'tasks' ? 0 : -1"
@@ -711,6 +730,11 @@ onBeforeUnmount(() => {
             <span class="problem-row__location">{{ p.file }}:{{ p.line }}:{{ p.column }}</span>
           </button>
         </div>
+      </div>
+
+      <!-- prompt-11 11-A: Debug DAP panel -->
+      <div v-if="activeView === 'debug'" class="terminal-panel__body terminal-panel__debug">
+        <DebugPanel />
       </div>
 
       <!-- Tasks view -->

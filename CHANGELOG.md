@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added (prompt-11 — in-IDE DAP + language depth)
+
+- **11-A In-IDE DAP client** — `dlv dap` + embedded client: breakpoints (F9/glyph), F5 start/continue, step over/in/out, call stack, locals; Debug bottom panel.
+- **11-B Coverage path normalization** — no basename-only gutter bleed; unit tests (Go + vitest).
+- **11-C Rename summary preview** — per-file edit counts + short hunk; failed paths → Output.
+- **11-D ESLint live diagnostics** — debounced quiet `eslint-file` while typing (not only on save).
+- **11-E Release artifacts** — multi-platform Release keeps SHA256; code-sign optional unless `REQUIRE_CODE_SIGN=true`.
+- **11-F** `go test -json` + test explorer status mapping.
+- **11-G** Debug Test at Cursor (Go).
+- **11-H** Vitest/lcov coverage gutter (optional).
+- **11-I** go.work / package workspace root switch (toolchain/coverage cwd).
+- **11-J** typing diagnostics debounce (~1s) via LSP Problems refresh.
+- **11-K/L/M/N** `docs/perf-baseline.md`, `docs/plugin-api-core.md`, SECURITY support table, `scripts/dev-setup.*`.
+
 ## [0.3.0] — 2026-07-10
 
 ### Added (prompt-10 — trusted refactor + debug/coverage MVP)

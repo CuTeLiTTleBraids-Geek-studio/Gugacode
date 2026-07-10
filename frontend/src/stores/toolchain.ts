@@ -91,6 +91,68 @@ export async function runToolchainCommand(cmdId: string, filePath?: string): Pro
 }
 
 /**
+ * prompt-11 11-D: quiet ESLint/live diagnostics — no focus steal, merge problems for one file.
+ * Skips if another toolchain command is already running.
+ */
+export async function runToolchainCommandQuiet(
+  cmdId: string,
+  filePath?: string,
+): Promise<ToolchainResult | null> {
+  if (toolchainState.running) return null;
+  toolchainState.running = true;
+  toolchainState.runningId = cmdId;
+  try {
+    const result = await toolchainService.runToolchainCommand(cmdId, filePath ?? "");
+    // Merge diagnostics for this file only; do not clear other Problems.
+    const fromBackend = result.errors ?? [];
+    const fromOutput =
+      fromBackend.length === 0 && result.output
+        ? parseToolOutputToProblems(result.output, sourceLabel(cmdId))
+        : [];
+    const diags = fromBackend.length ? fromBackend : fromOutput.map((p) => ({
+      severity: p.severity,
+      file: p.file,
+      line: p.line,
+      column: p.column,
+      message: p.message,
+      source: p.source,
+    }));
+    if (filePath) {
+      const { outputState } = await import("@/stores/output");
+      outputState.problems = outputState.problems.filter(
+        (p) =>
+          p.source !== "eslint" &&
+          p.file !== filePath &&
+          !filePath.endsWith(p.file) &&
+          !p.file.endsWith(filePath),
+      );
+    }
+    for (const d of diags) {
+      const sev =
+        d.severity === "error" || d.severity === "warning" || d.severity === "info" || d.severity === "hint"
+          ? d.severity
+          : d.severity === "error"
+            ? "error"
+            : "warning";
+      pushProblem(
+        sev as "error" | "warning" | "info" | "hint",
+        d.file || filePath || "",
+        d.line,
+        d.column,
+        d.message,
+        d.source || "eslint",
+      );
+    }
+    return result;
+  } catch {
+    return null;
+  } finally {
+    toolchainState.running = false;
+    toolchainState.runningId = null;
+  }
+}
+
+/**
  * prompt-9 9-C / 9-H: run the test at the given 0-based line.
  */
 export async function runTestAtCursor(

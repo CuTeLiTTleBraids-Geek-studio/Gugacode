@@ -9,7 +9,7 @@
 | **核心 IDE** | File, Project, Settings, Window, Terminal, Git, Search, LSP, Toolchain, Editor 路径相关 | 默认启用；变更需测试 |
 | **AI** | AI, Conversation, Agent, Preset, Rules | 安全门禁（审批、密钥、沙箱）不可放松 |
 | **双窗** | Window AI APIs + 事件 | 见 `docs/ai-windows.md` |
-| **调试/质量** | Debug (Delve headless), Coverage | MVP；完整 DAP/UI 迭代 |
+| **调试/质量** | Debug (内嵌 DAP via `dlv dap`), Coverage | 11-A 断点/单步/栈/变量；勿再加非语言调试服务 |
 | **实验** | Computer Use, IM, Marketplace 深度 | 默认 Experimental UI；勿进主路径卖点 |
 | **避免** | 再新增完整「模式」服务 | 优先扩展 Toolchain/LSP/Debug |
 
@@ -19,7 +19,7 @@
 |---|---|---|
 | **编辑核心** | editor, app, lsp, toolchain, output | 保存/诊断/工具链闭环 |
 | **AI** | ai, agent, … | 与 editor 解耦；事件 SSOT |
-| **调试** | debug, coverage, testExplorer | 可演示 MVP |
+| **调试** | debug, coverage, testExplorer, workspaceModules | DAP 面板 + 覆盖率 gutter + 测试树 |
 | **实验** | computerUse, im, … | 设置「实验」分组 |
 
 ## 贡献检查

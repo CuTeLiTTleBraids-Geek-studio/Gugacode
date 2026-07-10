@@ -308,6 +308,9 @@ const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 function mountTerminalPanel() {
   return mount(TerminalPanel, {
     global: {
+      stubs: {
+        DebugPanel: { template: "<div class=\"debug-panel-stub\" />" },
+      },
       plugins: [ElementPlus, iconPlugin],
     },
   });
@@ -406,9 +409,9 @@ describe("TerminalPanel", () => {
 
     // 面板根节点存在
     expect(wrapper.find(".terminal-panel").exists()).toBe(true);
-    // 5 个视图标签：terminal / output / problems / tasks / workflows
+    // 6 个视图标签：terminal / output / problems / debug / tasks / workflows
     const viewTabs = wrapper.findAll(".terminal-panel__view-tab");
-    expect(viewTabs.length).toBe(5);
+    expect(viewTabs.length).toBe(6);
     // 默认激活 terminal 视图
     expect(wrapper.text()).toContain("Terminal");
   });

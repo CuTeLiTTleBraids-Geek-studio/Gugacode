@@ -1,62 +1,129 @@
 /**
- * prompt-10 10-L: lightweight go.work / package.json workspace awareness.
+ * prompt-10 10-L + prompt-11 11-I: go.work / package.json multi-root awareness + switch.
  */
 import { reactive } from "vue";
-import { fileService } from "@/api/services";
+import { fileService, lspService, toolchainService, coverageService } from "@/api/services";
 import { appState } from "@/stores/app";
 import { runtimeVersions } from "@/stores/toolchain";
+import { notifySuccess, notifyError } from "@/lib/notifications";
+import { pushOutput } from "@/stores/output";
 
 export const workspaceModulesState = reactive({
   goWorkModules: [] as string[],
   packageWorkspaces: [] as string[],
+  /** Absolute paths of selectable roots */
+  roots: [] as string[],
+  activeRoot: "" as string,
   loading: false,
 });
+
+function joinRoot(root: string, rel: string): string {
+  const r = root.replace(/[\\/]$/, "");
+  const p = rel.replace(/^[\\/]/, "").replace(/"/g, "");
+  if (p.startsWith("/") || /^[A-Za-z]:/.test(p)) return p;
+  return r + "/" + p;
+}
 
 export async function refreshWorkspaceModules(): Promise<void> {
   const root = appState.currentProject;
   if (!root) {
     workspaceModulesState.goWorkModules = [];
     workspaceModulesState.packageWorkspaces = [];
+    workspaceModulesState.roots = [];
     return;
   }
   workspaceModulesState.loading = true;
   try {
+    const roots = new Set<string>([root.replace(/[\\/]$/, "")]);
     // go.work
-    if (runtimeVersions.hasGoWork) {
-      try {
-        const text = await fileService.readFile(root.replace(/[\\/]$/, "") + "/go.work");
-        const mods: string[] = [];
-        for (const line of text.split(/\r?\n/)) {
-          const t = line.trim();
-          if (!t || t.startsWith("//") || t.startsWith("go ") || t === "use (" || t === ")") continue;
-          if (t.startsWith("use ")) {
-            mods.push(t.slice(4).trim().replace(/^"|"$/g, ""));
-          } else if (!t.includes(" ")) {
-            mods.push(t.replace(/^"|"$/g, ""));
-          }
+    try {
+      const text = await fileService.readFile(root.replace(/[\\/]$/, "") + "/go.work");
+      const mods: string[] = [];
+      for (const line of text.split(/\r?\n/)) {
+        const t = line.trim();
+        if (!t || t.startsWith("//") || t.startsWith("go ") || t === "use (" || t === ")") continue;
+        if (t.startsWith("use ")) {
+          mods.push(t.slice(4).trim().replace(/^"|"$/g, ""));
+        } else if (!t.includes(" ")) {
+          mods.push(t.replace(/^"|"$/g, ""));
         }
-        workspaceModulesState.goWorkModules = mods;
-      } catch {
-        workspaceModulesState.goWorkModules = [];
       }
-    } else {
+      workspaceModulesState.goWorkModules = mods;
+      for (const m of mods) roots.add(joinRoot(root, m));
+    } catch {
       workspaceModulesState.goWorkModules = [];
     }
     // package.json workspaces
     try {
       const pkg = await fileService.readFile(root.replace(/[\\/]$/, "") + "/package.json");
       const j = JSON.parse(pkg) as { workspaces?: string[] | { packages?: string[] } };
-      if (Array.isArray(j.workspaces)) {
-        workspaceModulesState.packageWorkspaces = j.workspaces;
-      } else if (j.workspaces && Array.isArray(j.workspaces.packages)) {
-        workspaceModulesState.packageWorkspaces = j.workspaces.packages;
-      } else {
-        workspaceModulesState.packageWorkspaces = [];
+      let list: string[] = [];
+      if (Array.isArray(j.workspaces)) list = j.workspaces;
+      else if (j.workspaces && Array.isArray(j.workspaces.packages)) list = j.workspaces.packages;
+      workspaceModulesState.packageWorkspaces = list;
+      for (const m of list) {
+        // skip globs for absolute root list (keep pattern for display)
+        if (!m.includes("*")) roots.add(joinRoot(root, m));
       }
     } catch {
       workspaceModulesState.packageWorkspaces = [];
     }
+    workspaceModulesState.roots = Array.from(roots);
+    if (!workspaceModulesState.activeRoot) {
+      workspaceModulesState.activeRoot = root.replace(/[\\/]$/, "");
+    }
   } finally {
     workspaceModulesState.loading = false;
   }
+}
+
+/**
+ * prompt-11 11-I: switch active module/workspace root for toolchain + coverage cwd.
+ * LSP restarts best-effort when root changes.
+ */
+export async function setActiveWorkspaceRoot(absPath: string): Promise<void> {
+  const path = absPath.replace(/[\\/]$/, "");
+  if (!path) return;
+  workspaceModulesState.activeRoot = path;
+  try {
+    await toolchainService.setWorkspaceRoot(path);
+  } catch {
+    /* ignore */
+  }
+  try {
+    await coverageService.setWorkspaceRoot(path);
+  } catch {
+    /* ignore */
+  }
+  // Point project tools at sub-root for gopls when user selects a go.work module
+  try {
+    // soft: restart go/ts servers against new root if API exists
+    const anyLsp = lspService as unknown as {
+      setWorkspaceRoot?: (r: string) => Promise<void>;
+      stopServer?: (lang: string) => Promise<void>;
+    };
+    if (anyLsp.setWorkspaceRoot) await anyLsp.setWorkspaceRoot(path);
+    else if (anyLsp.stopServer) {
+      await anyLsp.stopServer("go");
+      await anyLsp.stopServer("typescript");
+    }
+  } catch {
+    /* best-effort */
+  }
+  pushOutput("Workspace", "info", `Active root → ${path}`);
+  notifySuccess(`Workspace root: ${path}`);
+}
+
+export async function selectWorkspaceRootInteractive(): Promise<void> {
+  await refreshWorkspaceModules();
+  const roots = workspaceModulesState.roots;
+  if (roots.length <= 1) {
+    notifyError("No additional go.work / package workspaces detected");
+    return;
+  }
+  // Simple cycle for palette without full UI: pick next root
+  const cur = workspaceModulesState.activeRoot || appState.currentProject || "";
+  const idx = roots.findIndex((r) => r.replace(/\\/g, "/") === cur.replace(/\\/g, "/"));
+  const next = roots[(idx + 1) % roots.length];
+  await setActiveWorkspaceRoot(next);
 }

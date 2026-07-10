@@ -12,11 +12,54 @@ import (
 	"time"
 )
 
-// CoverageHit is a simplified per-line coverage flag for gutter UI (prompt-9/10).
+// CoverageHit is a simplified per-line coverage flag for gutter UI (prompt-9/10/11).
+// File is always stored as a cleaned slash-normalized path (may still be package-relative).
 type CoverageHit struct {
 	File    string `json:"file"`
 	Line    int    `json:"line"`
 	Covered bool   `json:"covered"`
+}
+
+// NormalizeCoveragePath cleans and slash-normalizes a coverprofile path so
+// same-basename files under different directories do not collide (prompt-11 11-B).
+func NormalizeCoveragePath(p string) string {
+	if p == "" {
+		return ""
+	}
+	// Windows drive paths: keep as-is after Clean; always use forward slashes.
+	p = filepath.Clean(p)
+	p = strings.ReplaceAll(p, "\\", "/")
+	// strip redundant ./ prefix
+	p = strings.TrimPrefix(p, "./")
+	return p
+}
+
+// CoveragePathsMatch reports whether a cover hit path refers to the same file
+// as editorPath. Never matches on basename alone when either side has directories
+// (prompt-11 11-B — avoid cross-package gutter bleed).
+func CoveragePathsMatch(hitPath, editorPath string) bool {
+	h := NormalizeCoveragePath(hitPath)
+	e := NormalizeCoveragePath(editorPath)
+	if h == "" || e == "" {
+		return false
+	}
+	if strings.EqualFold(h, e) {
+		return true
+	}
+	hParts := strings.Split(h, "/")
+	eParts := strings.Split(e, "/")
+	// Basename-only paths only match other basename-only paths.
+	if len(hParts) == 1 || len(eParts) == 1 {
+		return len(hParts) == 1 && len(eParts) == 1 && strings.EqualFold(h, e)
+	}
+	// Prefer full relative suffix (pkg/a/foo.go vs /abs/pkg/a/foo.go).
+	hl, el := strings.ToLower(h), strings.ToLower(e)
+	if strings.HasSuffix(el, "/"+hl) || strings.HasSuffix(hl, "/"+el) {
+		return true
+	}
+	// Require last two path segments (dir + file) to match.
+	return strings.EqualFold(hParts[len(hParts)-1], eParts[len(eParts)-1]) &&
+		strings.EqualFold(hParts[len(hParts)-2], eParts[len(eParts)-2])
 }
 
 // CoverageRunResult is returned after go test -coverprofile (prompt-10 10-H).
@@ -88,9 +131,10 @@ func (c *CoverageService) ParseCoverProfile(profilePath string) ([]CoverageHit, 
 			endLine, _ = strconv.Atoi(end[:endDot])
 		}
 		covered := count > 0
+		normFile := NormalizeCoveragePath(file)
 		for ln := startLine; ln <= endLine; ln++ {
 			out = append(out, CoverageHit{
-				File:    filepath.Clean(file),
+				File:    normFile,
 				Line:    ln,
 				Covered: covered,
 			})

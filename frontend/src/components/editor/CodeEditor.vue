@@ -189,6 +189,53 @@ function registerContextMenuActions(editor: monacoEditor.editor.IStandaloneCodeE
       });
     },
   });
+  // prompt-11 11-G: Debug Test at Cursor
+  if (lang === "go") {
+    editor.addAction({
+      id: "tc-debug-test-at-cursor",
+      label: "Debug Test at Cursor",
+      contextMenuGroupId: "toolchain",
+      contextMenuOrder: 21,
+      run: (ed) => {
+        const filePath = appState.currentFilePath ?? props.path ?? "";
+        const model = ed.getModel();
+        if (!model || !filePath) return;
+        const pos = ed.getPosition();
+        const line = pos ? pos.lineNumber - 1 : 0;
+        void import("@/stores/debug").then(({ debugTestAtCursor }) => {
+          void debugTestAtCursor("go", filePath, line, model.getValue());
+        });
+      },
+    });
+  }
+  // prompt-11 11-A: F5 start debug package; F9 toggle breakpoint
+  editor.addAction({
+    id: "debug-start",
+    label: "Debug: Start (F5)",
+    keybindings: [16 /* F5 */],
+    run: () => {
+      void import("@/stores/debug").then(({ launchDebugPackage, debugContinue, debugState }) => {
+        if (debugState.running && debugState.stopped) {
+          void debugContinue();
+        } else if (!debugState.running) {
+          void launchDebugPackage();
+        }
+      });
+    },
+  });
+  editor.addAction({
+    id: "debug-toggle-bp",
+    label: "Debug: Toggle Breakpoint (F9)",
+    keybindings: [20 /* F9 */],
+    run: (ed) => {
+      const filePath = appState.currentFilePath ?? props.path ?? "";
+      const pos = ed.getPosition();
+      if (!filePath || !pos) return;
+      void import("@/stores/debug").then(({ toggleBreakpoint }) => {
+        void toggleBreakpoint(filePath, pos.lineNumber);
+      });
+    },
+  });
 }
 
 function registerInlineCompletionProvider(
@@ -260,6 +307,10 @@ const lspProvidersDisposable = ref<monacoEditor.IDisposable | null>(null);
 const cursorListener = ref<monacoEditor.IDisposable | null>(null);
 
 let coverageDecorations: string[] = [];
+let breakpointDecorations: string[] = [];
+let debugLineDecorations: string[] = [];
+let eslintDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let typingDiagTimer: ReturnType<typeof setTimeout> | null = null;
 
 function applyCoverageDecorations(
   editor: monacoEditor.editor.IStandaloneCodeEditor,
@@ -283,13 +334,105 @@ function applyCoverageDecorations(
   });
 }
 
+function applyBreakpointDecorations(
+  editor: monacoEditor.editor.IStandaloneCodeEditor,
+  monaco: typeof import("monaco-editor"),
+) {
+  void import("@/stores/debug").then(({ breakpointsForFile }) => {
+    const bps = breakpointsForFile(props.path || "");
+    const decs: monacoEditor.editor.IModelDeltaDecoration[] = bps.map((b) => ({
+      range: new monaco.Range(b.line, 1, b.line, 1),
+      options: {
+        isWholeLine: false,
+        glyphMarginClassName: b.verified ? "debug-bp-glyph" : "debug-bp-glyph debug-bp-glyph--unverified",
+        glyphMarginHoverMessage: { value: `Breakpoint L${b.line}` },
+      },
+    }));
+    breakpointDecorations = editor.deltaDecorations(breakpointDecorations, decs);
+  });
+}
+
+function applyDebugLineDecoration(
+  editor: monacoEditor.editor.IStandaloneCodeEditor,
+  monaco: typeof import("monaco-editor"),
+) {
+  void import("@/stores/debug").then(({ debugState }) => {
+    const frame = debugState.stack[0];
+    const path = (props.path || "").replace(/\\/g, "/").toLowerCase();
+    if (!debugState.stopped || !frame?.file || !frame.line) {
+      debugLineDecorations = editor.deltaDecorations(debugLineDecorations, []);
+      return;
+    }
+    const f = frame.file.replace(/\\/g, "/").toLowerCase();
+    if (!(path === f || path.endsWith(f) || f.endsWith(path))) {
+      debugLineDecorations = editor.deltaDecorations(debugLineDecorations, []);
+      return;
+    }
+    debugLineDecorations = editor.deltaDecorations(debugLineDecorations, [
+      {
+        range: new monaco.Range(frame.line, 1, frame.line, 1),
+        options: {
+          isWholeLine: true,
+          className: "debug-current-line",
+          glyphMarginClassName: "debug-current-glyph",
+        },
+      },
+    ]);
+  });
+}
+
+/** prompt-11 11-D / 11-J: debounced ESLint + LSP diagnostics while typing. */
+function scheduleLiveDiagnostics(content: string) {
+  const filePath = props.path || "";
+  const lang = resolvedLanguage.value;
+  if (!filePath) return;
+  if (typingDiagTimer) clearTimeout(typingDiagTimer);
+  typingDiagTimer = setTimeout(() => {
+    const lspLang =
+      lang === "go" || lang === "typescript" || lang === "javascript"
+        ? lang
+        : lang === "typescriptreact"
+          ? "typescript"
+          : lang === "javascriptreact"
+            ? "javascript"
+            : "";
+    if (lspLang) {
+      void import("@/stores/lsp").then(({ refreshDiagnosticsToProblems }) => {
+        void refreshDiagnosticsToProblems(lspLang, filePath, content);
+      });
+    }
+  }, 900);
+  if (lang === "typescript" || lang === "javascript" || lang === "typescriptreact" || lang === "javascriptreact") {
+    if (eslintDebounceTimer) clearTimeout(eslintDebounceTimer);
+    eslintDebounceTimer = setTimeout(() => {
+      void import("@/stores/toolchain").then(({ runToolchainCommandQuiet }) => {
+        void runToolchainCommandQuiet("eslint-file", filePath);
+      });
+    }, 1200);
+  }
+}
+
 function handleMount(
   editor: monacoEditor.editor.IStandaloneCodeEditor,
   monaco: typeof import("monaco-editor")
 ) {
   editorInstance.value = editor;
+  // Enable glyph margin for breakpoints
+  editor.updateOptions({ glyphMargin: true });
   cursorListener.value = editor.onDidChangeCursorPosition((e: monacoEditor.editor.ICursorPositionChangedEvent) => {
     emit("cursor-change", e.position.lineNumber, e.position.column);
+  });
+  // Click glyph margin to toggle breakpoint (prompt-11 11-A)
+  editor.onMouseDown((e) => {
+    if (e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
+      const line = e.target.position?.lineNumber;
+      const filePath = props.path || appState.currentFilePath || "";
+      if (line && filePath) {
+        void import("@/stores/debug").then(({ toggleBreakpoint }) => {
+          void toggleBreakpoint(filePath, line).then(() => applyBreakpointDecorations(editor, monaco));
+        });
+      }
+    }
   });
   registerContextMenuActions(editor);
   inlineCompletionProvider.value = registerInlineCompletionProvider(editor, monaco);
@@ -303,10 +446,21 @@ function handleMount(
   }
   // prompt-10 10-H: coverage gutter
   applyCoverageDecorations(editor, monaco);
+  applyBreakpointDecorations(editor, monaco);
+  applyDebugLineDecoration(editor, monaco);
   void import("@/stores/coverage").then(({ coverageState }) => {
     watch(
       () => coverageState.hits.length,
       () => applyCoverageDecorations(editor, monaco),
+    );
+  });
+  void import("@/stores/debug").then(({ debugState }) => {
+    watch(
+      () => [debugState.breakpoints.length, debugState.stopped, debugState.stack.length] as const,
+      () => {
+        applyBreakpointDecorations(editor, monaco);
+        applyDebugLineDecoration(editor, monaco);
+      },
     );
   });
 }
@@ -338,7 +492,10 @@ onBeforeUnmount(() => {
 });
 
 function handleChange(value: string | undefined) {
-  emit("update:content", value ?? "");
+  const v = value ?? "";
+  emit("update:content", v);
+  // prompt-11 11-D / 11-J: live diagnostics (debounced)
+  scheduleLiveDiagnostics(v);
 }
 </script>
 

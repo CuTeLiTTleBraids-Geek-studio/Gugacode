@@ -1443,3 +1443,22 @@ html[data-editor-bg] .monaco-editor-background {
 .coverage-line--uncovered {
   background: rgba(248, 81, 73, 0.08);
 }
+
+/* prompt-11 11-A: debug breakpoint glyphs + current line */
+.debug-bp-glyph {
+  background: #f85149;
+  border-radius: 50%;
+  width: 8px !important;
+  height: 8px !important;
+  margin-left: 5px;
+  margin-top: 5px;
+}
+.debug-bp-glyph--unverified {
+  background: #e3b341;
+}
+.debug-current-line {
+  background: rgba(56, 139, 253, 0.15) !important;
+}
+.debug-current-glyph {
+  border-left: 4px solid #58a6ff;
+}

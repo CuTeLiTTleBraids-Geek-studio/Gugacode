@@ -23,6 +23,18 @@ git clone https://github.com/<your-org>/gugacode.git
 cd gugacode
 ```
 
+### One-shot setup（prompt-11 11-N，约 30 分钟）
+
+```bash
+# Unix
+bash scripts/dev-setup.sh
+
+# Windows PowerShell
+pwsh -File scripts/dev-setup.ps1
+```
+
+脚本会：`go mod download`、`npm ci`、`vitest run`、`go test ./services/`，并可选安装 `gopls` / `dlv`。
+
 ### Installing Dependencies
 
 ```bash
