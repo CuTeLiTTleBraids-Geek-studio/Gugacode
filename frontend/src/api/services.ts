@@ -24,6 +24,8 @@ import * as MarketplaceServiceBindings from "../../bindings/gugacode/services/ma
 // prompt-10: may need regen; Call.ByName fallback avoided — generate bindings after Go changes.
 import * as DebugServiceBindings from "../../bindings/gugacode/services/debugservice.js";
 import * as CoverageServiceBindings from "../../bindings/gugacode/services/coverageservice.js";
+// prompt-13: eslint long-lived service (regen bindings after build)
+import * as EslintServiceBindings from "../../bindings/gugacode/services/eslintservice.js";
 import type { DirEntry, Project, Settings, ChatMessage, GitFileChange, BranchInfo, SearchResult, Conversation, PresetMeta, PresetFile, PresetWithSource, CompletionRequest, CompletionResponse, RawCompletionResponse, BranchRef, MergeConflict, ReplaceResult, TaskDef, WorkflowDef, WorkflowValidationResult, ExecResult, CommandCheck, RulesFile, RulesFileCandidate, RulesConfig, PluginInfo, ProfileInfo, ProfileExport, SecretInfo, ToolchainCommand, ToolchainResult, LSPServerStatus, LSPCompletionRequest, LSPCompletionItem, Diagnostic, ProjectTemplate, CreateProjectRequest, ExtensionSearchResult, ExtensionDetail, InstalledExtension, VSCodeExtensionManifest } from "@/types";
 
 export const fileService = {
@@ -498,6 +500,8 @@ export const lspService = {
     LSPServiceBindings.StartLSPServer(language) as Promise<void>,
   stopServer: (language: string) =>
     LSPServiceBindings.StopLSPServer(language) as Promise<void>,
+  setWorkspaceRoot: (root: string) =>
+    LSPServiceBindings.SetWorkspaceRoot(root) as Promise<void>,
   getCompletions: (req: LSPCompletionRequest) =>
     LSPServiceBindings.GetCompletions(req) as Promise<LSPCompletionItem[]>,
   getHover: (req: LSPCompletionRequest) =>
@@ -610,6 +614,47 @@ export const debugService = {
     DebugServiceBindings.RemoveWatch(expression) as Promise<DebugVar[]>,
   refreshWatches: () => DebugServiceBindings.RefreshWatches() as Promise<DebugVar[]>,
   listWatches: () => DebugServiceBindings.ListWatches() as Promise<DebugVar[]>,
+  attachDelve: (addr: string) =>
+    DebugServiceBindings.AttachDelve(addr) as Promise<DebugSessionInfo>,
+  probeDelveTCP: (addr: string) =>
+    DebugServiceBindings.ProbeDelveTCP(addr) as Promise<{
+      ok: boolean;
+      message: string;
+      address?: string;
+    }>,
+  clearLastError: () => DebugServiceBindings.ClearLastError() as Promise<void>,
+};
+
+export const eslintService = {
+  status: () =>
+    EslintServiceBindings.Status() as Promise<{
+      eslint: boolean;
+      eslint_d: boolean;
+      useDaemon: boolean;
+      workspace: string;
+      hint: string;
+    }>,
+  setWorkspaceRoot: (root: string) =>
+    EslintServiceBindings.SetWorkspaceRoot(root) as Promise<void>,
+  lintFile: (filePath: string, content: string, contentHash: string) =>
+    EslintServiceBindings.LintFile(filePath, content, contentHash) as Promise<{
+      success: boolean;
+      output: string;
+      diagnostics: Array<{
+        file: string;
+        line: number;
+        column: number;
+        severity: string;
+        message: string;
+        rule?: string;
+        source: string;
+      }>;
+      usedDaemon: boolean;
+      skipped: boolean;
+      durationMs: number;
+      daemonStatus: string;
+    }>,
+  warmDaemon: () => EslintServiceBindings.WarmDaemon() as Promise<string>,
 };
 
 export const coverageService = {

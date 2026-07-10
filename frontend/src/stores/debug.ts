@@ -61,8 +61,10 @@ export const debugState = reactive({
   watchInput: "",
   evaluateInput: "",
   evaluateResult: "" as string,
+  lastError: "" as string,
   launchConfigs: [] as DebugLaunchConfig[],
   activeConfigName: "" as string,
+  attachAddr: "127.0.0.1:2345" as string,
   pollTimer: 0 as number | ReturnType<typeof setInterval>,
 });
 
@@ -88,6 +90,20 @@ export function loadLaunchConfigs(): void {
         kind: "test",
         dir: "",
         mode: "test",
+      },
+      // prompt-13 13-I: TS debug template for test tree linkage
+      {
+        name: "Node: current file",
+        kind: "node",
+        dir: "",
+        program: "",
+      },
+      {
+        name: "Node: vitest run",
+        kind: "node",
+        dir: "",
+        program: "",
+        args: ["node_modules/vitest/vitest.mjs", "run"],
       },
     ];
   }
@@ -132,6 +148,7 @@ function applySnapshot(st: {
   locals?: DebugVariable[];
   watches?: DebugVariable[];
   stopReason?: string;
+  lastError?: string;
 }): void {
   debugState.running = !!st.session?.running;
   debugState.address = st.session?.address || "";
@@ -143,6 +160,7 @@ function applySnapshot(st: {
   debugState.stack = st.stack || [];
   debugState.locals = st.locals || [];
   debugState.watches = st.watches || [];
+  debugState.lastError = st.lastError || "";
 }
 
 function startPolling(): void {
@@ -443,9 +461,65 @@ export async function removeWatch(expr: string): Promise<void> {
 export async function evaluateExpression(expr: string): Promise<void> {
   try {
     const v = await debugService.evaluate(expr);
-    debugState.evaluateResult = `${v.name} = ${v.value}${v.type ? ` (${v.type})` : ""}`;
+    if (v.type === "error") {
+      debugState.evaluateResult = `ERROR: ${v.value}`;
+      debugState.lastError = `evaluate: ${v.value}`;
+      pushOutput("Debug", "error", `evaluate ${expr}: ${v.value}`);
+    } else {
+      debugState.evaluateResult = `${v.name} = ${v.value}${v.type ? ` (${v.type})` : ""}`;
+    }
   } catch (e) {
-    debugState.evaluateResult = String(e);
+    const msg = e instanceof Error ? e.message : String(e);
+    debugState.evaluateResult = `ERROR: ${msg}`;
+    debugState.lastError = msg;
+    pushOutput("Debug", "error", msg);
+  }
+}
+
+/** prompt-13 13-E: probe + attach remote delve */
+export async function probeAndAttachDelve(addr?: string): Promise<void> {
+  const a = (addr || debugState.attachAddr || "").trim();
+  if (!a) {
+    notifyError("Enter host:port for remote Delve");
+    return;
+  }
+  try {
+    const probe = await debugService.probeDelveTCP(a);
+    if (!probe.ok) {
+      notifyError(`Probe failed: ${probe.message}`);
+      pushOutput("Debug", "error", `probe ${a}: ${probe.message}`);
+      return;
+    }
+    notifyInfo(probe.message || "port open");
+    const session = await debugService.attachDelve(a);
+    applySession(session);
+    startPolling();
+    notifySuccess(`Attached: ${a}`);
+  } catch (e) {
+    notifyError(e instanceof Error ? e.message : String(e));
+  }
+}
+
+/** prompt-13 13-H: export launch configs as JSON string */
+export function exportLaunchConfigsJSON(): string {
+  return JSON.stringify({ version: 1, configs: debugState.launchConfigs }, null, 2);
+}
+
+export function importLaunchConfigsJSON(raw: string): number {
+  try {
+    const j = JSON.parse(raw) as { configs?: DebugLaunchConfig[] } | DebugLaunchConfig[];
+    const list = Array.isArray(j) ? j : j.configs || [];
+    let n = 0;
+    for (const c of list) {
+      if (c?.name && c?.kind) {
+        upsertLaunchConfig(c as DebugLaunchConfig);
+        n++;
+      }
+    }
+    return n;
+  } catch (e) {
+    notifyError("Invalid launch JSON: " + (e instanceof Error ? e.message : String(e)));
+    return 0;
   }
 }
 

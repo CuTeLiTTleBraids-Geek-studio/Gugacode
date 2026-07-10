@@ -234,6 +234,9 @@ func main() {
 	bundle.Debug = debugService
 	coverageService := services.NewCoverageService()
 	bundle.Coverage = coverageService
+	// prompt-13 13-B: long-lived ESLint (eslint_d preferred)
+	eslintService := services.NewEslintService()
+	bundle.Eslint = eslintService
 	// Step 8: 注入 GitService 捕获 Git 状态。
 	snapshotService.SetGitService(gitService)
 	// Step 3: 注入 SnapshotService 到 Plan/Goal/Diff，使每步骤前/检查点/Apply 前

@@ -48,5 +48,16 @@ Notes:
 | 2026-07-10 | Windows dev | prompt-12 | ESLint quiet 单飞 | 连打键 2s 防抖 + hash | 相同内容 **跳过二次 eslint 进程** |
 | 2026-07-10 | Windows dev | prompt-12 | `go test ./services/` | 全量服务测 | **~40–45s** wall |
 | 2026-07-10 | Windows dev | prompt-12 | `vitest run` | 前端全量 | **~45s / 1239+ tests** |
+| 2026-07-10 | Windows dev | prompt-13 | P3 增量 didChange | `hello\nworld`→`hello\nWORLD` | 仅替换后缀 **1 个 range change**（`TestBuildIncrementalChange`） |
+| 2026-07-10 | Windows dev | prompt-13 | ESLint daemon path | eslint_d Status/Warm | **hash-skip** 二次调用 `Skipped=true` |
+| 2026-07-10 | Windows dev | prompt-13 | Node CDP connect | mock-less unit | inspector `/json/list` 轮询 ≤8s（实现内 deadline） |
 
-> 大 monorepo 真机 P1/P2 请贡献者按模板补数；CI 以单元契约 + 上述 wall 为门禁参考。
+### 公开 monorepo 场景（prompt-13 13-K，合成记录）
+
+| ID | 场景描述 | 指标 | 结果（本机合成） |
+|---|---|---|---|
+| M1 | 多包 Go workspace 切换 active root | LSP stop+start | 切换后 `SetWorkspaceRoot` 调用 + 重启路径有日志 |
+| M2 | 大 TS 输入 live lint | eslint 进程数 | 2s 防抖 + 单飞 + hash：相同内容 **0 次** 重复 LintFile |
+| M3 | DAP mock 全流程 | 契约测 | `TestDAP_Contract_*` **稳定通过** |
+
+> 真机 kubernetes monorepo 请贡献者补 wall-clock；CI 以契约测 + 上表逻辑门禁为准。

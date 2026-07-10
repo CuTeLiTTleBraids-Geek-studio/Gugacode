@@ -46,6 +46,7 @@ type appBundle struct {
 	Preset             *services.PresetService
 	Debug              *services.DebugService
 	Coverage           *services.CoverageService
+	Eslint             *services.EslintService
 	InstanceLock       *services.InstanceLock
 }
 
@@ -85,5 +86,6 @@ func (b *appBundle) wailsServices() []application.Service {
 		application.NewService(b.Snapshot),
 		application.NewService(b.Debug),
 		application.NewService(b.Coverage),
+		application.NewService(b.Eslint),
 	}
 }

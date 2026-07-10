@@ -58,10 +58,10 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 | **Rename (F2)** | ✅ 多文件预览 + dirty + Save All | ✅ 同上 |
 | Run test (package / file / cursor) | ✅ go-test-pkg + **Test at Cursor**（含 `t.Run`） | ✅ vitest-file + **cursor**（含 `test.each`） |
 | Signature Help / Organize Imports | ✅ | ✅ + auto-import additionalTextEdits |
-| Delve 调试 | ✅ **内嵌 DAP**：断点（含条件/未 verified 可视化）、F5/Restart、单步、栈、locals、watch（需 `dlv`） | 🟡 Node `inspect-brk` MVP（非完整 Chrome DAP） |
+| Delve 调试 | ✅ **内嵌 DAP**：条件/未 verified、F5/Restart、单步、栈、locals、watch（需 `dlv`）；远程 Probe+Attach | ✅ **同一 Debug 面板 + CDP**（`inspect-brk` 后连 WebSocket；非完整 js-debug） |
 | Coverage gutter | ✅ `go test -coverprofile`（路径规范化） | 🟡 可选 lcov / vitest coverage |
-| live ESLint | — | ✅ 防抖 + hash 跳过 + 单飞（非每键起进程） |
-| 多根 go.work / pnpm | 🟡 切换 active root 并重启 LSP/工具链 | 🟡 package workspaces 列表 + 切换 |
+| live ESLint | — | ✅ **eslint_d 长驻优先** + 2s 防抖 + hash 跳过；无 daemon 时 CLI 单飞 |
+| 多根 go.work / pnpm | 🟡 切换 root → `SetWorkspaceRoot` + LSP 重启 | 🟡 package workspaces + 切换 |
 
 > *Offline-first desktop IDE for Go and TypeScript/JavaScript, with sandboxed AI agents.*  
 > AI 是加速器；**语言服务正确性优先于再堆 Agent 模式**（见 `docs/prompts/prompt-8.md`）。

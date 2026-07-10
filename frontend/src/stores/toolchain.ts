@@ -128,6 +128,46 @@ export async function runToolchainCommandQuiet(
     toolchainState.running = true;
     toolchainState.runningId = cmdId;
     try {
+      // prompt-13 13-B: prefer long-lived EslintService (eslint_d) for eslint-file
+      if (cmdId === "eslint-file" && path) {
+        try {
+          const { eslintService } = await import("@/api/services");
+          const r = await eslintService.lintFile(path, content ?? "", hash);
+          if (r.skipped) {
+            return { success: true, output: "", errors: [], duration: 0 } as ToolchainResult;
+          }
+          if (path) {
+            const { outputState } = await import("@/stores/output");
+            outputState.problems = outputState.problems.filter(
+              (p) =>
+                p.source !== "eslint" &&
+                p.file !== path &&
+                !path.endsWith(p.file) &&
+                !p.file.endsWith(path),
+            );
+          }
+          for (const d of r.diagnostics || []) {
+            const sev = d.severity === "error" ? "error" : "warning";
+            pushProblem(sev, d.file || path, d.line, d.column, d.message, "eslint");
+          }
+          if (path && hash) quietLintCache.set(path, hash);
+          return {
+            success: r.success,
+            output: r.output || "",
+            errors: (r.diagnostics || []).map((d) => ({
+              severity: d.severity,
+              file: d.file,
+              line: d.line,
+              column: d.column,
+              message: d.message,
+              source: "eslint",
+            })),
+            duration: r.durationMs,
+          } as ToolchainResult;
+        } catch {
+          // fall through to CLI
+        }
+      }
       const result = await toolchainService.runToolchainCommand(cmdId, path);
       const fromBackend = result.errors ?? [];
       const fromOutput =

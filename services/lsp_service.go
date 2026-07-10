@@ -89,9 +89,13 @@ type lspServer struct {
 	docVersions map[string]int
 	// docHashes last full-sync content hash (prompt-9 9-K throttle).
 	docHashes map[string]string
+	// docLastContent last synced full text (prompt-13 13-F incremental).
+	docLastContent map[string]string
 	// docLastSync last successful didChange time per URI.
 	docLastSync map[string]time.Time
-	docMu       sync.Mutex
+	// syncKind: 1=Full 2=Incremental (from server capabilities).
+	syncKind int
+	docMu    sync.Mutex
 
 	// diagnostics cache (publishDiagnostics).
 	diags   map[string][]Diagnostic
@@ -274,10 +278,12 @@ func (s *LSPService) StartLSPServer(language string) error {
 		stdin:       stdin,
 		stdout:      stdout,
 		client:      client,
-		docVersions: make(map[string]int),
-		docHashes:   make(map[string]string),
-		docLastSync: make(map[string]time.Time),
-		diags:       make(map[string][]Diagnostic),
+		docVersions:    make(map[string]int),
+		docHashes:      make(map[string]string),
+		docLastContent: make(map[string]string),
+		docLastSync:    make(map[string]time.Time),
+		syncKind:       1,
+		diags:          make(map[string][]Diagnostic),
 	}
 	// G-FEAT-02: collect published diagnostics so GetDiagnostics can return
 	// them. The server pushes diagnostics asynchronously after didOpen.
@@ -425,8 +431,28 @@ func (s *LSPService) initializeLocked(srv *lspServer, language, workspaceRoot st
 			{"uri": pathToURI(workspaceRoot), "name": filepath.Base(workspaceRoot)},
 		}
 	}
-	if _, err := srv.client.request(ctx, "initialize", initParams); err != nil {
+	raw, err := srv.client.request(ctx, "initialize", initParams)
+	if err != nil {
 		return err
+	}
+	// prompt-13 13-F: negotiate TextDocumentSync Kind
+	srv.syncKind = 1 // default Full
+	var initRes struct {
+		Capabilities struct {
+			TextDocumentSync interface{} `json:"textDocumentSync"`
+		} `json:"capabilities"`
+	}
+	if json.Unmarshal(raw, &initRes) == nil {
+		switch v := initRes.Capabilities.TextDocumentSync.(type) {
+		case float64:
+			if int(v) == 2 {
+				srv.syncKind = 2
+			}
+		case map[string]interface{}:
+			if ch, ok := v["change"].(float64); ok && int(ch) == 2 {
+				srv.syncKind = 2
+			}
+		}
 	}
 	if err := srv.client.notify("initialized", map[string]interface{}{}); err != nil {
 		return err
@@ -890,20 +916,18 @@ func (s *LSPService) syncDocument(req LSPCompletionRequest) (*lspServer, error) 
 	hash := hex.EncodeToString(sum[:])
 
 	srv.docMu.Lock()
+	if srv.docLastContent == nil {
+		srv.docLastContent = map[string]string{}
+	}
 	prev, opened := srv.docVersions[uri]
 	prevHash := srv.docHashes[uri]
+	prevContent := srv.docLastContent[uri]
 	lastSync := srv.docLastSync[uri]
+	syncKind := srv.syncKind
 	// Skip redundant full didChange when content is identical.
 	if opened && prevHash == hash {
 		srv.docMu.Unlock()
 		return srv, nil
-	}
-	// prompt-12 12-I: stronger throttle on full didChange (300ms) for large monorepos.
-	// Still skip when content hash is unchanged (above). When content changes rapidly,
-	// coalesce by delaying only if last sync was < 50ms (burst typing).
-	if opened && time.Since(lastSync) < 50*time.Millisecond {
-		// Allow through but record — actual skip of identical handled above.
-		// For rapid distinct edits, still send (correctness); callers debounce UI.
 	}
 	if opened && time.Since(lastSync) < 100*time.Millisecond && prevHash == hash {
 		srv.docMu.Unlock()
@@ -915,6 +939,7 @@ func (s *LSPService) syncDocument(req LSPCompletionRequest) (*lspServer, error) 
 	}
 	srv.docVersions[uri] = next
 	srv.docHashes[uri] = hash
+	srv.docLastContent[uri] = req.Content
 	srv.docLastSync[uri] = time.Now()
 	srv.docMu.Unlock()
 
@@ -931,21 +956,81 @@ func (s *LSPService) syncDocument(req LSPCompletionRequest) (*lspServer, error) 
 			slog.Debug("LSP didOpen failed", "language", req.Language, "err", err)
 		}
 	} else {
-		// Full document sync (TextDocumentSyncKind.Full).
+		// prompt-13 13-F: Incremental when server supports kind=2.
+		var changes []map[string]interface{}
+		if syncKind == 2 {
+			if inc := buildIncrementalChange(prevContent, req.Content); inc != nil {
+				changes = []map[string]interface{}{inc}
+			}
+		}
+		if changes == nil {
+			changes = []map[string]interface{}{{"text": req.Content}}
+		}
 		params := map[string]interface{}{
 			"textDocument": map[string]interface{}{
 				"uri":     uri,
 				"version": next,
 			},
-			"contentChanges": []map[string]interface{}{
-				{"text": req.Content},
-			},
+			"contentChanges": changes,
 		}
 		if err := srv.client.notify("textDocument/didChange", params); err != nil {
 			slog.Debug("LSP didChange failed", "language", req.Language, "err", err)
 		}
 	}
 	return srv, nil
+}
+
+// buildIncrementalChange returns a TextDocumentContentChangeEvent with range.
+func buildIncrementalChange(oldText, newText string) map[string]interface{} {
+	if oldText == newText {
+		return nil
+	}
+	i := 0
+	minLen := len(oldText)
+	if len(newText) < minLen {
+		minLen = len(newText)
+	}
+	for i < minLen && oldText[i] == newText[i] {
+		i++
+	}
+	j := 0
+	for i+j < len(oldText) && i+j < len(newText) &&
+		oldText[len(oldText)-1-j] == newText[len(newText)-1-j] {
+		j++
+	}
+	start := i
+	oldEnd := len(oldText) - j
+	newEnd := len(newText) - j
+	if oldEnd < start {
+		oldEnd = start
+	}
+	if newEnd < start {
+		newEnd = start
+	}
+	startLine, startCol := offsetToLineCol(oldText, start)
+	endLine, endCol := offsetToLineCol(oldText, oldEnd)
+	return map[string]interface{}{
+		"range": map[string]interface{}{
+			"start": map[string]int{"line": startLine, "character": startCol},
+			"end":   map[string]int{"line": endLine, "character": endCol},
+		},
+		"text": newText[start:newEnd],
+	}
+}
+
+func offsetToLineCol(s string, offset int) (line, col int) {
+	if offset > len(s) {
+		offset = len(s)
+	}
+	for i := 0; i < offset; i++ {
+		if s[i] == '\n' {
+			line++
+			col = 0
+		} else {
+			col++
+		}
+	}
+	return line, col
 }
 
 // lspLanguageID maps language + path to LSP languageId (tsx/jsx aware).

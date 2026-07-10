@@ -102,34 +102,35 @@ export async function setActiveWorkspaceRoot(absPath: string): Promise<void> {
   } catch {
     /* ignore */
   }
-  // prompt-12 12-H: stop+restart language servers so gopls/tsserver re-root
+  // prompt-13 13-G: set LSP workspace root then restart servers (correct package root)
   try {
-    await lspService.stopServer("go");
+    const anyLsp = lspService as unknown as { setWorkspaceRoot?: (r: string) => Promise<void> };
+    if (anyLsp.setWorkspaceRoot) {
+      await anyLsp.setWorkspaceRoot(path);
+    }
   } catch {
     /* ignore */
   }
   try {
-    await lspService.stopServer("typescript");
+    await import("@/api/services").then(({ eslintService }) => eslintService.setWorkspaceRoot(path));
   } catch {
     /* ignore */
   }
-  try {
-    await lspService.stopServer("javascript");
-  } catch {
-    /* ignore */
+  for (const lang of ["go", "typescript", "javascript"] as const) {
+    try {
+      await lspService.stopServer(lang);
+    } catch {
+      /* ignore */
+    }
   }
-  // restart best-effort
-  try {
-    await lspService.startServer("go");
-  } catch {
-    /* ignore */
+  for (const lang of ["go", "typescript"] as const) {
+    try {
+      await lspService.startServer(lang);
+    } catch {
+      /* ignore */
+    }
   }
-  try {
-    await lspService.startServer("typescript");
-  } catch {
-    /* ignore */
-  }
-  pushOutput("Workspace", "info", `Active root → ${path} (toolchain + LSP restarted)`);
+  pushOutput("Workspace", "info", `Active root → ${path} (LSP SetWorkspaceRoot + restart)`);
   notifySuccess(`Workspace root: ${path}`);
 }
 

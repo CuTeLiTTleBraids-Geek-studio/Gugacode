@@ -21,13 +21,18 @@ import {
   setBreakpointCondition,
   launchWithConfig,
   loadLaunchConfigs,
+  probeAndAttachDelve,
+  exportLaunchConfigsJSON,
+  importLaunchConfigsJSON,
 } from "@/stores/debug";
 import { openFileFromPath } from "@/stores/editor";
 import { appState } from "@/stores/app";
+import { notifySuccess } from "@/lib/notifications";
 
 const condFile = ref("");
 const condLine = ref(1);
 const condExpr = ref("");
+const importJSON = ref("");
 
 onMounted(() => {
   loadLaunchConfigs();
@@ -108,6 +113,41 @@ function editCondition(b: { file: string; line: number; condition?: string }) {
         · paused: <strong>{{ debugState.stopReason || "stopped" }}</strong>
       </span>
       <span v-if="debugState.mode" class="debug-panel__mode"> · {{ debugState.mode }}</span>
+    </div>
+    <div v-if="debugState.lastError" class="debug-panel__error" role="alert">
+      ⚠ {{ debugState.lastError }}
+    </div>
+    <div class="debug-panel__attach">
+      <input v-model="debugState.attachAddr" class="debug-panel__input" placeholder="127.0.0.1:2345 remote dlv" />
+      <button type="button" class="debug-panel__btn" @click="probeAndAttachDelve()">Probe+Attach</button>
+      <button
+        type="button"
+        class="debug-panel__btn"
+        @click="
+          () => {
+            const j = exportLaunchConfigsJSON();
+            void navigator.clipboard?.writeText(j);
+            notifySuccess('Launch configs copied');
+          }
+        "
+      >
+        Export JSON
+      </button>
+    </div>
+    <div class="debug-panel__import">
+      <textarea v-model="importJSON" class="debug-panel__ta" rows="2" placeholder='Import launch JSON…' />
+      <button
+        type="button"
+        class="debug-panel__btn"
+        @click="
+          () => {
+            const n = importLaunchConfigsJSON(importJSON);
+            if (n > 0) notifySuccess(`Imported ${n} config(s)`);
+          }
+        "
+      >
+        Import
+      </button>
     </div>
 
     <div class="debug-panel__configs" v-if="debugState.launchConfigs.length">
@@ -241,6 +281,31 @@ function editCondition(b: { file: string; line: number; condition?: string }) {
 }
 .debug-panel__paused {
   color: #e3b341;
+}
+.debug-panel__error {
+  padding: 4px 8px;
+  background: rgba(248, 81, 73, 0.15);
+  color: #ff7b72;
+  border-bottom: 1px solid #f85149;
+  font-size: 11px;
+}
+.debug-panel__attach,
+.debug-panel__import {
+  display: flex;
+  gap: 4px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--color-border, #333);
+  align-items: flex-start;
+}
+.debug-panel__ta {
+  flex: 1;
+  min-width: 0;
+  background: #1e1e1e;
+  border: 1px solid #444;
+  color: inherit;
+  border-radius: 3px;
+  font-size: 10px;
+  font-family: ui-monospace, monospace;
 }
 .debug-panel__mode {
   opacity: 0.7;

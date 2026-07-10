@@ -40,6 +40,16 @@
 
 核心卖点保持 **Go + TS/JS + AI 沙箱**；横向实验服务禁止进入默认路径（`architecture-boundaries.md`）。
 
+## 冻结候选（prompt-13 13-L）
+
+下列表面拟在 v1.0 前 **semver 冻结**（仅 additive 扩展，不改语义）：
+
+1. `languages.register*Provider`（completion/hover/definition/reference/format/rename/signature）  
+2. `commands.registerCommand` / `executeCommand`  
+3. 沙箱 `workspace` 受限读写  
+
+**兼容策略**：破坏性变更 → major；弃用至少一次 minor 警告；核心语言能力不经插件移除。
+
 ## 贡献
 
 新增表面前对照 `docs/architecture-boundaries.md`：优先扩展 LSP / Toolchain / Debug，而非新实验服务。

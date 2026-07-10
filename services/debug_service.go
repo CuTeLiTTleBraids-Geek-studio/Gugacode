@@ -44,6 +44,11 @@ type DebugService struct {
 
 	// last launch for Restart (prompt-12 12-A/G)
 	lastLaunch debugLaunchSpec
+
+	// prompt-13 13-A: Node CDP session (same panel as DAP)
+	cdp *nodeCDPClient
+	// last evaluate/watch error for UI (prompt-13 13-C)
+	lastError string
 }
 
 // debugLaunchSpec remembers how to restart the current configuration.
@@ -104,6 +109,7 @@ type DebugStateSnapshot struct {
 	Locals      []DebugVariable   `json:"locals"`
 	Watches     []DebugVariable   `json:"watches"`
 	StopReason  string            `json:"stopReason"`
+	LastError   string            `json:"lastError,omitempty"` // 13-C: condition/watch/eval errors
 }
 
 // DebugLaunchConfig is a persisted launch profile (prompt-12 12-G).
@@ -216,6 +222,7 @@ func (d *DebugService) GetState() DebugStateSnapshot {
 		Locals:      locals,
 		Watches:     watches,
 		StopReason:  d.stopReason,
+		LastError:   d.lastError,
 	}
 }
 
@@ -430,8 +437,7 @@ func (d *DebugService) launchDAP(packageDir, mode, runRegex string, cfg DebugLau
 	return d.GetSession(), nil
 }
 
-// launchNode: MVP Node/TS debug via node --inspect-brk (prompt-12 12-F).
-// Exposes listen address; full CDP UI is progressive — session is tracked like DAP.
+// launchNode: Node/TS via --inspect-brk + CDP into the same Debug panel (prompt-13 13-A).
 func (d *DebugService) launchNode(cfg DebugLaunchConfig) (DebugSessionInfo, error) {
 	_ = d.Stop()
 	prog := cfg.Program
@@ -471,30 +477,82 @@ func (d *DebugService) launchNode(cfg DebugLaunchConfig) (DebugSessionInfo, erro
 		return DebugSessionInfo{}, err
 	}
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
+
+	cdp, cdpErr := connectNodeCDP(addr, 8*time.Second)
+	if cdpErr != nil {
+		slog.Warn("node CDP connect failed; session without live stack", "err", cdpErr)
+	} else {
+		cdp.onPaused = func(reason string, frames []DebugStackFrame, locals []DebugVariable) {
+			d.mu.Lock()
+			d.stopped = true
+			d.stopReason = reason
+			if d.stopReason == "" {
+				d.stopReason = "paused"
+			}
+			d.stack = frames
+			d.locals = locals
+			d.mu.Unlock()
+			go func() { _, _ = d.RefreshWatches() }()
+		}
+	}
+
 	d.mu.Lock()
 	d.cmd = cmd
 	d.addr = addr
 	d.mode = "node"
 	d.cwd = dir
+	d.cdp = cdp
 	d.stopped = true
 	d.stopReason = "entry"
+	d.lastError = ""
+	if cdpErr != nil {
+		d.lastError = cdpErr.Error()
+	}
 	d.lastLaunch = debugLaunchSpec{Kind: "node", Program: prog, Dir: dir, Args: cfg.Args, Env: cfg.Env}
+	bpsCopy := append([]DebugBreakpoint(nil), d.breakpoints...)
 	d.mu.Unlock()
+
+	// Apply existing breakpoints over CDP
+	if cdp != nil {
+		for _, b := range bpsCopy {
+			id, verified, msg, err := cdp.SetBreakpointByURL(b.File, b.Line, b.Condition)
+			_ = id
+			d.mu.Lock()
+			for i := range d.breakpoints {
+				if d.breakpoints[i].File == b.File && d.breakpoints[i].Line == b.Line {
+					d.breakpoints[i].Verified = verified
+					if err != nil {
+						d.breakpoints[i].Message = err.Error()
+						d.breakpoints[i].Verified = false
+					} else {
+						d.breakpoints[i].Message = msg
+					}
+				}
+			}
+			d.mu.Unlock()
+		}
+	}
+
 	go func() {
 		_ = cmd.Wait()
 		d.mu.Lock()
 		if d.cmd == cmd {
+			if d.cdp != nil {
+				_ = d.cdp.Close()
+				d.cdp = nil
+			}
 			d.cleanupLocked()
 		}
 		d.mu.Unlock()
 	}()
+
+	msg := fmt.Sprintf("Node CDP session on %s — same Debug panel (breakpoints/stack/continue)", addr)
+	if cdpErr != nil {
+		msg = fmt.Sprintf("Node inspect on %s (CDP connect failed: %v)", addr, cdpErr)
+	}
 	return DebugSessionInfo{
-		Running:    true,
-		Address:    addr,
-		Mode:       "node",
-		Message:    fmt.Sprintf("Node inspect-brk on %s — attach Chrome DevTools or continue MVP session", addr),
-		Stopped:    true,
-		StopReason: "entry",
+		Running: true, Address: addr, Mode: "node", Message: msg,
+		Stopped: true, StopReason: "entry",
 	}, nil
 }
 
@@ -549,25 +607,35 @@ func (d *DebugService) cleanupLocked() {
 		_ = d.conn.Close()
 		d.conn = nil
 	}
+	if d.cdp != nil {
+		_ = d.cdp.Close()
+		d.cdp = nil
+	}
 	d.cmd = nil
 	d.addr = ""
 	d.mode = ""
 	d.stopped = false
 	d.stack = nil
 	d.locals = nil
+	d.lastError = ""
 	for _, ch := range d.pending {
 		close(ch)
 	}
 	d.pending = make(map[int]chan dapMessage)
 }
 
-// Stop terminates the DAP session and Delve process.
+// Stop terminates the DAP/CDP session and child process.
 func (d *DebugService) Stop() error {
 	d.mu.Lock()
 	conn := d.conn
+	cdp := d.cdp
 	cmd := d.cmd
+	d.cdp = nil
 	d.cleanupLocked()
 	d.mu.Unlock()
+	if cdp != nil {
+		_ = cdp.Close()
+	}
 	if conn != nil {
 		// best-effort disconnect
 		_ = d.sendRequestUnlocked(conn, "disconnect", map[string]interface{}{"restart": false})
@@ -577,6 +645,13 @@ func (d *DebugService) Stop() error {
 		_ = cmd.Process.Kill()
 	}
 	return nil
+}
+
+// ClearLastError clears the last evaluate/breakpoint error banner.
+func (d *DebugService) ClearLastError() {
+	d.mu.Lock()
+	d.lastError = ""
+	d.mu.Unlock()
 }
 
 // SetBreakpoint adds or updates a source breakpoint (1-based line).
@@ -612,10 +687,37 @@ func (d *DebugService) SetBreakpointEx(file string, line int, condition, logMess
 	}
 	bps := append([]DebugBreakpoint(nil), d.breakpoints...)
 	running := d.conn != nil
+	cdp := d.cdp
+	mode := d.mode
 	d.mu.Unlock()
 
-	if running {
+	if mode == "node" && cdp != nil {
+		_, verified, msg, err := cdp.SetBreakpointByURL(abs, line, condition)
+		d.mu.Lock()
+		for i := range d.breakpoints {
+			if filepath.Clean(d.breakpoints[i].File) == filepath.Clean(abs) && d.breakpoints[i].Line == line {
+				d.breakpoints[i].Verified = verified
+				d.breakpoints[i].Message = msg
+				if err != nil {
+					d.breakpoints[i].Verified = false
+					d.breakpoints[i].Message = err.Error()
+					d.lastError = "breakpoint: " + err.Error()
+				} else if !verified {
+					d.lastError = "breakpoint: " + msg
+				} else {
+					d.lastError = ""
+				}
+				bp := d.breakpoints[i]
+				d.mu.Unlock()
+				return bp, err
+			}
+		}
+		d.mu.Unlock()
+	} else if running {
 		if err := d.applyAllBreakpoints(bps); err != nil {
+			d.mu.Lock()
+			d.lastError = "breakpoint: " + err.Error()
+			d.mu.Unlock()
 			return DebugBreakpoint{}, err
 		}
 	}
@@ -706,41 +808,77 @@ func (d *DebugService) ListBreakpoints() []DebugBreakpoint {
 	return append([]DebugBreakpoint(nil), d.breakpoints...)
 }
 
-// Continue resumes execution.
+// Continue resumes execution (DAP or Node CDP).
 func (d *DebugService) Continue() error {
 	d.mu.Lock()
+	cdp := d.cdp
+	mode := d.mode
 	tid := d.threadID
 	if tid == 0 {
 		tid = 1
 	}
 	d.stopped = false
 	d.mu.Unlock()
+	if mode == "node" && cdp != nil {
+		return cdp.Resume()
+	}
 	return d.dapRequest("continue", map[string]interface{}{"threadId": tid})
 }
 
 // StepOver steps over the current line.
 func (d *DebugService) StepOver() error {
+	d.mu.Lock()
+	cdp, mode := d.cdp, d.mode
+	d.mu.Unlock()
+	if mode == "node" && cdp != nil {
+		d.mu.Lock()
+		d.stopped = false
+		d.mu.Unlock()
+		return cdp.StepOver()
+	}
 	return d.step("next")
 }
 
 // StepIn steps into a call.
 func (d *DebugService) StepIn() error {
+	d.mu.Lock()
+	cdp, mode := d.cdp, d.mode
+	d.mu.Unlock()
+	if mode == "node" && cdp != nil {
+		d.mu.Lock()
+		d.stopped = false
+		d.mu.Unlock()
+		return cdp.StepInto()
+	}
 	return d.step("stepIn")
 }
 
 // StepOut steps out of the current function.
 func (d *DebugService) StepOut() error {
+	d.mu.Lock()
+	cdp, mode := d.cdp, d.mode
+	d.mu.Unlock()
+	if mode == "node" && cdp != nil {
+		d.mu.Lock()
+		d.stopped = false
+		d.mu.Unlock()
+		return cdp.StepOut()
+	}
 	return d.step("stepOut")
 }
 
 // Pause requests a pause (if supported).
 func (d *DebugService) Pause() error {
 	d.mu.Lock()
+	cdp, mode := d.cdp, d.mode
 	tid := d.threadID
 	if tid == 0 {
 		tid = 1
 	}
 	d.mu.Unlock()
+	if mode == "node" && cdp != nil {
+		return cdp.Pause()
+	}
 	return d.dapRequest("pause", map[string]interface{}{"threadId": tid})
 }
 
@@ -948,24 +1086,41 @@ func (d *DebugService) applyAllBreakpoints(bps []DebugBreakpoint) error {
 	return nil
 }
 
-// Evaluate runs DAP evaluate for expression (watch / REPL) (prompt-12 12-B).
+// Evaluate runs DAP/CDP evaluate for expression (watch / REPL) (prompt-12/13).
 func (d *DebugService) Evaluate(expression string) (DebugVariable, error) {
 	expr := strings.TrimSpace(expression)
 	if expr == "" {
 		return DebugVariable{}, fmt.Errorf("empty expression")
 	}
 	d.mu.Lock()
+	cdp, mode := d.cdp, d.mode
 	frameID := 0
 	if len(d.stack) > 0 {
 		frameID = d.stack[0].ID
 	}
 	d.mu.Unlock()
+	if mode == "node" && cdp != nil {
+		v, err := cdp.Evaluate(expr)
+		if err != nil {
+			d.mu.Lock()
+			d.lastError = "evaluate: " + err.Error()
+			d.mu.Unlock()
+		} else {
+			d.mu.Lock()
+			d.lastError = ""
+			d.mu.Unlock()
+		}
+		return v, err
+	}
 	body, err := d.dapRequestBody("evaluate", map[string]interface{}{
 		"expression": expr,
 		"frameId":    frameID,
 		"context":    "watch",
 	})
 	if err != nil {
+		d.mu.Lock()
+		d.lastError = "evaluate: " + err.Error()
+		d.mu.Unlock()
 		return DebugVariable{Name: expr, Value: err.Error(), Type: "error"}, err
 	}
 	var resp struct {
@@ -973,6 +1128,9 @@ func (d *DebugService) Evaluate(expression string) (DebugVariable, error) {
 		Type   string `json:"type"`
 	}
 	_ = json.Unmarshal(body, &resp)
+	d.mu.Lock()
+	d.lastError = ""
+	d.mu.Unlock()
 	return DebugVariable{Name: expr, Value: resp.Result, Type: resp.Type}, nil
 }
 

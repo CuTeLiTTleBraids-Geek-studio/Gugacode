@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-07-10
+
+### Added (prompt-13 — Node CDP panel + eslint_d + v0.5)
+
+- **13-A** Node/TS debug via **Chrome DevTools Protocol** in the **same Debug panel** (breakpoints, pause reason, stack, locals, continue/step when CDP connects).
+- **13-B** `EslintService` prefers **eslint_d** daemon; hash-skip + single-flight; CLI fallback.
+- **13-C** Condition/watch/evaluate **errors** → `lastError` + Output; contract tests extended.
+- **13-D** README matrix honest for Node CDP + eslint_d.
+- **13-E** Probe+Attach remote Delve (`ProbeDelveTCP` / `AttachDelve`) in Debug panel.
+- **13-F** Incremental `didChange` when server advertises TextDocumentSync Kind=2.
+- **13-G** Multi-root calls `LSP.SetWorkspaceRoot` + eslint root + server restart.
+- **13-H** Launch config **import/export JSON**.
+- **13-I** TS/Node launch templates for test-tree linkage.
+- **13-J/K/L/M** Reconnect cleanup on stop; perf-baseline rows; plugin freeze note; SECURITY v0.5 support line.
+
 ## [0.4.0] — 2026-07-10
 
 ### Added (prompt-12 — trusted DAP + live lint + release)
