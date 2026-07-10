@@ -134,7 +134,13 @@ export async function runToolchainCommandQuiet(
           const { eslintService } = await import("@/api/services");
           const r = await eslintService.lintFile(path, content ?? "", hash);
           if (r.skipped) {
-            return { success: true, output: "", errors: [], duration: 0 } as ToolchainResult;
+            return {
+              success: true,
+              output: "",
+              errors: [],
+              durationMs: 0,
+              notInstalled: false,
+            } as ToolchainResult;
           }
           if (path) {
             const { outputState } = await import("@/stores/output");
@@ -162,7 +168,8 @@ export async function runToolchainCommandQuiet(
               message: d.message,
               source: "eslint",
             })),
-            duration: r.durationMs,
+            durationMs: r.durationMs,
+            notInstalled: false,
           } as ToolchainResult;
         } catch {
           // fall through to CLI

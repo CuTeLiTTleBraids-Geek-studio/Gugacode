@@ -1,7 +1,7 @@
 import { reactive, computed, watch } from "vue";
 import { Events } from "@wailsio/runtime";
 import { settingsService, windowService } from "@/api/services";
-import type { Settings, ShortcutKeys, ToolApprovalConfig, CustomAccentTheme, AIProviderConfig, PersonalizationConfig } from "@/types";
+import type { Settings, ShortcutKeys, ToolApprovalConfig, CustomAccentTheme, AIProviderConfig, PersonalizationConfig, AIWindowTheme } from "@/types";
 import type { AccentTheme } from "@/lib/monaco-themes";
 import { accentThemes, applyMonacoTheme, applyMonacoThemeForMode, registerAllThemes, registerCustomTheme } from "@/lib/monaco-themes";
 import { PROVIDER_PRESETS } from "@/lib/aiProviders";
@@ -132,7 +132,7 @@ export interface AppState {
   // G-FEAT-03: which bottom-panel tab to focus after a toolchain run.
   // Empty string means "don't change". TerminalPanel watches this and
   // switches its activeView when it changes to a known value.
-  bottomPanelView: "terminal" | "output" | "problems" | "tasks" | "workflows" | "";
+  bottomPanelView: "terminal" | "output" | "problems" | "debug" | "tasks" | "workflows" | "";
   // G-FEAT-03: toolchain binary path overrides, mirrored from settings so
   // they round-trip through save and are pushed to the backend on load.
   toolPaths: Record<string, string>;
@@ -140,6 +140,9 @@ export interface AppState {
   personalization: PersonalizationConfig;
   // prompt-5 Task C / BUG-L6: open AI companion window on app startup.
   openAIWindowOnStartup: boolean;
+  aiWindowTheme: AIWindowTheme;
+  aiSidebarWidth: number;
+  aiTerminalWidth: number;
   /** prompt-9 9-A: format via LSP before save. */
   formatOnSave: boolean;
   /** prompt-7 Task F: last known settings.json version for CAS. */
@@ -224,6 +227,9 @@ export const appState = reactive<AppState>({
   toolPaths: {},
   // prompt-5 Task C: default off — user opens AI window on demand.
   openAIWindowOnStartup: false,
+  aiWindowTheme: "apple-dark",
+  aiSidebarWidth: 288,
+  aiTerminalWidth: 440,
   formatOnSave: true,
   settingsVersion: 0,
   // Plan 11 Task 15: personalization defaults (empty = no background/avatar override).
@@ -583,6 +589,19 @@ export async function loadSettings(): Promise<void> {
     }
     // prompt-5 Task C: AI companion window on startup (default false).
     appState.openAIWindowOnStartup = settings.openAIWindowOnStartup === true;
+    appState.aiWindowTheme = settings.aiWindowTheme ?? "apple-dark";
+    appState.aiSidebarWidth = settings.aiSidebarWidth ?? 288;
+    appState.aiTerminalWidth = settings.aiTerminalWidth ?? 440;
+    try {
+      const { syncAIWindowPreferences } = await import("@/stores/aiWindow");
+      syncAIWindowPreferences({
+        theme: appState.aiWindowTheme,
+        sidebarWidth: appState.aiSidebarWidth,
+        terminalWidth: appState.aiTerminalWidth,
+      });
+    } catch {
+      // The AI-window UI store may be unavailable in isolated unit tests.
+    }
     try {
       const { toolchainService } = await import("@/api/services");
       void toolchainService.setToolPaths(appState.toolPaths);
@@ -663,6 +682,9 @@ export function saveSettings(): void {
       personalization: { ...appState.personalization },
       // prompt-5 Task C: AI companion window on startup.
       openAIWindowOnStartup: appState.openAIWindowOnStartup,
+      aiWindowTheme: appState.aiWindowTheme,
+      aiSidebarWidth: appState.aiSidebarWidth,
+      aiTerminalWidth: appState.aiTerminalWidth,
     };
     try {
       await settingsService.saveSettings(settings);

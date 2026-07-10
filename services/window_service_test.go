@@ -28,6 +28,9 @@ func TestWindowService_NilWindowDoesNotPanic(t *testing.T) {
 	if w.IsAIWindowOpen() {
 		t.Error("expected AI window closed when no app")
 	}
+	if w.IsAIWindowVisible() {
+		t.Error("expected nil AI window not visible")
+	}
 	if !w.IsAIAlwaysOnTop() {
 		// Default is true after SetApp; without SetApp, zero-value is false.
 		// Ensure SetAIAlwaysOnTop works without a window.

@@ -51,7 +51,7 @@ const routes: RouteRecordRaw[] = [
     path: "/ai-window",
     name: "AiWindow",
     component: () => import("@/views/AiWindowView.vue"),
-    meta: { title: "gugacode AI", hideLayout: true },
+    meta: { title: "AI Assistant", hideLayout: true },
   },
 ];
 

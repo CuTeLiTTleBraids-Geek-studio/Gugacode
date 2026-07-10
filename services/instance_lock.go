@@ -4,11 +4,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 )
 
 // InstanceLock prevents multiple gugacode instances from running simultaneously
 // and competing for the same settings.json (G-QUAL-05).
+//
+// Stale locks (crash / Task Manager kill / GUI exit without Release) are
+// detected by checking whether the PID written in the lock file is still alive.
 type InstanceLock struct {
 	mu       sync.Mutex
 	released bool
@@ -23,28 +28,76 @@ func NewInstanceLock(configDir string) *InstanceLock {
 	}
 }
 
+// LockPath returns the absolute lock file path (for error messages / UI).
+func (l *InstanceLock) LockPath() string {
+	return l.lockPath
+}
+
 // Acquire tries to acquire the single-instance lock. Returns an error if
-// another instance is already running.
+// another *live* instance is already running. Removes stale lock files when
+// the recorded PID is not running (common after GUI crash / Force-quit).
 func (l *InstanceLock) Acquire() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// Create the lock file with O_EXCL (fails if it already exists)
-	f, err := os.OpenFile(l.lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-	if err != nil {
-		if os.IsExist(err) {
-			return fmt.Errorf("another gugacode instance is already running (lock file: %s)", l.lockPath)
-		}
+	if err := l.tryCreateExclusive(); err == nil {
+		return nil
+	} else if !os.IsExist(err) {
 		return fmt.Errorf("create lock file: %w", err)
 	}
-	// Write the current PID for debugging
+
+	// Lock exists — check for stale owner.
+	pid, readErr := readLockPID(l.lockPath)
+	if readErr == nil && pid > 0 && !processAlive(pid) {
+		// Stale: previous process died without Release().
+		_ = os.Remove(l.lockPath)
+		if err := l.tryCreateExclusive(); err != nil {
+			if os.IsExist(err) {
+				return fmt.Errorf("another gugacode instance is already running (lock file: %s)", l.lockPath)
+			}
+			return fmt.Errorf("create lock file after stale cleanup: %w", err)
+		}
+		return nil
+	}
+
+	if pid > 0 && processAlive(pid) {
+		return fmt.Errorf("another gugacode instance is already running (pid %d, lock: %s)", pid, l.lockPath)
+	}
+	// Unreadable / empty lock — still treat as conflict unless we can clear it.
+	// Last resort: remove empty/corrupt lock and retry once.
+	data, _ := os.ReadFile(l.lockPath)
+	if len(strings.TrimSpace(string(data))) == 0 || readErr != nil {
+		_ = os.Remove(l.lockPath)
+		if err := l.tryCreateExclusive(); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("another gugacode instance is already running (lock file: %s)", l.lockPath)
+}
+
+func (l *InstanceLock) tryCreateExclusive() error {
+	f, err := os.OpenFile(l.lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
 	fmt.Fprintf(f, "%d\n", os.Getpid())
 	l.file = f
-	// Reset the released flag so a subsequent Release() actually closes
-	// the new file handle. Without this, reacquiring after release would
-	// leave the file open (Release would no-op on the stale flag).
 	l.released = false
 	return nil
+}
+
+func readLockPID(path string) (int, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return 0, err
+	}
+	line := strings.TrimSpace(string(b))
+	if line == "" {
+		return 0, fmt.Errorf("empty lock")
+	}
+	// first token only
+	fields := strings.Fields(line)
+	return strconv.Atoi(fields[0])
 }
 
 // Release releases the single-instance lock.

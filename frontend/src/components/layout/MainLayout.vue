@@ -231,7 +231,20 @@ const commands = computed<Command[]>(() => {
         });
       },
     },
-    { id: "toggle-ai", label: t("mainLayout.commandToggleAiChat"), action: () => setPanelTab("ai") },
+    {
+      id: "toggle-ai",
+      label: t("mainLayout.commandToggleAiChat"),
+      action: () => {
+        // 与活动栏一致：切换 OS 级 AI 伴侣窗口，而非主窗侧边栏嵌入面板
+        void import("@/api/services").then(({ windowService }) => {
+          void windowService.toggleAIWindow().catch(() => {
+            void import("@/stores/aiAssistant").then(({ openAIDesktopWindow }) => {
+              openAIDesktopWindow();
+            });
+          });
+        });
+      },
+    },
     { id: "toggle-terminal", label: t("mainLayout.commandToggleTerminal"), action: () => toggleTerminal() },
     { id: "clear-chat", label: t("mainLayout.commandClearChat"), action: () => clearMessages() },
     { id: "toggle-sidebar", label: t("mainLayout.commandToggleSidebar"), action: () => { appState.sidebarCollapsed = !appState.sidebarCollapsed; } },

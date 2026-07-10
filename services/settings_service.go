@@ -123,6 +123,11 @@ type Settings struct {
 	// automatically on app startup. Default false — users open it on demand.
 	// Must NOT use omitempty so false round-trips correctly.
 	OpenAIWindowOnStartup bool `json:"openAIWindowOnStartup"`
+	// AI companion-window-only presentation preferences. These are separate
+	// from the main editor theme and layout settings.
+	AIWindowTheme  string `json:"aiWindowTheme"`
+	AISidebarWidth int    `json:"aiSidebarWidth"`
+	AITerminalWidth int   `json:"aiTerminalWidth"`
 }
 
 // PersonalizationConfig holds user personalization settings (Task 15 Step 1).
@@ -335,6 +340,9 @@ func (s *SettingsService) LoadSettings() (Settings, error) {
 			"path", s.configPath, "err", err)
 		return defaultSettings(), nil
 	}
+	settings.AIWindowTheme = normalizeAIWindowTheme(settings.AIWindowTheme)
+	settings.AISidebarWidth = clampInt(settings.AISidebarWidth, 288, 260, 380)
+	settings.AITerminalWidth = clampInt(settings.AITerminalWidth, 440, 340, 960)
 	// Decrypt the API key (handles legacy plaintext, dpapi:, aes:, plain:).
 	rawKey := settings.AIApiKey
 	decrypted, derr := DecryptSecret(rawKey)
@@ -678,5 +686,30 @@ func defaultSettings() Settings {
 		EnablePluginSandbox: true,
 		// prompt-5 Task C: do not auto-pop AI window on every launch.
 		OpenAIWindowOnStartup: false,
+		AIWindowTheme:         "apple-dark",
+		AISidebarWidth:        288,
+		AITerminalWidth:       440,
 	}
+}
+
+func normalizeAIWindowTheme(value string) string {
+	switch value {
+	case "apple-dark", "apple-light", "claude-dark", "claude-light", "system":
+		return value
+	default:
+		return "apple-dark"
+	}
+}
+
+func clampInt(value, fallback, min, max int) int {
+	if value == 0 {
+		return fallback
+	}
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }

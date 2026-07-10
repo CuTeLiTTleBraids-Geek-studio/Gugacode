@@ -98,9 +98,16 @@ func TestAIGoalService_CreateGoal(t *testing.T) {
 		t.Errorf("MaxIterations = %d, want 5", g.MaxIterations)
 	}
 	// Goal 与 Plan 互斥：active 应指向当前 Goal。
-	active, _ := svc.GetActiveGoal()
-	if active.ID != "g1" {
+	active := svc.GetActiveGoal()
+	if active == nil || active.ID != "g1" {
 		t.Error("active goal should be g1")
+	}
+}
+
+func TestAIGoalService_GetActiveGoal_NilWhenNone(t *testing.T) {
+	svc := newTestGoalService(t)
+	if active := svc.GetActiveGoal(); active != nil {
+		t.Fatalf("expected nil active goal, got %+v", active)
 	}
 }
 
@@ -236,8 +243,7 @@ func TestAIGoalService_AbortGoal(t *testing.T) {
 	if v.Status != GoalStatusAborted {
 		t.Errorf("Status = %s, want aborted", v.Status)
 	}
-	active, _ := svc.GetActiveGoal()
-	if active.ID != "" {
+	if active := svc.GetActiveGoal(); active != nil {
 		t.Error("active goal should be cleared after abort")
 	}
 }
@@ -407,16 +413,16 @@ func TestAIGoalService_CheckPathBoundary_Inside(t *testing.T) {
 func TestAIGoalService_GoalPlanMutex(t *testing.T) {
 	svc := newTestGoalService(t)
 	g1, _ := svc.CreateGoal("g1", "d1", "c1", 5, 1.0, 10*time.Minute, true)
-	active, _ := svc.GetActiveGoal()
-	if active.ID != "g1" {
+	active := svc.GetActiveGoal()
+	if active == nil || active.ID != "g1" {
 		t.Error("active should be g1")
 	}
 	g2, _ := svc.CreateGoal("g2", "d2", "c2", 5, 1.0, 10*time.Minute, true)
 	if g1 == g2 {
 		t.Error("should be different goal instances")
 	}
-	active, _ = svc.GetActiveGoal()
-	if active.ID != "g2" {
+	active = svc.GetActiveGoal()
+	if active == nil || active.ID != "g2" {
 		t.Error("active should be g2 after new goal")
 	}
 }

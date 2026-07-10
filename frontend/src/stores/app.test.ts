@@ -20,7 +20,8 @@ vi.mock("@wailsio/runtime", () => ({
   Events: { On: vi.fn() },
 }));
 
-import { appState, applyMode, resolveSystemMode } from "./app";
+import { settingsService } from "@/api/services";
+import { appState, applyMode, resolveSystemMode, saveSettings } from "./app";
 
 describe("Theme Mode", () => {
   beforeEach(() => {
@@ -53,5 +54,25 @@ describe("Theme Mode", () => {
   it("applyMode updates appState.theme", () => {
     applyMode("light");
     expect(appState.theme).toBe("light");
+  });
+});
+
+describe("AI window preferences", () => {
+  it("persists theme and dock widths independently", async () => {
+    vi.useFakeTimers();
+    vi.mocked(settingsService.saveSettings).mockClear();
+    appState.aiWindowTheme = "claude-light";
+    appState.aiSidebarWidth = 336;
+    appState.aiTerminalWidth = 520;
+
+    saveSettings();
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(settingsService.saveSettings).toHaveBeenCalledWith(expect.objectContaining({
+      aiWindowTheme: "claude-light",
+      aiSidebarWidth: 336,
+      aiTerminalWidth: 520,
+    }));
+    vi.useRealTimers();
   });
 });

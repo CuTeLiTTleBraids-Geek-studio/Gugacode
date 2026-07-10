@@ -69,6 +69,10 @@ func main() {
 	}
 	instanceLock := services.NewInstanceLock(gugacodeDir)
 	if err := instanceLock.Acquire(); err != nil {
+		// GUI builds (-H=windowsgui) have no console — MessageBox so the user
+		// sees why double-click appears to "do nothing" (stale lock / second instance).
+		msg := fmt.Sprintf("%v\n\nIf no gugacode window is open, delete:\n%s\nand try again.", err, instanceLock.LockPath())
+		services.ShowStartupError("gugacode 无法启动", msg)
 		log.Fatalf("G-QUAL-05: %v", err)
 	}
 	// Safety net for panic paths. The normal shutdown path calls

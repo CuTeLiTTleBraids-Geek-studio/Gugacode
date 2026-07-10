@@ -6,24 +6,4 @@
 // @ts-ignore: Unused imports
 import { Create as $Create } from "@wailsio/runtime";
 
-function configure() {
-    Object.freeze(Object.assign($Create.Events, {
-        "agent:pending-updated": $$createType0,
-        "ai:apply-to-editor": $$createType1,
-        "ai:chunk": $$createType0,
-        "ai:done": $$createType0,
-        "ai:error": $$createType0,
-        "ai:selection": $$createType1,
-        "ai:stream-busy": $$createType0,
-        "ai:tool_calls": $$createType0,
-        "conversation:saved": $$createType0,
-        "settings:changed": $$createType0,
-        "terminal:output": $$createType1,
-    }));
-}
-
-// Private type creation functions
-const $$createType0 = $Create.Map($Create.Any, $Create.Any);
-const $$createType1 = $Create.Map($Create.Any, $Create.Any);
-
-configure();
+Object.freeze($Create.Events);

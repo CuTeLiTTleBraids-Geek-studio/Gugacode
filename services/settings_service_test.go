@@ -24,6 +24,55 @@ func TestSettingsService_LoadSettings_returnsDefaultsWhenNoFile(t *testing.T) {
 	}
 }
 
+func TestSettingsService_AIWindowPreferencesRoundTrip(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "settings.json")
+	svc := &SettingsService{configPath: configPath}
+	settings := defaultSettings()
+	settings.AIWindowTheme = "claude-light"
+	settings.AISidebarWidth = 336
+	settings.AITerminalWidth = 512
+
+	if err := svc.SaveSettings(settings); err != nil {
+		t.Fatalf("SaveSettings failed: %v", err)
+	}
+
+	loaded, err := svc.LoadSettings()
+	if err != nil {
+		t.Fatalf("LoadSettings failed: %v", err)
+	}
+	if loaded.AIWindowTheme != "claude-light" {
+		t.Fatalf("expected claude-light, got %q", loaded.AIWindowTheme)
+	}
+	if loaded.AISidebarWidth != 336 {
+		t.Fatalf("expected sidebar width 336, got %d", loaded.AISidebarWidth)
+	}
+	if loaded.AITerminalWidth != 512 {
+		t.Fatalf("expected terminal width 512, got %d", loaded.AITerminalWidth)
+	}
+}
+
+func TestSettingsService_AIWindowPreferencesLegacyDefaults(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "settings.json")
+	if err := os.WriteFile(configPath, []byte(`{"language":"zh","theme":"dark"}`), 0o600); err != nil {
+		t.Fatalf("write legacy settings: %v", err)
+	}
+
+	svc := &SettingsService{configPath: configPath}
+	loaded, err := svc.LoadSettings()
+	if err != nil {
+		t.Fatalf("LoadSettings failed: %v", err)
+	}
+	if loaded.AIWindowTheme != "apple-dark" {
+		t.Fatalf("expected apple-dark, got %q", loaded.AIWindowTheme)
+	}
+	if loaded.AISidebarWidth != 288 {
+		t.Fatalf("expected sidebar width 288, got %d", loaded.AISidebarWidth)
+	}
+	if loaded.AITerminalWidth != 440 {
+		t.Fatalf("expected terminal width 440, got %d", loaded.AITerminalWidth)
+	}
+}
+
 func TestSettingsService_SaveAndLoad(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "settings.json")
 	svc := &SettingsService{configPath: configPath}

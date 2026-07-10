@@ -171,7 +171,7 @@ func (c *CoverageService) RunPackageCoverage(packageDir string) (CoverageRunResu
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, goBin, "test", "-count=1", "-coverprofile="+profile, ".")
+	cmd := commandContext(ctx, goBin, "test", "-count=1", "-coverprofile="+profile, ".")
 	cmd.Dir = dir
 	start := time.Now()
 	out, runErr := cmd.CombinedOutput()

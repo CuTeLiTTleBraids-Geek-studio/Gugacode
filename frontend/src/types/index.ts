@@ -47,6 +47,13 @@ export interface ShortcutKeys {
   alt: boolean;
 }
 
+export type AIWindowTheme =
+  | "apple-dark"
+  | "apple-light"
+  | "claude-dark"
+  | "claude-light"
+  | "system";
+
 export interface Settings {
   /** prompt-7 Task F: monotonic settings version for dual-window CAS. */
   version?: number;
@@ -126,6 +133,12 @@ export interface Settings {
   personalization?: PersonalizationConfig;
   /** prompt-5 Task C: open AI companion OS window on startup (default false). */
   openAIWindowOnStartup?: boolean;
+  /** Independent theme used only by the AI companion window. */
+  aiWindowTheme?: AIWindowTheme;
+  /** Persisted AI workspace sidebar width in pixels. */
+  aiSidebarWidth?: number;
+  /** Persisted right-docked AI terminal width in pixels. */
+  aiTerminalWidth?: number;
 }
 
 /** Plan 11 Task 15 — 个性化配置（Step 1）。 */

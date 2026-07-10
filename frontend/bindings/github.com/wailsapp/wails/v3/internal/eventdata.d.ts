@@ -8,18 +8,18 @@ import type { Events } from "@wailsio/runtime";
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
-            "agent:pending-updated": { [_ in string]?: any };
-            "ai:apply-to-editor": { [_ in string]?: string };
-            "ai:chunk": { [_ in string]?: any };
-            "ai:done": { [_ in string]?: any };
-            "ai:error": { [_ in string]?: any };
-            "ai:selection": { [_ in string]?: string };
-            "ai:stream-busy": { [_ in string]?: any };
-            "ai:tool_calls": { [_ in string]?: any };
-            "conversation:saved": { [_ in string]?: any };
+            "agent:pending-updated": { [_ in string]?: any } | null;
+            "ai:apply-to-editor": { [_ in string]?: string } | null;
+            "ai:chunk": { [_ in string]?: any } | null;
+            "ai:done": { [_ in string]?: any } | null;
+            "ai:error": { [_ in string]?: any } | null;
+            "ai:selection": { [_ in string]?: string } | null;
+            "ai:stream-busy": { [_ in string]?: any } | null;
+            "ai:tool_calls": { [_ in string]?: any } | null;
+            "conversation:saved": { [_ in string]?: any } | null;
             "file:saved": string;
-            "settings:changed": { [_ in string]?: any };
-            "terminal:output": { [_ in string]?: string };
+            "settings:changed": { [_ in string]?: any } | null;
+            "terminal:output": { [_ in string]?: string } | null;
             "time": string;
             "window:maximised": boolean;
         }

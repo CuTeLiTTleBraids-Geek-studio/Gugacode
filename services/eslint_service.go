@@ -84,7 +84,7 @@ func (e *EslintService) ensureDaemon() {
 	if lookPathExists("eslint_d") {
 		// best-effort start (may already be running)
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		cmd := exec.CommandContext(ctx, "eslint_d", "start")
+		cmd := commandContext(ctx, "eslint_d", "start")
 		e.mu.Lock()
 		if e.workspaceRoot != "" {
 			cmd.Dir = e.workspaceRoot
@@ -129,7 +129,7 @@ func (e *EslintService) LintFile(filePath, content, contentHash string) (EslintL
 	defer cancel()
 
 	if useD {
-		cmd := exec.CommandContext(ctx, "eslint_d", "--stdin", "--stdin-filename", filePath, "-f", "json")
+		cmd := commandContext(ctx, "eslint_d", "--stdin", "--stdin-filename", filePath, "-f", "json")
 		if root != "" {
 			cmd.Dir = root
 		} else {
@@ -153,7 +153,7 @@ func (e *EslintService) LintFile(filePath, content, contentHash string) (EslintL
 				bin = local
 			}
 		}
-		cmd := exec.CommandContext(ctx, bin, "--stdin", "--stdin-filename", filePath, "-f", "json", "--no-error-on-unmatched-pattern")
+		cmd := commandContext(ctx, bin, "--stdin", "--stdin-filename", filePath, "-f", "json", "--no-error-on-unmatched-pattern")
 		if root != "" {
 			cmd.Dir = root
 		} else {

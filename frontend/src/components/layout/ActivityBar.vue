@@ -9,9 +9,11 @@ import {
   MagicStick,
   Setting,
 } from "@element-plus/icons-vue";
-import { computed } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "@/lib/i18n";
+import { windowService } from "@/api/services";
+import { notifyError } from "@/lib/notifications";
 
 const { t } = useI18n();
 const router = useRouter();
@@ -20,7 +22,8 @@ const route = useRoute();
 interface ActivityItem {
   icon: typeof FolderOpened;
   labelKey: string;
-  tab: PanelTab | null;
+  /** null = special handler (settings); "ai-window" = OS companion window */
+  tab: PanelTab | "ai-window" | null;
   isBottom?: boolean;
 }
 
@@ -29,7 +32,8 @@ const items: ActivityItem[] = [
   { icon: Search, labelKey: "activity.search", tab: "search" },
   { icon: Connection, labelKey: "activity.sourceControl", tab: "git" },
   { icon: SetUp, labelKey: "activity.extensions", tab: "extensions" },
-  { icon: MagicStick, labelKey: "activity.ai", tab: "ai" },
+  // 双窗协议：活动栏 AI 打开独立 OS 窗口，不占用主窗侧边栏
+  { icon: MagicStick, labelKey: "activity.ai", tab: "ai-window" },
 ];
 
 const settingsItem: ActivityItem = {
@@ -40,10 +44,39 @@ const settingsItem: ActivityItem = {
 };
 
 const activeTab = computed(() => appState.panelTab);
-const isAiActive = computed(() => appState.panelTab === "ai");
+/** AI 伴侣窗口是否打开（活动栏高亮用） */
+const aiWindowVisible = ref(false);
+let aiWindowPoll: ReturnType<typeof setInterval> | null = null;
+
+async function refreshAiWindowState(): Promise<void> {
+  try {
+    aiWindowVisible.value = await windowService.isAIWindowVisible();
+  } catch {
+    aiWindowVisible.value = false;
+  }
+}
+
+const isAiActive = computed(() => aiWindowVisible.value);
 const isSettingsActive = computed(() => route.path === "/settings");
 
+async function handleAiWindowClick(): Promise<void> {
+  try {
+    // 切换独立 AI 窗口；隐藏后应立即清除活动态。
+    await windowService.toggleAIWindow();
+    await refreshAiWindowState();
+  } catch (e) {
+    aiWindowVisible.value = false;
+    notifyError(
+      e instanceof Error ? e.message : "无法切换 AI 独立窗口",
+    );
+  }
+}
+
 function handleClick(item: ActivityItem) {
+  if (item.tab === "ai-window") {
+    void handleAiWindowClick();
+    return;
+  }
   if (item.tab) {
     // VS Code 风格：点击当前 active tab 折叠/展开侧边栏；
     // 点击其他 tab 切换并确保侧边栏展开（解决关闭后无法呼出的问题）。
@@ -64,6 +97,21 @@ function handleClick(item: ActivityItem) {
     }
   }
 }
+
+onMounted(() => {
+  void refreshAiWindowState();
+  // 轮询窗口状态，关闭 AI 窗后活动栏高亮可消失
+  aiWindowPoll = setInterval(() => {
+    void refreshAiWindowState();
+  }, 1500);
+});
+
+onBeforeUnmount(() => {
+  if (aiWindowPoll) {
+    clearInterval(aiWindowPoll);
+    aiWindowPoll = null;
+  }
+});
 </script>
 
 <template>
@@ -79,19 +127,24 @@ function handleClick(item: ActivityItem) {
         :key="item.labelKey"
         class="activity-bar__item"
         :class="{
-          'activity-bar__item--active': activeTab === item.tab,
+          'activity-bar__item--active':
+            item.tab === 'ai-window' ? isAiActive : activeTab === item.tab,
         }"
         :aria-label="t(item.labelKey)"
-        :aria-pressed="activeTab === item.tab"
-        :title="t(item.labelKey)"
+        :aria-pressed="item.tab === 'ai-window' ? isAiActive : activeTab === item.tab"
+        :title="
+          item.tab === 'ai-window'
+            ? t('aiChat.openAIWindow')
+            : t(item.labelKey)
+        "
         @click="handleClick(item)"
       >
         <el-icon :size="20">
           <component :is="item.icon" />
         </el-icon>
-        <!-- AI indicator dot -->
+        <!-- AI companion window open indicator -->
         <span
-          v-if="item.tab === 'ai' && isAiActive"
+          v-if="item.tab === 'ai-window' && isAiActive"
           class="activity-bar__dot"
           aria-hidden="true"
         />

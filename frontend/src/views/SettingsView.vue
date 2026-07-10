@@ -2,60 +2,24 @@
 import { ref } from "vue";
 import GeneralSection from "@/components/settings/GeneralSection.vue";
 import EditorSection from "@/components/settings/EditorSection.vue";
-import AiSection from "@/components/settings/AiSection.vue";
-import AgentSection from "@/components/settings/AgentSection.vue";
-import McpSection from "@/components/settings/ai/McpSection.vue";
-import SkillsSection from "@/components/settings/ai/SkillsSection.vue";
-import ComputerUseSection from "@/components/settings/ai/ComputerUseSection.vue";
-import ImSection from "@/components/settings/ai/ImSection.vue";
-import PersonaSection from "@/components/settings/ai/PersonaSection.vue";
-import PlanSection from "@/components/settings/ai/PlanSection.vue";
-import GoalSection from "@/components/settings/ai/GoalSection.vue";
-import WorkflowSection from "@/components/settings/ai/WorkflowSection.vue";
-import ModelPermissionSection from "@/components/settings/ai/ModelPermissionSection.vue";
-import DiffSection from "@/components/settings/ai/DiffSection.vue";
-import RollbackSection from "@/components/settings/ai/RollbackSection.vue";
-import PersonalizationSection from "@/components/settings/ai/PersonalizationSection.vue";
 import TerminalSection from "@/components/settings/TerminalSection.vue";
 import ShortcutsSection from "@/components/settings/ShortcutsSection.vue";
 import AppearanceSection from "@/components/settings/AppearanceSection.vue";
-import PresetsSection from "@/components/settings/PresetsSection.vue";
-import PromptsSection from "@/components/settings/PromptsSection.vue";
 import ProfileSection from "@/components/settings/ProfileSection.vue";
 import { useI18n } from "@/lib/i18n";
 
-type SettingsSection = "general" | "editor" | "ai" | "agent" | "mcp" | "skills" | "computerUse" | "im" | "persona" | "plan" | "goal" | "workflow" | "modelPermission" | "diff" | "rollback" | "personalization" | "presets" | "prompts" | "terminal" | "shortcuts" | "appearance" | "profiles";
+type SettingsSection = "general" | "editor" | "terminal" | "shortcuts" | "appearance" | "profiles";
 
 const { t } = useI18n();
 const activeSection = ref<SettingsSection>("general");
 
-// prompt-6 Task 10: primary nav first; Computer Use / IM under experimental group.
 const primaryNavItems: { key: SettingsSection; labelKey: string }[] = [
   { key: "general", labelKey: "settings.general" },
   { key: "editor", labelKey: "settings.editor" },
-  { key: "ai", labelKey: "settings.ai" },
-  { key: "agent", labelKey: "settings.agent" },
-  { key: "mcp", labelKey: "settings.mcp" },
-  { key: "skills", labelKey: "settings.skills" },
-  { key: "persona", labelKey: "settings.persona" },
-  { key: "plan", labelKey: "settings.plan" },
-  { key: "goal", labelKey: "settings.goal" },
-  { key: "workflow", labelKey: "settings.workflow" },
-  { key: "modelPermission", labelKey: "settings.modelPermission" },
-  { key: "diff", labelKey: "settings.diff" },
-  { key: "rollback", labelKey: "settings.rollback" },
-  { key: "personalization", labelKey: "settings.personalization" },
-  { key: "presets", labelKey: "settings.presets" },
-  { key: "prompts", labelKey: "settings.prompts" },
   { key: "terminal", labelKey: "settings.terminal" },
   { key: "shortcuts", labelKey: "settings.shortcuts" },
   { key: "appearance", labelKey: "settings.appearance" },
   { key: "profiles", labelKey: "settings.profiles" },
-];
-
-const experimentalNavItems: { key: SettingsSection; labelKey: string }[] = [
-  { key: "computerUse", labelKey: "settings.computerUse" },
-  { key: "im", labelKey: "settings.im" },
 ];
 
 function selectSection(key: SettingsSection) {
@@ -85,50 +49,11 @@ function selectSection(key: SettingsSection) {
           </button>
         </li>
       </ul>
-      <!-- prompt-6 Task 10: experimental features collapsed under a labeled group -->
-      <div class="settings-nav-group">
-        <p class="settings-nav-group-label">{{ t("settings.experimentalGroup") }}</p>
-        <ul class="settings-nav-list">
-          <li
-            v-for="item in experimentalNavItems"
-            :key="item.key"
-            class="settings-nav-item"
-          >
-            <button
-              type="button"
-              class="settings-nav-btn settings-nav-btn--experimental"
-              :class="{ 'is-active': activeSection === item.key }"
-              :aria-label="t(item.labelKey)"
-              :aria-current="activeSection === item.key ? 'page' : undefined"
-              @click="selectSection(item.key)"
-            >
-              <span class="settings-nav-indicator" aria-hidden="true" />
-              <span class="settings-nav-label">{{ t(item.labelKey) }}</span>
-            </button>
-          </li>
-        </ul>
-      </div>
     </aside>
 
     <main class="settings-content">
       <GeneralSection v-show="activeSection === 'general'" />
       <EditorSection v-show="activeSection === 'editor'" />
-      <AiSection v-show="activeSection === 'ai'" />
-      <AgentSection v-show="activeSection === 'agent'" />
-      <McpSection v-show="activeSection === 'mcp'" />
-      <SkillsSection v-show="activeSection === 'skills'" />
-      <ComputerUseSection v-show="activeSection === 'computerUse'" />
-      <ImSection v-show="activeSection === 'im'" />
-      <PersonaSection v-show="activeSection === 'persona'" />
-      <PlanSection v-show="activeSection === 'plan'" />
-      <GoalSection v-show="activeSection === 'goal'" />
-      <WorkflowSection v-show="activeSection === 'workflow'" />
-      <ModelPermissionSection v-show="activeSection === 'modelPermission'" />
-      <DiffSection v-show="activeSection === 'diff'" />
-      <RollbackSection v-show="activeSection === 'rollback'" />
-      <PersonalizationSection v-show="activeSection === 'personalization'" />
-      <PresetsSection v-show="activeSection === 'presets'" />
-      <PromptsSection v-show="activeSection === 'prompts'" />
       <TerminalSection v-show="activeSection === 'terminal'" />
       <ShortcutsSection v-show="activeSection === 'shortcuts'" />
       <AppearanceSection v-show="activeSection === 'appearance'" />

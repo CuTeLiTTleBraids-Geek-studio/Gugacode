@@ -18,6 +18,7 @@ import {
 
 const props = defineProps<{
   width: number;
+  embedded?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -349,7 +350,8 @@ onUnmounted(() => {
 <template>
   <aside
     class="ai-conv-sidebar"
-    :style="{ width: `${props.width}px` }"
+    :class="{ 'ai-conv-sidebar--embedded': props.embedded }"
+    :style="{ width: props.embedded ? '100%' : `${props.width}px` }"
     @click="closeContextMenu"
   >
     <div class="ai-conv-sidebar__top">
@@ -486,6 +488,11 @@ onUnmounted(() => {
   flex-shrink: 0;
   overflow: hidden;
   position: relative;
+}
+.ai-conv-sidebar--embedded {
+  height: 100%;
+  border-right: 0;
+  background: transparent;
 }
 .ai-conv-sidebar__top {
   padding: 8px;

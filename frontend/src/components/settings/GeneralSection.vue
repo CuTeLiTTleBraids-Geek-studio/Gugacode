@@ -81,18 +81,6 @@ loadLogPath();
     </div>
 
     <div class="setting-row">
-      <label class="setting-label">{{ t("general.openAIWindowOnStartup") }}</label>
-      <div class="setting-control">
-        <el-switch
-          v-model="appState.openAIWindowOnStartup"
-          :aria-label="t('general.openAIWindowOnStartup')"
-          @change="saveSettings"
-        />
-      </div>
-      <p class="setting-hint">{{ t("general.openAIWindowOnStartupHint") }}</p>
-    </div>
-
-    <div class="setting-row">
       <label class="setting-label">{{ t("general.autoUpdate") }}</label>
       <div class="setting-control">
         <el-switch v-model="appState.autoUpdate" :aria-label="t('general.autoUpdate')" @change="saveSettings" />

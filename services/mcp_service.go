@@ -161,7 +161,7 @@ func newStdioTransport(ctx context.Context, cfg MCPServerConfig) (*stdioTranspor
 	if cfg.Command == "" {
 		return nil, fmt.Errorf("stdio transport requires a command: %w", ErrInvalidInput)
 	}
-	cmd := exec.CommandContext(ctx, cfg.Command, cfg.Args...)
+	cmd := commandContext(ctx, cfg.Command, cfg.Args...)
 	// Inherit a minimal env: parent env + user-provided overrides.
 	cmd.Env = os.Environ()
 	for k, v := range cfg.Env {

@@ -126,6 +126,7 @@ export const windowService = {
   closeAIWindow: () => WindowServiceBindings.CloseAIWindow() as Promise<void>,
   toggleAIWindow: () => WindowServiceBindings.ToggleAIWindow() as Promise<void>,
   isAIWindowOpen: () => WindowServiceBindings.IsAIWindowOpen() as Promise<boolean>,
+  isAIWindowVisible: () => WindowServiceBindings.IsAIWindowVisible() as Promise<boolean>,
   setAIAlwaysOnTop: (onTop: boolean) =>
     WindowServiceBindings.SetAIAlwaysOnTop(onTop) as Promise<void>,
   isAIAlwaysOnTop: () => WindowServiceBindings.IsAIAlwaysOnTop() as Promise<boolean>,
@@ -322,7 +323,11 @@ export const searchService = {
 
 export const conversationService = {
   save: (conv: Conversation) =>
-    ConversationServiceBindings.Save(conv) as Promise<void>,
+    // Bindings require revision:number; frontend Conversation allows optional revision.
+    ConversationServiceBindings.Save({
+      ...conv,
+      revision: conv.revision ?? 0,
+    } as Parameters<typeof ConversationServiceBindings.Save>[0]) as Promise<void>,
   load: (id: string) =>
     ConversationServiceBindings.Load(id) as Promise<Conversation>,
   list: () =>
@@ -584,8 +589,28 @@ export const debugService = {
     DebugServiceBindings.LaunchTest(packageDir, runRegex) as Promise<DebugSessionInfo>,
   launchNode: (program: string, args: string[]) =>
     DebugServiceBindings.LaunchNode(program, args) as Promise<DebugSessionInfo>,
-  launchWithConfig: (cfg: Record<string, unknown>) =>
-    DebugServiceBindings.LaunchWithConfig(cfg) as Promise<DebugSessionInfo>,
+  launchWithConfig: (cfg: {
+    name?: string;
+    kind: string;
+    dir: string;
+    program?: string;
+    runRegex?: string;
+    args?: string[];
+    env?: Record<string, string>;
+    stopOnEntry?: boolean;
+    mode?: string;
+  }) =>
+    DebugServiceBindings.LaunchWithConfig({
+      name: cfg.name ?? "",
+      kind: cfg.kind,
+      dir: cfg.dir,
+      program: cfg.program ?? "",
+      runRegex: cfg.runRegex ?? "",
+      args: cfg.args ?? [],
+      env: cfg.env ?? {},
+      stopOnEntry: !!cfg.stopOnEntry,
+      mode: cfg.mode ?? "",
+    }) as Promise<DebugSessionInfo>,
   restart: () => DebugServiceBindings.Restart() as Promise<DebugSessionInfo>,
   stop: () => DebugServiceBindings.Stop() as Promise<void>,
   setBreakpoint: (file: string, line: number) =>
@@ -617,7 +642,7 @@ export const debugService = {
   attachDelve: (addr: string) =>
     DebugServiceBindings.AttachDelve(addr) as Promise<DebugSessionInfo>,
   probeDelveTCP: (addr: string) =>
-    DebugServiceBindings.ProbeDelveTCP(addr) as Promise<{
+    DebugServiceBindings.ProbeDelveTCP(addr) as unknown as Promise<{
       ok: boolean;
       message: string;
       address?: string;
@@ -627,7 +652,7 @@ export const debugService = {
 
 export const eslintService = {
   status: () =>
-    EslintServiceBindings.Status() as Promise<{
+    EslintServiceBindings.Status() as unknown as Promise<{
       eslint: boolean;
       eslint_d: boolean;
       useDaemon: boolean;

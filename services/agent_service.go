@@ -456,7 +456,7 @@ func (s *AgentService) ExecCommand(command, cwd string) (ExecResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd := commandContext(ctx, argv[0], argv[1:]...)
 	if resolvedCwd != "" {
 		cmd.Dir = resolvedCwd
 	}

@@ -327,7 +327,7 @@ func (d *DebugService) launchDAP(packageDir, mode, runRegex string, cfg DebugLau
 	}
 
 	// Use `dlv dap` so we speak standard DAP (prompt-11 11-A).
-	cmd := exec.Command(dlv, "dap", "--listen="+addr, "--log=false")
+	cmd := command(dlv, "dap", "--listen="+addr, "--log=false")
 	cmd.Dir = abs
 	cmd.Stdout = nil
 	cmd.Stderr = nil
@@ -464,7 +464,7 @@ func (d *DebugService) launchNode(cfg DebugLaunchConfig) (DebugSessionInfo, erro
 
 	args := []string{fmt.Sprintf("--inspect-brk=127.0.0.1:%d", port), prog}
 	args = append(args, cfg.Args...)
-	cmd := exec.Command(nodeBin, args...)
+	cmd := command(nodeBin, args...)
 	cmd.Dir = dir
 	if len(cfg.Env) > 0 {
 		env := os.Environ()

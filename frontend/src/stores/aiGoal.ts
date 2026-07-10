@@ -129,8 +129,10 @@ async function loadBindings(): Promise<GoalBindingsShape> {
 
 // normalizeGoal 确保 Goal 的切片字段不为 null（Go nil 切片序列化为 null）。
 // 否则组件模板访问 goal.checkpoints.length 会报 "Cannot read properties of null"。
-function normalizeGoal(g: Goal | null): Goal | null {
-  if (!g) return null;
+// 同时把「无 id 的零值 GoalView」当成 null：旧后端 GetActiveGoal 在无活动目标时
+// 会返回 {id:""}，否则 onMounted 会 refreshCostReport("") → goal "": not found。
+function normalizeGoal(g: Goal | null | undefined): Goal | null {
+  if (!g || !String(g.id ?? "").trim()) return null;
   return { ...g, checkpoints: g.checkpoints ?? [] };
 }
 
@@ -228,6 +230,10 @@ export async function createGoal(
 }
 
 export async function runGoal(id: string): Promise<boolean> {
+  if (!id?.trim()) {
+    aiGoalState.error = "goal id is required";
+    return false;
+  }
   aiGoalState.error = null;
   try {
     await getBackend().runGoal(id);
@@ -276,6 +282,10 @@ export async function abortGoal(id: string): Promise<boolean> {
 }
 
 export async function refreshCostReport(id: string): Promise<void> {
+  if (!id?.trim()) {
+    aiGoalState.costReport = null;
+    return;
+  }
   aiGoalState.error = null;
   try {
     aiGoalState.costReport = await getBackend().getCostReport(id);

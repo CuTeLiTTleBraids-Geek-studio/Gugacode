@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -829,7 +828,7 @@ func (g *GitService) ContinueRebase() error {
 // returns the combined output. Used by the rebase methods which need CLI
 // features that go-git does not expose.
 func (g *GitService) runGit(repoPath string, args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
+	cmd := command("git", args...)
 	cmd.Dir = repoPath
 	out, err := cmd.CombinedOutput()
 	if err != nil {

@@ -247,13 +247,17 @@ func (s *AIGoalService) GetGoal(id string) (GoalView, error) {
 }
 
 // GetActiveGoal 返回当前活动 Goal 视图（Plan 与 Goal 互斥）。
-func (s *AIGoalService) GetActiveGoal() (GoalView, error) {
+// 无活动 Goal 时返回 nil（与 GetActivePlan 一致）。
+// 切勿返回零值 GoalView：Wails 会把它序列化成 {id:""}，前端会当成真实 Goal
+// 再调用 GetCostReport("")，触发 `goal "": not found`。
+func (s *AIGoalService) GetActiveGoal() *GoalView {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.active == nil {
-		return GoalView{}, nil
+		return nil
 	}
-	return s.active.View(), nil
+	v := s.active.View()
+	return &v
 }
 
 // ListGoals 返回所有 Goal 视图。

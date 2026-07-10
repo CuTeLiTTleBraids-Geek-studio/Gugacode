@@ -133,10 +133,10 @@ func (w *WindowService) createAIWindowLocked() *application.WebviewWindow {
 	aiWin := w.app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Name:        "ai",
 		Title:       "gugacode AI",
-		Width:       460,
-		Height:      720,
-		MinWidth:    320,
-		MinHeight:   480,
+		Width:       1200,
+		Height:      780,
+		MinWidth:    900,
+		MinHeight:   560,
 		Frameless:   false, // keep native title bar for independent drag/resize
 		AlwaysOnTop: alwaysOnTop,
 		// Hash-router SPA: load with the /ai-window hash so the companion
@@ -211,6 +211,16 @@ func (w *WindowService) ToggleAIWindow() {
 // IsAIWindowOpen reports whether the AI companion window currently exists.
 func (w *WindowService) IsAIWindowOpen() bool {
 	return w.currentAIWindow() != nil
+}
+
+// IsAIWindowVisible reports whether the AI companion window currently exists
+// and is visible. A hidden window remains open but must not keep the editor's
+// activity-bar AI item highlighted.
+func (w *WindowService) IsAIWindowVisible() bool {
+	w.mu.RLock()
+	aiWin := w.aiWindow
+	w.mu.RUnlock()
+	return aiWin != nil && aiWin.IsVisible()
 }
 
 // SetAIAlwaysOnTop enables/disables always-on-top for the AI window (prompt-4 Task 6).

@@ -270,7 +270,7 @@ func (s *ToolchainService) RunToolchainCommand(cmdID string, filePath string) (T
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	c := exec.CommandContext(ctx, resolved, args...)
+	c := commandContext(ctx, resolved, args...)
 	// Package-level go test uses file's directory as workDir.
 	c.Dir = workDir
 	// Inherit the environment so tools find GOPATH, NODE_PATH, etc.
@@ -316,7 +316,7 @@ type RuntimeVersions struct {
 func (s *ToolchainService) DetectRuntimeVersions() RuntimeVersions {
 	rv := RuntimeVersions{}
 	if p, err := exec.LookPath("go"); err == nil {
-		if out, err := exec.Command(p, "version").Output(); err == nil {
+		if out, err := command(p, "version").Output(); err == nil {
 			// "go version go1.22.0 windows/amd64" → go1.22.0
 			parts := strings.Fields(string(out))
 			if len(parts) >= 3 {
@@ -327,12 +327,12 @@ func (s *ToolchainService) DetectRuntimeVersions() RuntimeVersions {
 		}
 	}
 	if p, err := exec.LookPath("node"); err == nil {
-		if out, err := exec.Command(p, "--version").Output(); err == nil {
+		if out, err := command(p, "--version").Output(); err == nil {
 			rv.NodeVersion = strings.TrimSpace(string(out))
 		}
 	}
 	if p, err := exec.LookPath("gopls"); err == nil {
-		if out, err := exec.Command(p, "version").Output(); err == nil {
+		if out, err := command(p, "version").Output(); err == nil {
 			line := strings.TrimSpace(strings.Split(string(out), "\n")[0])
 			rv.GoplsVer = line
 		}
@@ -399,7 +399,7 @@ func (s *ToolchainService) RunTestAtCursor(language, filePath string, line int, 
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	c := exec.CommandContext(ctx, resolved, args...)
+	c := commandContext(ctx, resolved, args...)
 	c.Dir = workDir
 	c.Env = os.Environ()
 	start := time.Now()
@@ -534,7 +534,7 @@ func (s *ToolchainService) RunGoTestsJSON(packageDir, runRegex string) (GoTestJS
 	args = append(args, ".")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, goBin, args...)
+	cmd := commandContext(ctx, goBin, args...)
 	cmd.Dir = dir
 	start := time.Now()
 	out, err := cmd.CombinedOutput()

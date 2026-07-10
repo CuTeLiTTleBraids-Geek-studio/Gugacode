@@ -222,7 +222,7 @@ func detectServerPath(language, workspaceRoot string) (path, version, kind strin
 
 // tryVersion runs `<exe> <flag>` and returns the trimmed first line of output.
 func tryVersion(exe string, args ...string) string {
-	cmd := exec.Command(exe, args...)
+	cmd := command(exe, args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return ""
@@ -352,15 +352,15 @@ func startServerProcess(language, exePath, kind, workspaceRoot string) (*exec.Cm
 	switch language {
 	case "go":
 		// gopls stdio serve (prompt-8 M20: single process; remote=auto optional later).
-		cmd = exec.Command(exePath, "serve")
+		cmd = command(exePath, "serve")
 	case "typescript", "javascript":
 		// prompt-8 Task 8-B / BUG-IDE-02: LSP wrappers need --stdio.
 		switch kind {
 		case "vtsls":
-			cmd = exec.Command(exePath, "--stdio")
+			cmd = command(exePath, "--stdio")
 		default:
 			// typescript-language-server
-			cmd = exec.Command(exePath, "--stdio")
+			cmd = command(exePath, "--stdio")
 		}
 	default:
 		return nil, nil, nil, fmt.Errorf("unsupported language: %s", language)

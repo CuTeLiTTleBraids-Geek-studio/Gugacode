@@ -76,6 +76,17 @@ function editCondition(b: { file: string; line: number; condition?: string }) {
   condLine.value = b.line;
   condExpr.value = b.condition || "";
 }
+
+function copyLaunchConfigs() {
+  const j = exportLaunchConfigsJSON();
+  void globalThis.navigator?.clipboard?.writeText(j);
+  notifySuccess("Launch configs copied");
+}
+
+function doImportLaunchConfigs() {
+  const n = importLaunchConfigsJSON(importJSON.value);
+  if (n > 0) notifySuccess(`Imported ${n} config(s)`);
+}
 </script>
 
 <template>
@@ -120,32 +131,13 @@ function editCondition(b: { file: string; line: number; condition?: string }) {
     <div class="debug-panel__attach">
       <input v-model="debugState.attachAddr" class="debug-panel__input" placeholder="127.0.0.1:2345 remote dlv" />
       <button type="button" class="debug-panel__btn" @click="probeAndAttachDelve()">Probe+Attach</button>
-      <button
-        type="button"
-        class="debug-panel__btn"
-        @click="
-          () => {
-            const j = exportLaunchConfigsJSON();
-            void navigator.clipboard?.writeText(j);
-            notifySuccess('Launch configs copied');
-          }
-        "
-      >
+      <button type="button" class="debug-panel__btn" @click="copyLaunchConfigs">
         Export JSON
       </button>
     </div>
     <div class="debug-panel__import">
       <textarea v-model="importJSON" class="debug-panel__ta" rows="2" placeholder='Import launch JSON…' />
-      <button
-        type="button"
-        class="debug-panel__btn"
-        @click="
-          () => {
-            const n = importLaunchConfigsJSON(importJSON);
-            if (n > 0) notifySuccess(`Imported ${n} config(s)`);
-          }
-        "
-      >
+      <button type="button" class="debug-panel__btn" @click="doImportLaunchConfigs">
         Import
       </button>
     </div>
