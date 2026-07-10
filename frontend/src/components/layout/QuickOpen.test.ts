@@ -204,7 +204,7 @@ describe("QuickOpen (Plan 55)", () => {
 
   it("does not fetch files when no project is set", async () => {
     mockAppState.currentProject = "";
-    const wrapper = mountQuickOpen(true);
+    mountQuickOpen(true);
     await new Promise((r) => setTimeout(r, 10));
     expect(listAllFilesMock).not.toHaveBeenCalled();
     mockAppState.currentProject = "/proj";

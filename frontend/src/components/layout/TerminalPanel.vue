@@ -153,11 +153,17 @@ async function initTerminalForSession(sessionId: string) {
       .trim() || "JetBrains Mono";
   const fontFamily = `${cssFont}, JetBrains Mono, Consolas, 'Courier New', monospace`;
 
+  // G-PERF-03: cap xterm scrollback at 5000 lines. Combined with the
+  // backend outputBuffer 1 MiB cap (output_buffer.go), this bounds peak
+  // memory per terminal session. xterm's default is 1000, which drops
+  // useful context during long builds; 5000 keeps recent history without
+  // unbounded growth.
   const term = new Terminal({
     fontFamily,
     fontSize: appState.terminalFontSize || 13,
     theme: getTerminalTheme(),
     cursorBlink: true,
+    scrollback: 5000,
   });
 
   const fitAddon = new FitAddon();
@@ -344,7 +350,23 @@ function severityIcon(sev: ProblemEntry["severity"]): string {
 }
 
 async function handleProblemClick(p: ProblemEntry) {
-  await openFileFromPath(p.file);
+  // prompt-10 10-D: resolve relative paths against project root; jump line via appState.
+  let path = p.file;
+  if (path && !/^[A-Za-z]:[\\/]/.test(path) && !path.startsWith("/")) {
+    const root = appState.currentProject;
+    if (root) {
+      path = root.replace(/[\\/]$/, "") + "/" + path.replace(/^[\\/]/, "");
+    }
+  }
+  try {
+    await openFileFromPath(path);
+    appState.cursorLine = p.line || 1;
+    appState.cursorColumn = p.column || 1;
+    // prompt-10 10-D: force Monaco reveal even if line/col unchanged
+    appState.editorJumpSeq = (appState.editorJumpSeq || 0) + 1;
+  } catch {
+    // openFileFromPath already notifies
+  }
 }
 
 function handleClearCurrentView() {
@@ -376,6 +398,19 @@ watch(activeView, (v) => {
     loadWorkflows(appState.currentProject);
   }
 });
+
+// G-FEAT-03: a toolchain run can request focusing a specific bottom-panel
+// tab (output/problems) by setting appState.bottomPanelView. Watch it and
+// switch activeView, then clear the override so manual tab clicks still work.
+watch(
+  () => appState.bottomPanelView,
+  (v) => {
+    if (v === "output" || v === "problems" || v === "terminal" || v === "tasks" || v === "workflows") {
+      activeView.value = v;
+      appState.bottomPanelView = "";
+    }
+  },
+);
 
 // Reload tasks and workflows when a project is opened.
 watch(
@@ -724,6 +759,11 @@ onBeforeUnmount(() => {
           >
             <div class="workflow-card__header">
               <span class="workflow-card__name" :title="wf.source">{{ wf.name }}</span>
+              <span
+                v-if="wf.runOn?.event === 'startup' && wf.requiresConfirmation"
+                class="workflow-card__pending-badge"
+                :title="t('terminal.pendingConfirmationTitle')"
+              >{{ t('terminal.pendingConfirmation') }}</span>
               <span v-if="wf.description" class="workflow-card__desc">{{ wf.description }}</span>
               <button
                 type="button"
@@ -1230,6 +1270,19 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* G-SEC-03: badge marking startup workflows that require explicit confirmation. */
+.workflow-card__pending-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  color: var(--color-warning, #d97706);
+  background-color: var(--color-warning-bg, rgba(217, 119, 6, 0.12));
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .workflow-card__run {

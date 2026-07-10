@@ -275,3 +275,190 @@ func TestValidateAllWorkflows(t *testing.T) {
 		t.Error("expected invalid-wf to be invalid")
 	}
 }
+
+// --- G-SEC-03: startup workflow confirmation gate ---
+
+// TestValidateWorkflow_ProjectSourceRequiresConfirmation verifies that a
+// workflow loaded from the project's .nknk/workflows directory has
+// RequiresConfirmation forced to true (G-SEC-03). This prevents untrusted
+// startup workflows in cloned repositories from auto-running shell commands.
+func TestValidateWorkflow_ProjectSourceRequiresConfirmation(t *testing.T) {
+	svc := NewWorkflowService()
+	wf := &WorkflowDef{
+		Name:   "bootstrap",
+		Source: ".nknk/workflows/bootstrap.yml",
+		Steps:  []WorkflowStep{{Name: "init", Command: "echo init"}},
+		RunOn:  &WorkflowTrigger{Event: "startup"},
+	}
+	svc.ValidateWorkflow(wf)
+	if !wf.RequiresConfirmation {
+		t.Error("expected RequiresConfirmation=true for project-source workflow, got false")
+	}
+}
+
+// TestValidateWorkflow_ProjectSourceRequiresConfirmationEvenWhenExplicitlyFalse
+// verifies that a malicious project workflow cannot bypass the confirmation
+// gate by setting requiresConfirmation: false in the file. The flag is forced
+// true for project sources regardless of the explicit setting.
+func TestValidateWorkflow_ProjectSourceRequiresConfirmationEvenWhenExplicitlyFalse(t *testing.T) {
+	svc := NewWorkflowService()
+	wf := &WorkflowDef{
+		Name:                  "sneaky",
+		Source:                ".nknk/workflows/sneaky.yml",
+		Steps:                 []WorkflowStep{{Name: "s", Command: "rm -rf /"}},
+		RunOn:                 &WorkflowTrigger{Event: "startup"},
+		RequiresConfirmation:  false, // explicit attempt to bypass
+	}
+	svc.ValidateWorkflow(wf)
+	if !wf.RequiresConfirmation {
+		t.Error("expected RequiresConfirmation forced true for project source even when explicitly false")
+	}
+}
+
+// TestValidateWorkflow_NonProjectSourceDoesNotForceConfirmation verifies that
+// a workflow without a project Source is not forced into confirmation (the
+// flag keeps its original value). This keeps the gate scoped to untrusted
+// project-level workflows.
+func TestValidateWorkflow_NonProjectSourceDoesNotForceConfirmation(t *testing.T) {
+	svc := NewWorkflowService()
+	wf := &WorkflowDef{
+		Name:   "manual",
+		Source: "", // no source — e.g. an in-memory workflow
+		Steps:  []WorkflowStep{{Name: "s", Command: "echo hi"}},
+	}
+	svc.ValidateWorkflow(wf)
+	if wf.RequiresConfirmation {
+		t.Error("expected RequiresConfirmation=false for non-project workflow, got true")
+	}
+}
+
+// TestLoadWorkflows_ProjectSourceSetsRequiresConfirmation verifies that
+// LoadWorkflows marks every loaded workflow with RequiresConfirmation=true
+// so the frontend receives the flag and can show the confirmation gate.
+func TestLoadWorkflows_ProjectSourceSetsRequiresConfirmation(t *testing.T) {
+	svc := NewWorkflowService()
+	tmp := t.TempDir()
+	writeWorkflowFile(t, tmp, ".nknk/workflows/startup.yml", `
+name: startup
+runOn:
+  event: startup
+steps:
+  - name: init
+    command: echo init
+`)
+	out, err := svc.LoadWorkflows(tmp)
+	if err != nil {
+		t.Fatalf("LoadWorkflows: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 workflow, got %d", len(out))
+	}
+	if !out[0].RequiresConfirmation {
+		t.Error("expected loaded project workflow to have RequiresConfirmation=true")
+	}
+}
+
+// TestPendingStartupWorkflows_ReturnsStartupWorkflows verifies that
+// PendingStartupWorkflows returns only workflows with runOn.event == "startup".
+func TestPendingStartupWorkflows_ReturnsStartupWorkflows(t *testing.T) {
+	svc := NewWorkflowService()
+	wfs := []WorkflowDef{
+		{
+			Name:   "bootstrap",
+			Source: ".nknk/workflows/bootstrap.yml",
+			Steps:  []WorkflowStep{{Name: "init", Command: "echo init"}},
+			RunOn:  &WorkflowTrigger{Event: "startup"},
+		},
+		{
+			Name:   "manual",
+			Source: ".nknk/workflows/manual.yml",
+			Steps:  []WorkflowStep{{Name: "build", Command: "make"}},
+		},
+		{
+			Name:   "auto-test",
+			Source: ".nknk/workflows/auto-test.yml",
+			Steps:  []WorkflowStep{{Name: "test", Command: "go test"}},
+			RunOn:  &WorkflowTrigger{Event: "file-saved", Glob: "**/*.go"},
+		},
+		{
+			Name:   "sync-deps",
+			Source: ".nknk/workflows/sync-deps.yml",
+			Steps:  []WorkflowStep{{Name: "sync", Command: "go mod download"}},
+			RunOn:  &WorkflowTrigger{Event: "startup"},
+		},
+	}
+	pending := svc.PendingStartupWorkflows(wfs)
+	if len(pending) != 2 {
+		t.Fatalf("expected 2 pending startup workflows, got %d", len(pending))
+	}
+	names := []string{pending[0].Name, pending[1].Name}
+	if names[0] != "bootstrap" && names[1] != "bootstrap" {
+		t.Errorf("expected 'bootstrap' in pending list, got %v", names)
+	}
+	if names[0] != "sync-deps" && names[1] != "sync-deps" {
+		t.Errorf("expected 'sync-deps' in pending list, got %v", names)
+	}
+}
+
+// TestPendingStartupWorkflows_EmptyWhenNoStartupWorkflows verifies that
+// PendingStartupWorkflows returns an empty slice when no startup workflows
+// are present.
+func TestPendingStartupWorkflows_EmptyWhenNoStartupWorkflows(t *testing.T) {
+	svc := NewWorkflowService()
+	wfs := []WorkflowDef{
+		{
+			Name:   "manual",
+			Source: ".nknk/workflows/manual.yml",
+			Steps:  []WorkflowStep{{Name: "build", Command: "make"}},
+		},
+		{
+			Name:   "auto-test",
+			Source: ".nknk/workflows/auto-test.yml",
+			Steps:  []WorkflowStep{{Name: "test", Command: "go test"}},
+			RunOn:  &WorkflowTrigger{Event: "file-saved"},
+		},
+	}
+	pending := svc.PendingStartupWorkflows(wfs)
+	if len(pending) != 0 {
+		t.Fatalf("expected 0 pending startup workflows, got %d", len(pending))
+	}
+}
+
+// TestPendingStartupWorkflows_StartupWorkflowsNotAutoExecuted verifies the
+// G-SEC-03 guarantee: a startup workflow is returned by PendingStartupWorkflows
+// (for user confirmation) and is flagged with RequiresConfirmation=true so the
+// frontend knows NOT to auto-execute it. The backend exposes no auto-run path
+// for these workflows — they must be explicitly run by the user.
+func TestPendingStartupWorkflows_StartupWorkflowsNotAutoExecuted(t *testing.T) {
+	svc := NewWorkflowService()
+	wfs := []WorkflowDef{
+		{
+			Name:   "bootstrap",
+			Source: ".nknk/workflows/bootstrap.yml",
+			Steps:  []WorkflowStep{{Name: "init", Command: "echo init"}},
+			RunOn:  &WorkflowTrigger{Event: "startup"},
+		},
+	}
+	// Validate so RequiresConfirmation is applied (mirrors the frontend flow:
+	// load → validate → list pending for confirmation).
+	for i := range wfs {
+		svc.ValidateWorkflow(&wfs[i])
+	}
+	pending := svc.PendingStartupWorkflows(wfs)
+	if len(pending) != 1 {
+		t.Fatalf("expected 1 pending startup workflow, got %d", len(pending))
+	}
+	// The pending workflow must be flagged for confirmation — the UI uses this
+	// to show the "Pending Confirmation" badge and block auto-execution.
+	if !pending[0].RequiresConfirmation {
+		t.Error("expected pending startup workflow to have RequiresConfirmation=true")
+	}
+	// The backend WorkflowService has no Run/AutoRun method — the only way to
+	// execute a workflow is via the explicit RunOn trigger listener in the
+	// frontend, which no longer fires for "startup" events (G-SEC-03). This
+	// test documents that contract: PendingStartupWorkflows is a pure listing
+	// function with no execution side effects.
+	if pending[0].RunOn == nil || pending[0].RunOn.Event != "startup" {
+		t.Error("expected pending workflow to retain its startup trigger")
+	}
+}

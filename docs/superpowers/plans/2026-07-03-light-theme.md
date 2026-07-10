@@ -28,7 +28,7 @@
 
 Add a `[data-mode="light"]` block that overrides all dark-theme tokens with light equivalents. The accent overrides (lines 132-211) remain unchanged — they set `--color-primary` which works in both modes. Only surface/text/border/chrome tokens need overriding.
 
-- [ ] **Step 1: Insert light theme token block**
+- [x] **Step 1: Insert light theme token block**
 
 Insert this block after line 211 (after the indigo accent block), before the "Base reset & global styles" comment:
 
@@ -115,7 +115,7 @@ Insert this block after line 211 (after the indigo accent block), before the "Ba
 }
 ```
 
-- [ ] **Step 2: Verify CSS parses without errors**
+- [x] **Step 2: Verify CSS parses without errors**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
@@ -129,7 +129,7 @@ Expected: exit 0
 
 The `html` selector has `color-scheme: dark` hardcoded. This must be dynamic based on `data-mode`.
 
-- [ ] **Step 1: Update html selector**
+- [x] **Step 1: Update html selector**
 
 In `frontend/src/assets/styles/main.css`, find the `html` block (around line 225):
 ```css
@@ -161,7 +161,7 @@ html {
 }
 ```
 
-- [ ] **Step 2: Add explicit color-scheme for each mode**
+- [x] **Step 2: Add explicit color-scheme for each mode**
 
 Add after the `html` block (after line 235):
 ```css
@@ -174,7 +174,7 @@ Add after the `html` block (after line 235):
 }
 ```
 
-- [ ] **Step 3: Update .dark class marker**
+- [x] **Step 3: Update .dark class marker**
 
 Find the `.dark` block (around line 359):
 ```css
@@ -203,7 +203,7 @@ Change to:
 
 Add a `createLightThemeData(accent)` function and register light variants for all 8 accents. The light theme uses `base: "vs"` (Monaco's built-in light theme) instead of `vs-dark`.
 
-- [ ] **Step 1: Add light theme data function**
+- [x] **Step 1: Add light theme data function**
 
 In `frontend/src/lib/monaco-themes.ts`, add this function after `createThemeData()` (after line 96):
 
@@ -279,7 +279,7 @@ function createLightThemeData(accent: string): monaco.editor.IStandaloneThemeDat
 }
 ```
 
-- [ ] **Step 2: Add light theme names to accentThemes**
+- [x] **Step 2: Add light theme names to accentThemes**
 
 Update the `accentThemes` object (lines 17-26) to add `monacoLightTheme` field. Change:
 
@@ -324,7 +324,7 @@ export const accentThemes: Record<AccentTheme, ThemeMeta> = {
 };
 ```
 
-- [ ] **Step 3: Register light themes in registerAllThemes**
+- [x] **Step 3: Register light themes in registerAllThemes**
 
 Update `registerAllThemes()` (lines 102-107) from:
 
@@ -350,7 +350,7 @@ export function registerAllThemes(): void {
 }
 ```
 
-- [ ] **Step 4: Add light theme application function**
+- [x] **Step 4: Add light theme application function**
 
 Add after `applyMonacoTheme()` (after line 117):
 
@@ -376,7 +376,7 @@ export function getMonacoThemeNameForMode(accent: AccentTheme, mode: "dark" | "l
 }
 ```
 
-- [ ] **Step 5: Type-check**
+- [x] **Step 5: Type-check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
@@ -390,7 +390,7 @@ Expected: exit 0
 
 Add an `applyMode(mode)` function that sets `data-mode` on `<html>` and applies the matching Monaco theme. Handle "system" mode by checking `prefers-color-scheme`.
 
-- [ ] **Step 1: Update imports**
+- [x] **Step 1: Update imports**
 
 In `frontend/src/stores/app.ts` line 5, change:
 ```typescript
@@ -401,14 +401,14 @@ to:
 import { accentThemes, applyMonacoTheme, applyMonacoThemeForMode, registerAllThemes } from "@/lib/monaco-themes";
 ```
 
-- [ ] **Step 2: Add type for theme mode**
+- [x] **Step 2: Add type for theme mode**
 
 After line 7 (`export type PanelTab = ...`), add:
 ```typescript
 export type ThemeMode = "dark" | "light" | "system";
 ```
 
-- [ ] **Step 3: Add helper to resolve system mode**
+- [x] **Step 3: Add helper to resolve system mode**
 
 After the `applyAccentTheme` function (after line 129), add:
 
@@ -435,7 +435,7 @@ export function applyMode(mode: ThemeMode): void {
 }
 ```
 
-- [ ] **Step 4: Update initThemes to apply mode**
+- [x] **Step 4: Update initThemes to apply mode**
 
 Update `initThemes()` (lines 135-139) from:
 ```typescript
@@ -456,7 +456,7 @@ export function initThemes(): void {
 }
 ```
 
-- [ ] **Step 5: Add system mode change listener**
+- [x] **Step 5: Add system mode change listener**
 
 After `initThemes()`, add:
 ```typescript
@@ -489,7 +489,7 @@ export function stopSystemModeListener(): void {
 }
 ```
 
-- [ ] **Step 6: Type-check**
+- [x] **Step 6: Type-check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
@@ -503,7 +503,7 @@ Expected: exit 0
 
 The `handleThemeChange` function currently only saves settings. It must also call `applyMode`.
 
-- [ ] **Step 1: Update imports**
+- [x] **Step 1: Update imports**
 
 In `frontend/src/views/SettingsView.vue` line 3, change:
 ```typescript
@@ -515,7 +515,7 @@ import { appState, saveSettings, applyAccentTheme, applyMode } from "@/stores/ap
 import type { ThemeMode } from "@/stores/app";
 ```
 
-- [ ] **Step 2: Update handleThemeChange**
+- [x] **Step 2: Update handleThemeChange**
 
 Change the `handleThemeChange` function (lines 77-79) from:
 ```typescript
@@ -531,7 +531,7 @@ function handleThemeChange() {
 }
 ```
 
-- [ ] **Step 3: Type-check**
+- [x] **Step 3: Type-check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
@@ -545,7 +545,7 @@ Expected: exit 0
 
 The app must apply the saved theme mode on startup, and start the system mode listener.
 
-- [ ] **Step 1: Update main.ts**
+- [x] **Step 1: Update main.ts**
 
 In `frontend/src/main.ts`, update the imports (line 10) from:
 ```typescript
@@ -572,7 +572,7 @@ app.mount("#app");
 
 **Note:** `loadSettings` is async but not awaited — this is existing behavior. The `initThemes` runs first with default `theme: "dark"`, then `loadSettings` updates `appState.theme`. We need to apply the mode after settings load. Add a watcher in app.ts instead.
 
-- [ ] **Step 2: Add watcher for theme changes in app.ts**
+- [x] **Step 2: Add watcher for theme changes in app.ts**
 
 In `frontend/src/stores/app.ts`, add `watch` to the imports (line 1):
 ```typescript
@@ -590,7 +590,7 @@ watch(
 );
 ```
 
-- [ ] **Step 3: Type-check**
+- [x] **Step 3: Type-check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
@@ -602,7 +602,7 @@ Expected: exit 0
 **Files:**
 - Create: `frontend/src/stores/app.test.ts`
 
-- [ ] **Step 1: Write test file**
+- [x] **Step 1: Write test file**
 
 Create `frontend/src/stores/app.test.ts`:
 
@@ -666,7 +666,7 @@ describe("Theme Mode", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run: `cd frontend && npx vitest run src/stores/app.test.ts`
 Expected: All 5 tests pass
@@ -675,37 +675,37 @@ Expected: All 5 tests pass
 
 ### Task 8: Full Verification
 
-- [ ] **Step 1: Go tests (unchanged, sanity check)**
+- [x] **Step 1: Go tests (unchanged, sanity check)**
 
 Run: `cd e:\gugacode\gugacode\gugacode && go test ./services/...`
 Expected: ok gugacode/services
 
-- [ ] **Step 2: Frontend type-check**
+- [x] **Step 2: Frontend type-check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 3: Frontend tests**
+- [x] **Step 3: Frontend tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: All tests pass (82 existing + 5 new = 87)
 
-- [ ] **Step 4: Verify light tokens exist in CSS**
+- [x] **Step 4: Verify light tokens exist in CSS**
 
 Run: `grep "data-mode=\"light\"" frontend/src/assets/styles/main.css`
 Expected: At least one match
 
-- [ ] **Step 5: Verify light Monaco themes registered**
+- [x] **Step 5: Verify light Monaco themes registered**
 
 Run: `grep "createLightThemeData" frontend/src/lib/monaco-themes.ts`
 Expected: At least 2 matches (function definition + call in registerAllThemes)
 
-- [ ] **Step 6: Verify applyMode exists in app.ts**
+- [x] **Step 6: Verify applyMode exists in app.ts**
 
 Run: `grep "export function applyMode" frontend/src/stores/app.ts`
 Expected: `export function applyMode(mode: ThemeMode): void {`
 
-- [ ] **Step 7: Verify SettingsView calls applyMode**
+- [x] **Step 7: Verify SettingsView calls applyMode**
 
 Run: `grep "applyMode" frontend/src/views/SettingsView.vue`
 Expected: At least 2 matches (import + call in handleThemeChange)

@@ -1,10 +1,45 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+// prompt-6 Task 6 / BUG-M10: responseRecorder must preserve status codes.
+func TestResponseRecorder_PreservesStatusCode(t *testing.T) {
+	rec := &responseRecorder{
+		ResponseWriter: httptest.NewRecorder(),
+		buf:            &bytes.Buffer{},
+		statusCode:     http.StatusOK,
+	}
+	rec.WriteHeader(http.StatusNotFound)
+	if rec.statusCode != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", rec.statusCode)
+	}
+	n, err := rec.Write([]byte("missing"))
+	if err != nil || n != 7 {
+		t.Fatalf("Write: n=%d err=%v", n, err)
+	}
+	if rec.buf.String() != "missing" {
+		t.Fatalf("body = %q", rec.buf.String())
+	}
+}
+
+func TestResponseRecorder_DefaultStatusOK(t *testing.T) {
+	rec := &responseRecorder{
+		ResponseWriter: httptest.NewRecorder(),
+		buf:            &bytes.Buffer{},
+		statusCode:     http.StatusOK,
+	}
+	// Downstream may never call WriteHeader; default stays 200.
+	if rec.statusCode != http.StatusOK {
+		t.Fatalf("default status = %d", rec.statusCode)
+	}
+}
 
 // N-34 (prompt-4.md): CSP nonce injection tests.
 
@@ -62,10 +97,16 @@ func TestInjectNonceIntoHTML_SelfClosingScript(t *testing.T) {
 }
 
 func TestGenerateNonce_LengthAndHex(t *testing.T) {
-	nonce := generateNonce()
+	nonce, err := generateNonce()
+	if err != nil {
+		t.Fatalf("generateNonce returned unexpected error: %v", err)
+	}
 	// 16 bytes -> 32 hex chars
 	if len(nonce) != 32 {
 		t.Fatalf("expected 32-char hex nonce, got %d chars: %s", len(nonce), nonce)
+	}
+	if nonce == "" {
+		t.Fatalf("expected non-empty nonce")
 	}
 	for _, c := range nonce {
 		isHex := (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')
@@ -78,11 +119,29 @@ func TestGenerateNonce_LengthAndHex(t *testing.T) {
 func TestGenerateNonce_Uniqueness(t *testing.T) {
 	seen := make(map[string]bool, 1000)
 	for i := 0; i < 1000; i++ {
-		n := generateNonce()
+		n, err := generateNonce()
+		if err != nil {
+			t.Fatalf("generateNonce returned unexpected error on iteration %d: %v", i, err)
+		}
 		if seen[n] {
 			t.Fatalf("nonce %s repeated after %d iterations", n, i)
 		}
 		seen[n] = true
+	}
+}
+
+// TestGenerateNonce_NonEmptyOnSuccess verifies the happy path: a non-empty
+// hex string and nil error. Mocking crypto/rand.Read failure in Go is
+// awkward without dependency injection, so we assert the success path
+// returns a usable nonce — the failure branch returns ("", err) by
+// construction (G-SEC-10).
+func TestGenerateNonce_NonEmptyOnSuccess(t *testing.T) {
+	nonce, err := generateNonce()
+	if err != nil {
+		t.Fatalf("expected nil error on healthy crypto/rand, got: %v", err)
+	}
+	if nonce == "" {
+		t.Fatalf("expected non-empty nonce, got empty string")
 	}
 }
 
@@ -120,5 +179,18 @@ func TestContentSecurityPolicyStatic_NoUnsafeInline(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// G-PERF-04: BenchmarkGenerateNonce benchmarks CSP nonce generation.
+// Lives here (package main) because generateNonce is defined in main.go,
+// not the services package. The CI perf-benchmark job targets
+// ./services/... and so does not exercise this benchmark; it is kept for
+// local/manual performance characterization of the CSP nonce path.
+// generateNonce is also covered by TestGenerateNonce_* above.
+func BenchmarkGenerateNonce(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = generateNonce()
 	}
 }

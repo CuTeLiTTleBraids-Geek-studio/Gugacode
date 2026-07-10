@@ -38,7 +38,7 @@
 - Modify: `services/ai_service.go`
 - Test: `services/ai_service_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `services/ai_service_test.go`:
 
@@ -79,12 +79,12 @@ func TestAIService_Complete_NoAPIKey(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./services/ -run TestAIService_Complete -v`
 Expected: FAIL with "undefined: CompletionRequest"
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add to `services/ai_service.go` (after the `Send` method):
 
@@ -176,12 +176,12 @@ func (a *AIService) Complete(req CompletionRequest) (*CompletionResponse, error)
 
 Add `"strings"` to the import block if not already present.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./services/ -run TestAIService_Complete -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/ai_service.go services/ai_service_test.go
@@ -196,7 +196,7 @@ git commit -m "feat: add AIService.Complete for inline code completion"
 - Modify: `services/conversation_service.go`
 - Test: `services/conversation_service_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `services/conversation_service_test.go`:
 
@@ -253,12 +253,12 @@ func TestConversationService_UpdateTitle_EmptyTitle(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./services/ -run TestConversationService_UpdateTitle -v`
 Expected: FAIL with "undefined: UpdateTitle"
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add to `services/conversation_service.go` (after the `Delete` method):
 
@@ -280,12 +280,12 @@ func (p *ConversationService) UpdateTitle(id string, title string) error {
 
 Add `"errors"`, `"fmt"`, and `"strings"` to the import block if not already present.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./services/ -run TestConversationService_UpdateTitle -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/conversation_service.go services/conversation_service_test.go
@@ -300,7 +300,7 @@ git commit -m "feat: add ConversationService.UpdateTitle for renaming"
 - Modify: `services/git_service.go`
 - Test: `services/git_service_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `services/git_service_test.go`:
 
@@ -381,12 +381,12 @@ var testAuthor = object.Signature{Name: "Test", Email: "test@test.com", When: ti
 
 And ensure `"os"`, `"path/filepath"`, `"strings"`, `"time"`, `"github.com/go-git/go-git/v5"`, `"github.com/go-git/go-git/v5/plumbing/object"` are imported.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./services/ -run TestGitService_GetDiff -v`
 Expected: FAIL with "undefined: GetDiff"
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add to `services/git_service.go` (after the `Commit` method):
 
@@ -623,14 +623,14 @@ Add these imports to `git_service.go` if not present: `"bytes"`, `"fmt"`, `"io"`
 
 Note: The `index` package import path may need adjustment based on go-git v5.19.1. Check the actual path with `go list github.com/go-git/go-git/v5/utils/index` — if unavailable, use `repo.Storer.Index()` which returns `*index.Index` from `github.com/go-git/go-git/v5/utils/index`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./services/ -run TestGitService_GetDiff -v`
 Expected: PASS
 
 If the import for `index` fails, adjust: the correct type is obtained from `repo.Storer.Index()` which returns `index.Index` — you may need to import `github.com/go-git/go-git/v5/utils/index` or access the entry via the index's `Entries` slice.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/git_service.go services/git_service_test.go
@@ -645,7 +645,7 @@ git commit -m "feat: add GitService.GetDiff for file-level diffs"
 - Modify: `frontend/src/types/index.ts`
 - Modify: `frontend/src/api/services.ts`
 
-- [ ] **Step 1: Add types**
+- [x] **Step 1: Add types**
 
 Add to `frontend/src/types/index.ts`:
 
@@ -664,7 +664,7 @@ export interface CompletionResponse {
 }
 ```
 
-- [ ] **Step 2: Add API wrappers**
+- [x] **Step 2: Add API wrappers**
 
 In `frontend/src/api/services.ts`, add to the `aiService` object:
 
@@ -700,12 +700,12 @@ Ensure `CompletionRequest` is imported in the types import block at the top of `
 
 Note: The Wails Vite plugin auto-generates the binding JS files (`aiservice.js`, `conversationservice.js`, `gitservice.js`) when the Go services are updated. After running the dev server or `wails3 generate bindings`, the new `Complete`, `UpdateTitle`, and `GetDiff` functions will appear in the binding files. If the binding files are NOT auto-generated in the test environment, manually add the binding entries (see Task 4b below).
 
-- [ ] **Step 3: Verify types compile**
+- [x] **Step 3: Verify types compile**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0 (may have errors if binding files not yet regenerated — if so, proceed to Task 4b)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types/index.ts frontend/src/api/services.ts
@@ -723,7 +723,7 @@ git commit -m "feat: add complete/updateTitle/getDiff API wrappers"
 
 Since the Wails Vite plugin may not regenerate bindings in all environments, manually add the new binding entries. Each binding ID is the FNV-1a hash of `changeme/services.TypeName.MethodName`.
 
-- [ ] **Step 1: Compute binding IDs**
+- [x] **Step 1: Compute binding IDs**
 
 Run this Go snippet to get the IDs:
 
@@ -748,7 +748,7 @@ func main() {
 }
 ```
 
-- [ ] **Step 2: Add Complete to aiservice.js**
+- [x] **Step 2: Add Complete to aiservice.js**
 
 Add the `Complete` export using the computed binding ID:
 
@@ -760,7 +760,7 @@ export function Complete(req) {
 
 Where `bindingID` is the number from Step 1.
 
-- [ ] **Step 3: Add UpdateTitle to conversationservice.js**
+- [x] **Step 3: Add UpdateTitle to conversationservice.js**
 
 ```javascript
 export function UpdateTitle(id, title) {
@@ -768,7 +768,7 @@ export function UpdateTitle(id, title) {
 }
 ```
 
-- [ ] **Step 4: Add GetDiff to gitservice.js**
+- [x] **Step 4: Add GetDiff to gitservice.js**
 
 ```javascript
 export function GetDiff(path, filePath) {
@@ -776,7 +776,7 @@ export function GetDiff(path, filePath) {
 }
 ```
 
-- [ ] **Step 5: Verify frontend compiles**
+- [x] **Step 5: Verify frontend compiles**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
@@ -789,7 +789,7 @@ Expected: exit 0
 - Modify: `frontend/src/components/editor/CodeEditor.vue`
 - Create: `frontend/src/stores/inlineCompletion.ts`
 
-- [ ] **Step 1: Create the inline completion store**
+- [x] **Step 1: Create the inline completion store**
 
 Create `frontend/src/stores/inlineCompletion.ts`:
 
@@ -849,7 +849,7 @@ export function toggleInlineCompletion(): void {
 }
 ```
 
-- [ ] **Step 2: Register the InlineCompletionsProvider in CodeEditor.vue**
+- [x] **Step 2: Register the InlineCompletionsProvider in CodeEditor.vue**
 
 In `frontend/src/components/editor/CodeEditor.vue`, modify the `handleMount` function to register the provider:
 
@@ -918,17 +918,17 @@ function registerInlineCompletionProvider(editor: monacoEditor.editor.IStandalon
 
 Add `monacoEditor` to the import from `@guolao/vue-monaco-editor` if not already present (it should be imported as the type namespace).
 
-- [ ] **Step 3: Verify frontend compiles**
+- [x] **Step 3: Verify frontend compiles**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 4: Run existing tests**
+- [x] **Step 4: Run existing tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all existing tests pass (78+)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/stores/inlineCompletion.ts frontend/src/components/editor/CodeEditor.vue
@@ -943,7 +943,7 @@ git commit -m "feat: add AI inline code completion (Copilot-style ghost text)"
 - Modify: `frontend/src/stores/ai.ts`
 - Modify: `frontend/src/components/layout/AiChatPanel.vue`
 
-- [ ] **Step 1: Add renameConversation to ai.ts store**
+- [x] **Step 1: Add renameConversation to ai.ts store**
 
 In `frontend/src/stores/ai.ts`, add:
 
@@ -972,7 +972,7 @@ export async function renameConversation(id: string, newTitle: string): Promise<
 
 Ensure `conversationService` and `notifyError` are imported.
 
-- [ ] **Step 2: Add rename UI to AiChatPanel.vue**
+- [x] **Step 2: Add rename UI to AiChatPanel.vue**
 
 In `frontend/src/components/layout/AiChatPanel.vue`, add a rename button and dialog. Add these refs and functions to the `<script setup>`:
 
@@ -1019,17 +1019,17 @@ Add a rename button in the template (near the "Clear" or "New Chat" button):
 
 Ensure `notifyWarning`, `notifySuccess` are imported from `@/lib/notifications`.
 
-- [ ] **Step 3: Verify frontend compiles**
+- [x] **Step 3: Verify frontend compiles**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all tests pass
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/stores/ai.ts frontend/src/components/layout/AiChatPanel.vue
@@ -1044,7 +1044,7 @@ git commit -m "feat: add conversation rename with prompt dialog"
 - Create: `frontend/src/components/editor/DiffView.vue`
 - Modify: `frontend/src/components/layout/GitPanel.vue`
 
-- [ ] **Step 1: Create DiffView.vue**
+- [x] **Step 1: Create DiffView.vue**
 
 Create `frontend/src/components/editor/DiffView.vue`:
 
@@ -1200,7 +1200,7 @@ function handleClose() {
 </style>
 ```
 
-- [ ] **Step 2: Wire DiffView into GitPanel.vue**
+- [x] **Step 2: Wire DiffView into GitPanel.vue**
 
 In `frontend/src/components/layout/GitPanel.vue`, add a "View Diff" button for each changed file. Add to the `<script setup>`:
 
@@ -1242,17 +1242,17 @@ Add the DiffView component at the end of the template:
 
 Ensure `ref` is imported from vue.
 
-- [ ] **Step 3: Verify frontend compiles**
+- [x] **Step 3: Verify frontend compiles**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all tests pass
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/editor/DiffView.vue frontend/src/components/layout/GitPanel.vue
@@ -1263,27 +1263,27 @@ git commit -m "feat: add Git diff view with file-level diff display"
 
 ## Task 8: Full Verification
 
-- [ ] **Step 1: Run all Go tests**
+- [x] **Step 1: Run all Go tests**
 
 Run: `go test ./services/... -count=1 -timeout 60s`
 Expected: all PASS
 
-- [ ] **Step 2: Run go build**
+- [x] **Step 2: Run go build**
 
 Run: `go build .`
 Expected: exit 0
 
-- [ ] **Step 3: Run vue-tsc**
+- [x] **Step 3: Run vue-tsc**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 4: Run vitest**
+- [x] **Step 4: Run vitest**
 
 Run: `cd frontend && npx vitest run`
 Expected: all tests pass
 
-- [ ] **Step 5: Manual GUI verification notes**
+- [x] **Step 5: Manual GUI verification notes**
 
 The following should be manually verified in the running app:
 1. **Inline completion**: Open a code file, type code, wait ~300ms — ghost text should appear. Tab to accept, Esc to dismiss.

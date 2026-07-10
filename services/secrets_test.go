@@ -203,8 +203,22 @@ func TestSettingsService_LoadSettings_decryptsAPIKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadSettings failed: %v", err)
 	}
-	if loaded.AIApiKey != "sk-decrypt-me" {
-		t.Errorf("AIApiKey = %q, want %q", loaded.AIApiKey, "sk-decrypt-me")
+	// G-SEC-07: LoadSettings must NOT return the plaintext key. It is cleared
+	// and AIApiKeyConfigured signals that a key is stored. The decrypted key
+	// is available via GetDecryptedAPIKey for internal backend use.
+	if loaded.AIApiKey != "" {
+		t.Errorf("AIApiKey = %q, want empty (G-SEC-07)", loaded.AIApiKey)
+	}
+	if !loaded.AIApiKeyConfigured {
+		t.Error("AIApiKeyConfigured = false, want true")
+	}
+	// The internal accessor still returns the decrypted key.
+	got, err := svc2.GetDecryptedAPIKey()
+	if err != nil {
+		t.Fatalf("GetDecryptedAPIKey failed: %v", err)
+	}
+	if got != "sk-decrypt-me" {
+		t.Errorf("GetDecryptedAPIKey = %q, want %q", got, "sk-decrypt-me")
 	}
 }
 
@@ -248,9 +262,21 @@ func TestSettingsService_LoadSettings_migratesLegacyPlaintext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadSettings failed: %v", err)
 	}
-	// The in-memory key should be the plaintext value.
-	if loaded.AIApiKey != "sk-legacy-plaintext" {
-		t.Errorf("AIApiKey = %q, want %q", loaded.AIApiKey, "sk-legacy-plaintext")
+	// G-SEC-07: the plaintext key is NOT returned; AIApiKeyConfigured signals
+	// that a key was stored, and the storage method reflects the legacy form.
+	if loaded.AIApiKey != "" {
+		t.Errorf("AIApiKey = %q, want empty (G-SEC-07)", loaded.AIApiKey)
+	}
+	if !loaded.AIApiKeyConfigured {
+		t.Error("AIApiKeyConfigured = false, want true")
+	}
+	// The decrypted key is still available internally for backend use.
+	got, err := svc.GetDecryptedAPIKey()
+	if err != nil {
+		t.Fatalf("GetDecryptedAPIKey failed: %v", err)
+	}
+	if got != "sk-legacy-plaintext" {
+		t.Errorf("GetDecryptedAPIKey = %q, want %q", got, "sk-legacy-plaintext")
 	}
 
 	// The on-disk file should now be encrypted (auto-migration).
@@ -283,6 +309,12 @@ func TestSettingsService_LoadSettings_emptyKeyStaysEmpty(t *testing.T) {
 	}
 	if loaded.AIApiKey != "" {
 		t.Errorf("AIApiKey = %q, want empty", loaded.AIApiKey)
+	}
+	if loaded.AIApiKeyConfigured {
+		t.Error("AIApiKeyConfigured = true, want false (no key stored)")
+	}
+	if loaded.AIApiKeyStorageMethod != "none" {
+		t.Errorf("AIApiKeyStorageMethod = %q, want %q", loaded.AIApiKeyStorageMethod, "none")
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
 )
 
@@ -203,5 +204,92 @@ func TestAIService_ListModels_N73_RejectsMaliciousBaseURL(t *testing.T) {
 				t.Errorf("handler should NOT have been called for malicious URL %q — API key would leak", u)
 			}
 		})
+	}
+}
+
+// TestAIService_ListModels_CRIT01_UsesStoredKeyWhenEmpty verifies that
+// ListModels uses the backend's stored (decrypted) API key when the caller
+// passes apiKey="". This is the G-SEC-07 / CRIT-01 isolation pattern: the
+// frontend never holds the plaintext key, so it calls ListModels with an
+// empty key and the backend fills it from a.config.APIKey (populated by
+// SetConfig when UseStoredKey was true).
+func TestAIService_ListModels_CRIT01_UsesStoredKeyWhenEmpty(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The stored key must be sent, NOT an empty auth header.
+		if got := r.Header.Get("Authorization"); got != "Bearer stored-test-key" {
+			t.Errorf("expected stored key auth, got %q (CRIT-01: key must come from backend config)", got)
+		}
+		response := map[string]interface{}{
+			"data": []map[string]interface{}{
+				{"id": "gpt-4o"},
+			},
+		}
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	svc := NewAIService()
+	// Simulate the state left by SetConfig: a.config.APIKey holds the
+	// decrypted stored key (populated via SettingsService.GetAPIKeyForConfig).
+	svc.mu.Lock()
+	svc.config = AIConfig{
+		APIKey:  "stored-test-key",
+		BaseURL: server.URL,
+	}
+	svc.mu.Unlock()
+
+	models, err := svc.ListModels(server.URL, "")
+	if err != nil {
+		t.Fatalf("ListModels failed: %v", err)
+	}
+	if len(models) != 1 || models[0] != "gpt-4o" {
+		t.Fatalf("unexpected models: %v", models)
+	}
+}
+
+// TestAIService_ListModels_CRIT01_FallsBackToSettingsService verifies that
+// when a.config.APIKey is empty (SetConfig not yet called, or cleared) but
+// the backend has a stored key for the configured ConfigID, ListModels
+// retrieves it via SettingsService.GetAPIKeyForConfig.
+func TestAIService_ListModels_CRIT01_FallsBackToSettingsService(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer ss-stored-key" {
+			t.Errorf("expected SettingsService key, got %q", got)
+		}
+		response := map[string]interface{}{
+			"data": []map[string]interface{}{
+				{"id": "claude-3"},
+			},
+		}
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	// Set up a SettingsService with a stored (encrypted) provider key.
+	configPath := filepath.Join(t.TempDir(), "settings.json")
+	ss := &SettingsService{configPath: configPath}
+	settings := defaultSettings()
+	settings.AIProviderConfigs = []AIProviderConfig{
+		{ID: "cfg-x", Name: "X", Provider: "openai", APIKey: "ss-stored-key", BaseURL: server.URL, Model: "gpt-4o"},
+	}
+	settings.ActiveAIConfigID = "cfg-x"
+	if err := ss.SaveSettings(settings); err != nil {
+		t.Fatalf("SaveSettings failed: %v", err)
+	}
+
+	svc := NewAIService()
+	svc.SetSettingsService(ss)
+	// a.config has ConfigID set but APIKey empty (UseStoredKey path not yet
+	// run, or config cleared). ListModels should fetch from SettingsService.
+	svc.mu.Lock()
+	svc.config = AIConfig{ConfigID: "cfg-x", BaseURL: server.URL}
+	svc.mu.Unlock()
+
+	models, err := svc.ListModels(server.URL, "")
+	if err != nil {
+		t.Fatalf("ListModels failed: %v", err)
+	}
+	if len(models) != 1 || models[0] != "claude-3" {
+		t.Fatalf("unexpected models: %v", models)
 	}
 }

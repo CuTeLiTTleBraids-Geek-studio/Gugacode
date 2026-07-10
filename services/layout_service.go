@@ -81,6 +81,12 @@ func (s *LayoutService) LoadLayout() (string, error) {
 // from racing on os.WriteFile. Writes to a temp file first, then renames
 // atomically — this prevents partial writes from corrupting the layout
 // file even if the process crashes mid-write.
+//
+// G-SEC-09: this already writes atomically (temp file + rename), so it
+// satisfies the atomic-write requirement directly. It is intentionally
+// not routed through atomicWriteJSON because that helper re-indents its
+// payload, and the layout JSON must be preserved verbatim (existing
+// round-trip tests assert byte-for-byte fidelity).
 func (s *LayoutService) SaveLayout(layoutJSON string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

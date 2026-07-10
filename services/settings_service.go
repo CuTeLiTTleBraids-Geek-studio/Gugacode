@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -13,49 +14,70 @@ import (
 // Settings holds all persisted application settings.
 //
 // The AIApiKey field is special (N-13): on disk it is stored encrypted with a
-// "dpapi:" (Windows) or "aes:" (other platforms) prefix. In memory (after
-// LoadSettings) it holds the plaintext key. SaveSettings always re-encrypts
-// before writing. Legacy plaintext keys (no prefix) are auto-migrated to
-// encrypted form on the first LoadSettings.
+// "dpapi:" (Windows) or "aes:" (other platforms) prefix. SaveSettings always
+// re-encrypts before writing. Legacy plaintext keys (no prefix) are
+// auto-migrated to encrypted form on the first LoadSettings.
+//
+// G-SEC-07: LoadSettings no longer returns the decrypted key in AIApiKey —
+// that field is cleared ("") in the returned struct so the plaintext key is
+// never sent to the frontend via the Wails binding (where it would live in
+// the JS heap and be vulnerable to XSS). Instead, AIApiKeyConfigured signals
+// whether a key is stored, and AIApiKeyStorageMethod labels how it is stored
+// ("dpapi"/"aes"/"keyring"/"plain"/"none"). The decrypted key remains
+// available to the backend via GetDecryptedAPIKey.
 //
 // CustomShortcuts (N-8) maps a shortcut label (e.g. "Save File") to a
 // user-defined key combination that overrides the default binding. The map
 // may be nil when no customizations have been made.
 type Settings struct {
-	Language    string `json:"language"`
-	Theme       string `json:"theme"`
-	FontSize    int    `json:"fontSize"`
-	FontFamily  string `json:"fontFamily"`
-	TabSize     int    `json:"tabSize"`
-	WordWrap    bool   `json:"wordWrap"`
-	LineNumbers bool   `json:"lineNumbers"`
-	Minimap     bool   `json:"minimap"`
-	AIApiKey       string `json:"aiApiKey"`
+	// Version is a monotonic counter bumped on every successful SaveSettings
+	// (prompt-7 Task F / BUG-M14). Clients send ExpectedVersion for CAS.
+	Version int64 `json:"version"`
+	// ExpectedVersion is write-intent only (not stored). When non-nil and the
+	// file already has a version, Save fails if disk.Version != *ExpectedVersion.
+	ExpectedVersion *int64 `json:"expectedVersion,omitempty"`
+	Language        string `json:"language"`
+	Theme           string `json:"theme"`
+	FontSize        int    `json:"fontSize"`
+	FontFamily      string `json:"fontFamily"`
+	TabSize         int    `json:"tabSize"`
+	WordWrap        bool   `json:"wordWrap"`
+	LineNumbers     bool   `json:"lineNumbers"`
+	Minimap         bool   `json:"minimap"`
+	AIApiKey        string `json:"aiApiKey"`
 	AIBaseURL      string `json:"aiBaseUrl"`
 	AIModel        string `json:"aiModel"`
 	AISystemPrompt string `json:"aiSystemPrompt"`
+	// G-SEC-07: AIApiKeyConfigured is true when a (decryptable) key is stored
+	// on disk. It is recomputed by LoadSettings and is the frontend's signal
+	// that a key exists without exposing the plaintext. AIApiKeyStorageMethod
+	// labels the on-disk storage method; "none" means no key.
+	AIApiKeyConfigured    bool   `json:"aiApiKeyConfigured"`
+	AIApiKeyStorageMethod string `json:"aiApiKeyStorageMethod"`
 	// Plan 54: optional overrides for the other three built-in prompts.
 	// When non-empty, the AIService returns these instead of the built-in
 	// const. Empty string means "use the built-in".
-	AIAgentSystemPrompt         string `json:"aiAgentSystemPrompt,omitempty"`
-	AIConversationTitlePrompt   string `json:"aiConversationTitlePrompt,omitempty"`
-	AIInlineCompletionPrompt    string `json:"aiInlineCompletionPrompt,omitempty"`
-	CursorBlinking          string  `json:"cursorBlinking"`
-	CursorStyle             string  `json:"cursorStyle"`
-	BracketColorization     bool    `json:"bracketColorization"`
-	AutoSave                bool    `json:"autoSave"`
-	AutoSaveDelay           string  `json:"autoSaveDelay"`
-	AIProvider              string  `json:"aiProvider"`
-	Temperature             float64 `json:"temperature"`
-	MaxTokens               int     `json:"maxTokens"`
-	DefaultShell            string  `json:"defaultShell"`
-	TerminalFontSize        int     `json:"terminalFontSize"`
-	TerminalCursorStyle     string  `json:"terminalCursorStyle"`
-	Scrollback              int     `json:"scrollback"`
-	UIDensity               string  `json:"uiDensity"`
-	FontSizeScaling         int     `json:"fontSizeScaling"`
-	InlineCompletionEnabled bool    `json:"inlineCompletionEnabled"`
-	CustomShortcuts         map[string]ShortcutKeys `json:"customShortcuts,omitempty"`
+	AIAgentSystemPrompt       string                  `json:"aiAgentSystemPrompt,omitempty"`
+	AIConversationTitlePrompt string                  `json:"aiConversationTitlePrompt,omitempty"`
+	AIInlineCompletionPrompt  string                  `json:"aiInlineCompletionPrompt,omitempty"`
+	CursorBlinking            string                  `json:"cursorBlinking"`
+	CursorStyle               string                  `json:"cursorStyle"`
+	BracketColorization       bool                    `json:"bracketColorization"`
+	AutoSave                  bool                    `json:"autoSave"`
+	AutoSaveDelay             string                  `json:"autoSaveDelay"`
+	AIProvider                string                  `json:"aiProvider"`
+	Temperature               float64                 `json:"temperature"`
+	MaxTokens                 int                     `json:"maxTokens"`
+	DefaultShell              string                  `json:"defaultShell"`
+	TerminalFontSize          int                     `json:"terminalFontSize"`
+	TerminalCursorStyle       string                  `json:"terminalCursorStyle"`
+	Scrollback                int                     `json:"scrollback"`
+	UIDensity                 string                  `json:"uiDensity"`
+	FontSizeScaling           int                     `json:"fontSizeScaling"`
+	InlineCompletionEnabled   bool                    `json:"inlineCompletionEnabled"`
+	// prompt-9 Task 9-A: format buffer via LSP before save (default true).
+	FormatOnSave bool `json:"formatOnSave"`
+	CustomShortcuts           map[string]ShortcutKeys `json:"customShortcuts,omitempty"`
 	// N-20: layout state. AiChatPosition omitempty is safe (empty defaults to
 	// "right" on the frontend). ActivityBarVisible must NOT use omitempty —
 	// otherwise "false" (the zero value) would be dropped and reload as "true".
@@ -86,8 +108,41 @@ type Settings struct {
 	// Temperature/MaxTokens/AISystemPrompt) are kept as a mirror of the
 	// active config so existing AI call paths work unchanged; switching
 	// the active config syncs these fields.
-	AIProviderConfigs  []AIProviderConfig `json:"aiProviderConfigs,omitempty"`
-	ActiveAIConfigID   string             `json:"activeAIConfigId,omitempty"`
+	AIProviderConfigs []AIProviderConfig `json:"aiProviderConfigs,omitempty"`
+	ActiveAIConfigID  string             `json:"activeAIConfigId,omitempty"`
+	// G-FEAT-03: optional overrides for toolchain binary paths. Keys are
+	// tool names (e.g. "golangci-lint", "eslint"), values are absolute or
+	// PATH-resolved executables. The ToolchainService checks this map first,
+	// then falls back to PATH. omitempty is safe — an empty map is equivalent
+	// to all-default (PATH lookup).
+	ToolPaths map[string]string `json:"toolPaths,omitempty"`
+	// Plan 11 Task 15: personalization (code area + chat background images,
+	// avatars, fonts, bubble styles). omitempty safe — zero value = defaults.
+	Personalization *PersonalizationConfig `json:"personalization,omitempty"`
+	// prompt-5 Task C / BUG-L6: whether to open the AI companion OS window
+	// automatically on app startup. Default false — users open it on demand.
+	// Must NOT use omitempty so false round-trips correctly.
+	OpenAIWindowOnStartup bool `json:"openAIWindowOnStartup"`
+}
+
+// PersonalizationConfig holds user personalization settings (Task 15 Step 1).
+// Image fields store relative paths under <configDir>/gugacode/assets/
+// (Step 2: images are copied there, not stored as base64).
+type PersonalizationConfig struct {
+	CodeEditorBgImage   string  `json:"codeEditorBgImage,omitempty"`   // assets/<name>
+	CodeEditorBgOpacity float64 `json:"codeEditorBgOpacity,omitempty"` // 0-1
+	CodeEditorBgBlur    float64 `json:"codeEditorBgBlur,omitempty"`    // px
+	ChatBgImage         string  `json:"chatBgImage,omitempty"`
+	ChatBgOpacity       float64 `json:"chatBgOpacity,omitempty"`
+	ChatBgBlur          float64 `json:"chatBgBlur,omitempty"`
+	UserAvatar          string  `json:"userAvatar,omitempty"`
+	AiAvatar            string  `json:"aiAvatar,omitempty"`
+	PersonaAvatars      map[string]string `json:"personaAvatars,omitempty"`
+	FontFamily          string  `json:"fontFamily,omitempty"`
+	FontSize            int     `json:"fontSize,omitempty"`
+	BubbleStyle         string  `json:"bubbleStyle,omitempty"` // rounded/sharp/bubble
+	BubbleOpacity       float64 `json:"bubbleOpacity,omitempty"`
+	MessageSpacing      int     `json:"messageSpacing,omitempty"`
 }
 
 // AIProviderConfig is a single named AI provider configuration. Users can
@@ -106,6 +161,12 @@ type AIProviderConfig struct {
 	Temperature  float64 `json:"temperature,omitempty"`
 	MaxTokens    int     `json:"maxTokens,omitempty"`
 	SystemPrompt string  `json:"systemPrompt,omitempty"`
+	// G-SEC-07: signals whether a key is stored on disk for this config.
+	// Recomputed by LoadSettings (true when the on-disk APIKey is non-empty).
+	// The frontend reads this to show "key configured" status without ever
+	// holding the plaintext. SaveSettings preserves the on-disk key when
+	// APIKey is empty but APIKeyConfigured is true.
+	APIKeyConfigured bool `json:"apiKeyConfigured,omitempty"`
 }
 
 // CustomAccentTheme is a user-defined accent theme (Plan 48). The base Color
@@ -175,10 +236,79 @@ func (s *SettingsService) SetConfigPath(path string) {
 	s.configPath = path
 }
 
+// assetsDir returns the personalization assets directory derived from the
+// config path: <configDir>/gugacode/assets/. Callers hold pathMu.
+func (s *SettingsService) assetsDir() string {
+	return filepath.Join(filepath.Dir(s.configPath), "assets")
+}
+
+// SavePersonalizationAsset stores an uploaded image (Step 2: copy to
+// <configDir>/gugacode/assets/<filename>, not base64). G-SEC-06: the
+// filename is sanitized to a basename (no path separators/traversal) and
+// the resolved path is validated to be within the assets dir.
+// Returns the relative path "assets/<filename>" for storage in PersonalizationConfig.
+func (s *SettingsService) SavePersonalizationAsset(filename string, data []byte) (string, error) {
+	// Sanitize filename: keep only the basename, reject empty.
+	clean := filepath.Base(filename)
+	if clean == "" || clean == "." || clean == ".." {
+		return "", fmt.Errorf("%w: invalid asset filename", ErrInvalidInput)
+	}
+	s.pathMu.RLock()
+	assetsDir := s.assetsDir()
+	s.pathMu.RUnlock()
+	if err := os.MkdirAll(assetsDir, 0o755); err != nil {
+		return "", fmt.Errorf("create assets dir: %w", err)
+	}
+	targetPath := filepath.Join(assetsDir, clean)
+	// G-SEC-06: validate the resolved path is within the assets dir.
+	if _, err := ValidatePathWithinRoot(assetsDir, targetPath); err != nil {
+		return "", fmt.Errorf("asset path validation failed: %w", err)
+	}
+	// Limit asset size to 8MB to prevent abuse (Step 2).
+	const maxAssetSize = 8 << 20
+	if len(data) > maxAssetSize {
+		return "", fmt.Errorf("%w: asset exceeds 8MB limit", ErrInvalidInput)
+	}
+	if err := atomicWriteFile(targetPath, data, 0o644); err != nil {
+		return "", fmt.Errorf("write asset: %w", err)
+	}
+	return "assets/" + clean, nil
+}
+
+// ReadPersonalizationAsset reads an asset by its relative path (e.g.
+// "assets/avatar.png"). G-SEC-06: validates the path is within the assets dir.
+func (s *SettingsService) ReadPersonalizationAsset(relPath string) ([]byte, error) {
+	s.pathMu.RLock()
+	assetsDir := s.assetsDir()
+	s.pathMu.RUnlock()
+	fullPath := filepath.Join(assetsDir, filepath.Base(relPath))
+	if _, err := ValidatePathWithinRoot(assetsDir, fullPath); err != nil {
+		return nil, fmt.Errorf("asset path validation failed: %w", err)
+	}
+	return os.ReadFile(fullPath)
+}
+
+// DeletePersonalizationAsset removes an asset by relative path.
+func (s *SettingsService) DeletePersonalizationAsset(relPath string) error {
+	s.pathMu.RLock()
+	assetsDir := s.assetsDir()
+	s.pathMu.RUnlock()
+	fullPath := filepath.Join(assetsDir, filepath.Base(relPath))
+	if _, err := ValidatePathWithinRoot(assetsDir, fullPath); err != nil {
+		return fmt.Errorf("asset path validation failed: %w", err)
+	}
+	return os.Remove(fullPath)
+}
+
 // LoadSettings reads settings from disk, falling back to defaults if the file
-// is missing or corrupt. The API key is decrypted in-memory. If the on-disk
-// key is legacy plaintext (no encryption prefix), it is auto-migrated to
-// encrypted form and re-saved (N-13).
+// is missing or corrupt. If the on-disk key is legacy plaintext (no encryption
+// prefix), it is auto-migrated to encrypted form and re-saved (N-13).
+//
+// G-SEC-07: the decrypted API key is NOT returned in Settings.AIApiKey (it is
+// cleared to "") so the plaintext never crosses the Wails binding into the
+// frontend JS heap. Instead AIApiKeyConfigured reports whether a key is stored
+// and AIApiKeyStorageMethod labels the storage method. The decrypted key is
+// available to the backend via GetDecryptedAPIKey.
 //
 // N-76: holds the read lock for the entire operation so a concurrent
 // SetConfigPath cannot swap the path mid-load (which would read from the
@@ -210,18 +340,36 @@ func (s *SettingsService) LoadSettings() (Settings, error) {
 	decrypted, derr := DecryptSecret(rawKey)
 	if derr != nil {
 		// Decryption failed — clear the key to avoid exposing ciphertext
-		// and return defaults for safety.
+		// and report no key configured.
 		settings.AIApiKey = ""
+		settings.AIApiKeyConfigured = false
+		settings.AIApiKeyStorageMethod = SecretMethod(rawKey)
 		return settings, nil
 	}
-	settings.AIApiKey = decrypted
 	// Auto-migrate legacy plaintext to encrypted form (N-13). Best-effort:
 	// errors are ignored so load still succeeds even if migration fails.
 	// saveSettingsLocked is used (not SaveSettings) because we already hold
 	// the read lock — Go's sync.RWMutex is NOT reentrant, so calling
-	// SaveSettings (which tries to RLock again) would deadlock.
+	// SaveSettings (which tries to RLock again) would deadlock. The
+	// decrypted key is used for the re-save, then cleared from the returned
+	// struct (G-SEC-07).
 	if rawKey != "" && !IsSecretEncrypted(rawKey) {
-		_ = s.saveSettingsLocked(settings)
+		migrationSettings := settings
+		migrationSettings.AIApiKey = decrypted
+		_ = s.saveSettingsLocked(migrationSettings)
+	}
+	// G-SEC-07: do NOT return the plaintext key. Signal presence via the
+	// boolean and label the storage method for the frontend.
+	settings.AIApiKey = ""
+	settings.AIApiKeyConfigured = decrypted != ""
+	settings.AIApiKeyStorageMethod = SecretMethod(rawKey)
+	// G-SEC-07: also strip the plaintext apiKey from each multi-provider
+	// config so keys never cross the Wails binding into the JS heap. The
+	// APIKeyConfigured flag lets the frontend show "key configured" status.
+	for i := range settings.AIProviderConfigs {
+		cfg := &settings.AIProviderConfigs[i]
+		cfg.APIKeyConfigured = cfg.APIKey != ""
+		cfg.APIKey = ""
 	}
 	return settings, nil
 }
@@ -242,9 +390,66 @@ func (s *SettingsService) SaveSettings(settings Settings) error {
 // saveSettingsLocked encrypts the API key and writes to disk. Caller MUST
 // hold s.pathMu (read or write). Used internally by LoadSettings (which
 // already holds the lock) and SaveSettings.
+//
+// G-SEC-07: when the caller passes an empty AIApiKey but signals
+// AIApiKeyConfigured (the frontend no longer holds the plaintext key, so it
+// saves unrelated changes with empty + configured=true), the existing
+// on-disk key is preserved so unrelated saves don't wipe the stored key. A
+// genuine clear passes AIApiKeyConfigured=false, so the key is written empty.
+// ErrSettingsConflict is returned when settings CAS fails (prompt-7 Task F).
+var ErrSettingsConflict = fmt.Errorf("settings version conflict: disk was modified by another window")
+
 func (s *SettingsService) saveSettingsLocked(settings Settings) error {
 	// Make a shallow copy so we don't mutate the caller's struct.
 	copy := settings
+
+	// prompt-7 Task F / BUG-M14: optional version CAS + monotonic bump.
+	if diskVer, ok := s.readDiskVersionLocked(); ok {
+		if copy.ExpectedVersion != nil && *copy.ExpectedVersion != diskVer {
+			return fmt.Errorf("%w (expected %d, disk %d)", ErrSettingsConflict, *copy.ExpectedVersion, diskVer)
+		}
+		copy.Version = diskVer + 1
+	} else if copy.Version <= 0 {
+		copy.Version = 1
+	}
+	copy.ExpectedVersion = nil
+
+	// G-SEC-07: preserve the existing on-disk key when the frontend saves
+	// without the plaintext key. Decrypt the stored value to plaintext so the
+	// normal encryption path below re-encrypts it (no double-encryption).
+	if copy.AIApiKey == "" && copy.AIApiKeyConfigured {
+		if existing := s.readRawAPIKeyLocked(); existing != "" {
+			if plaintext, derr := DecryptSecret(existing); derr == nil {
+				copy.AIApiKey = plaintext
+			}
+		}
+	}
+	// G-SEC-07/CRIT-01: preserve on-disk keys for multi-provider configs. The
+	// frontend sends empty apiKey + apiKeyConfigured=true when the user didn't
+	// enter a new key. Read the existing configs from disk and restore their
+	// keys so unrelated saves don't wipe stored keys.
+	//
+	// CRIT-01 scope fix: this block is OUTSIDE the legacy-key if-block so
+	// provider keys are preserved regardless of the legacy key state.
+	// Previously it was nested inside, so when the legacy key was non-empty
+	// the provider keys were wiped.
+	existingConfigs := s.readRawProviderConfigsLocked()
+	for i := range copy.AIProviderConfigs {
+		cfg := &copy.AIProviderConfigs[i]
+		if cfg.APIKey == "" && cfg.APIKeyConfigured {
+			for _, ec := range existingConfigs {
+				if ec.ID == cfg.ID && ec.APIKey != "" {
+					// ec.APIKey is stored encrypted on disk; decrypt to
+					// plaintext so the encryption path below re-encrypts it
+					// (no double-encryption).
+					if plaintext, derr := DecryptSecret(ec.APIKey); derr == nil {
+						cfg.APIKey = plaintext
+					}
+					break
+				}
+			}
+		}
+	}
 	encrypted, err := EncryptSecret(copy.AIApiKey)
 	if err != nil {
 		// Encryption failed — fall back to explicit plaintext marker so
@@ -256,15 +461,101 @@ func (s *SettingsService) saveSettingsLocked(settings Settings) error {
 	} else {
 		copy.AIApiKey = encrypted
 	}
-	dir := filepath.Dir(s.configPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
+	// CRIT-01: encrypt each provider config's API key before writing to disk
+	// so multi-provider keys are never stored in plaintext. This mirrors the
+	// legacy key encryption above and uses the same EncryptSecret path
+	// (DPAPI on Windows, AES-256-GCM elsewhere).
+	for i := range copy.AIProviderConfigs {
+		cfg := &copy.AIProviderConfigs[i]
+		if cfg.APIKey == "" {
+			continue
+		}
+		enc, encErr := EncryptSecret(cfg.APIKey)
+		if encErr != nil {
+			cfg.APIKey = secretPrefixPlain + cfg.APIKey
+		} else {
+			cfg.APIKey = enc
+		}
 	}
-	data, err := json.MarshalIndent(copy, "", "  ")
+	// G-SEC-09: atomic write (temp file + rename) so a crash mid-write
+	// cannot leave a half-written settings file. 0600 because the file
+	// holds an (encrypted) API key.
+	return atomicWriteJSON(s.configPath, copy, 0600)
+}
+
+// readDiskVersionLocked returns the on-disk settings version and whether the
+// file was readable (prompt-7 Task F). Caller MUST hold s.pathMu.
+func (s *SettingsService) readDiskVersionLocked() (int64, bool) {
+	data, err := os.ReadFile(s.configPath)
 	if err != nil {
-		return err
+		return 0, false
 	}
-	return os.WriteFile(s.configPath, data, 0644)
+	var raw struct {
+		Version int64 `json:"version"`
+	}
+	if json.Unmarshal(data, &raw) != nil {
+		return 0, false
+	}
+	return raw.Version, true
+}
+
+// readRawAPIKeyLocked reads the raw (possibly encrypted) aiApiKey value from
+// the on-disk settings file. Returns "" if the file is missing, corrupt, or
+// the key is absent. Caller MUST hold s.pathMu (read or write).
+func (s *SettingsService) readRawAPIKeyLocked() string {
+	data, err := os.ReadFile(s.configPath)
+	if err != nil {
+		return ""
+	}
+	var raw struct {
+		AIApiKey string `json:"aiApiKey"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return ""
+	}
+	return raw.AIApiKey
+}
+
+// readRawProviderConfigsLocked reads the raw AIProviderConfigs from the on-disk
+// settings file. Used by saveSettingsLocked to preserve existing config keys
+// when the frontend saves without the plaintext key (G-SEC-07). Returns an
+// empty slice if the file is missing, corrupt, or has no configs. Caller MUST
+// hold s.pathMu (read or write).
+func (s *SettingsService) readRawProviderConfigsLocked() []AIProviderConfig {
+	data, err := os.ReadFile(s.configPath)
+	if err != nil {
+		return nil
+	}
+	var raw struct {
+		AIProviderConfigs []AIProviderConfig `json:"aiProviderConfigs"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil
+	}
+	return raw.AIProviderConfigs
+}
+
+// GetAPIKeyForConfig returns the plaintext API key for the given config ID.
+// Used by AIService.SetConfig when UseStoredKey is true (G-SEC-07) so the
+// backend can make AI calls without the key ever crossing the Wails binding.
+// Returns ("", nil) when the config or its key is not found.
+//
+// CRIT-01: provider keys are stored encrypted on disk (via EncryptSecret).
+// DecryptSecret handles both encrypted ("dpapi:"/"aes:"/"keyring:") and
+// legacy plaintext values (returned as-is for backward compatibility).
+func (s *SettingsService) GetAPIKeyForConfig(configID string) (string, error) {
+	s.pathMu.RLock()
+	defer s.pathMu.RUnlock()
+	configs := s.readRawProviderConfigsLocked()
+	for _, c := range configs {
+		if c.ID == configID {
+			if c.APIKey == "" {
+				return "", nil
+			}
+			return DecryptSecret(c.APIKey)
+		}
+	}
+	return "", nil
 }
 
 // saveSettingsInternal is kept for backward compatibility with callers that
@@ -317,6 +608,22 @@ func (s *SettingsService) GetAPIKeyStorageMethod() string {
 	return SecretMethod(raw.AIApiKey)
 }
 
+// GetDecryptedAPIKey reads the on-disk API key and returns the decrypted
+// plaintext. It is intended for internal backend use (e.g. the AIService
+// making API calls) so the decrypted key never has to travel to the frontend
+// via LoadSettings (G-SEC-07). Returns ("", nil) when no key is stored.
+//
+// N-76: holds the read lock so configPath cannot change mid-read.
+func (s *SettingsService) GetDecryptedAPIKey() (string, error) {
+	s.pathMu.RLock()
+	defer s.pathMu.RUnlock()
+	rawKey := s.readRawAPIKeyLocked()
+	if rawKey == "" {
+		return "", nil
+	}
+	return DecryptSecret(rawKey)
+}
+
 // ListSecrets returns information about secrets stored in the platform
 // keyring (N-49). On Windows this returns an empty list (DPAPI blobs live in
 // settings.json). On macOS/Linux it queries the Keychain / libsecret for
@@ -336,36 +643,40 @@ func (s *SettingsService) DeleteSecret(account string) error {
 
 func defaultSettings() Settings {
 	return Settings{
-		Language:    "en",
-		Theme:       "dark",
-		FontSize:    14,
-		FontFamily:  "JetBrains Mono",
-		TabSize:     2,
-		WordWrap:    true,
-		LineNumbers: true,
-		Minimap:     false,
-		AIApiKey:       "",
-		AIBaseURL:      "https://api.openai.com",
-		AIModel:        "gpt-4o",
-		AISystemPrompt: "",
-		CursorBlinking:      "blink",
-		CursorStyle:         "line",
-		BracketColorization: true,
-		AutoSave:            false,
-		AutoSaveDelay:       "afterDelay",
-		AIProvider:          "",
-		Temperature:         0.7,
-		MaxTokens:           4096,
-		DefaultShell:        "",
-		TerminalFontSize:    13,
-		TerminalCursorStyle: "block",
-		Scrollback:          10000,
+		Language:                "en",
+		Theme:                   "dark",
+		FontSize:                14,
+		FontFamily:              "JetBrains Mono",
+		TabSize:                 2,
+		WordWrap:                true,
+		LineNumbers:             true,
+		Minimap:                 false,
+		AIApiKey:                "",
+		AIBaseURL:               "https://api.openai.com",
+		AIModel:                 "gpt-4o",
+		AISystemPrompt:          "",
+		CursorBlinking:          "blink",
+		CursorStyle:             "line",
+		BracketColorization:     true,
+		AutoSave:                false,
+		AutoSaveDelay:           "afterDelay",
+		AIProvider:              "",
+		Temperature:             0.7,
+		MaxTokens:               4096,
+		DefaultShell:            "",
+		TerminalFontSize:        13,
+		TerminalCursorStyle:     "block",
+		Scrollback:              10000,
 		UIDensity:               "comfortable",
 		FontSizeScaling:         100,
 		InlineCompletionEnabled: true,
-		AiChatPosition:          "right",
-		ActivityBarVisible:      true,
+		// prompt-9 Task 9-A: format via LSP before save by default.
+		FormatOnSave:       true,
+		AiChatPosition:     "right",
+		ActivityBarVisible: true,
 		// N-29: sandbox enabled by default (v2 behavior).
 		EnablePluginSandbox: true,
+		// prompt-5 Task C: do not auto-pop AI window on every launch.
+		OpenAIWindowOnStartup: false,
 	}
 }

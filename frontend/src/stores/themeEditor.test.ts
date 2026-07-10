@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 
 // Plan 57 / N-23: themeEditor.ts is a pure module with no side-effect imports
 // (only imports types), so no mocks are needed. The previous mocks for

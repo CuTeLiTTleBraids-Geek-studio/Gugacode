@@ -48,7 +48,6 @@ import {
   findTriggeredWorkflows,
   findStartupWorkflows,
   findChainTriggeredWorkflows,
-  runStartupWorkflows,
   extractStepOutputs,
   substituteOutputRefs,
 } from "./workflows";
@@ -472,10 +471,10 @@ describe("workflows store", () => {
       await new Promise((r) => setTimeout(r, 200));
       // Should have at least: "Starting workflow", step info, "completed".
       const sources = (pushOutput as any).mock.calls.map((c: any[]) => c[0]);
-      expect(sources.every((s) => s === "workflow")).toBe(true);
+      expect(sources.every((s: string) => s === "workflow")).toBe(true);
       const messages = (pushOutput as any).mock.calls.map((c: any[]) => c[2]);
-      expect(messages.some((m) => m.includes("Starting workflow"))).toBe(true);
-      expect(messages.some((m) => m.includes("completed"))).toBe(true);
+      expect(messages.some((m: string) => m.includes("Starting workflow"))).toBe(true);
+      expect(messages.some((m: string) => m.includes("completed"))).toBe(true);
     });
 
     it("N-46: kills the terminal session after workflow completes", async () => {
@@ -734,48 +733,18 @@ describe("workflows store", () => {
     });
   });
 
-  describe("runStartupWorkflows", () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-      workflowState.workflows = [];
-      workflowState.running = {};
-      workflowState.stepStates = {};
-    });
-
-    it("returns empty array when projectRoot is empty", async () => {
-      const result = await runStartupWorkflows("");
-      expect(result).toEqual([]);
-    });
-
-    it("runs workflows with startup trigger and returns their names", async () => {
-      workflowState.workflows = [
-        {
-          name: "bootstrap",
-          steps: [makeStep("init", "echo init")],
-          source: "bootstrap.yml",
-          runOn: { event: "startup" },
-        },
-      ];
-      (runCommandInSession as any).mockResolvedValue(0);
-
-      const result = await runStartupWorkflows("/project");
-
-      expect(result).toEqual(["bootstrap"]);
-    });
-
-    it("does not run workflows without startup trigger", async () => {
-      workflowState.workflows = [
-        {
-          name: "auto-test",
-          steps: [makeStep("test")],
-          source: "auto-test.yml",
-          runOn: { event: "file-saved", glob: "**/*.go" },
-        },
-      ];
-
-      const result = await runStartupWorkflows("/project");
-
-      expect(result).toEqual([]);
+  describe("findStartupWorkflows", () => {
+    // G-SEC-03: findStartupWorkflows is a pure lookup that lists startup
+    // workflows for user confirmation. It must NOT auto-execute them.
+    it("lists workflows for confirmation without executing them", () => {
+      const wf: WorkflowDef = {
+        name: "bootstrap",
+        steps: [makeStep("init")],
+        source: "bootstrap.yml",
+        runOn: { event: "startup" },
+      };
+      const result = findStartupWorkflows([wf], {});
+      expect(result.length).toBe(1);
       expect(runCommandInSession).not.toHaveBeenCalled();
     });
   });
@@ -1153,7 +1122,7 @@ describe("workflows store", () => {
       workflowState.running = {};
       workflowState.stepStates = {};
       // Wait for any background runWorkflow calls from previous tests
-      // (e.g. runStartupWorkflows fires runWorkflow without awaiting) to
+      // (e.g. chain triggers fire runWorkflow without awaiting) to
       // complete so their mock calls don't leak into this test's assertions.
       await new Promise((r) => setTimeout(r, 50));
     });

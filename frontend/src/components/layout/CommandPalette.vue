@@ -23,13 +23,57 @@ const dialogRef = ref<HTMLElement | null>(null);
 // restore it when the dialog closes.
 let previouslyFocused: HTMLElement | null = null;
 
+// G-VSC-04: source priority for the unified palette. Built-in commands
+// (undefined source) rank highest, then native plugins, then VS Code
+// extensions. Lower number = higher priority. Used for a stable sort so
+// native commands always appear before VS Code extension commands in the
+// filtered results, regardless of input order.
+function sourcePriority(source: Command["source"]): number {
+  if (source === "native") return 1;
+  if (source === "vscode") return 2;
+  return 0; // built-in
+}
+
 const filtered = computed(() => {
   const q = query.value.toLowerCase().trim();
-  if (!q) return props.commands;
-  return props.commands.filter((c) =>
-    c.label.toLowerCase().includes(q),
-  );
+  const list = q
+    ? props.commands.filter((c) => c.label.toLowerCase().includes(q))
+    : props.commands;
+  // Stable sort by source priority so native commands come before VS Code
+  // extension commands. Array.prototype.sort is stable in modern engines.
+  return [...list].sort((a, b) => sourcePriority(a.source) - sourcePriority(b.source));
 });
+
+// G-VSC-04: labels that appear more than once in the filtered set. When a
+// label collides, the source badge is always shown so the user can
+// disambiguate (e.g. a native plugin and a VS Code extension offering the
+// same command). Non-colliding native/vscode commands also show a badge.
+const duplicateLabels = computed(() => {
+  const counts = new Map<string, number>();
+  for (const c of filtered.value) {
+    counts.set(c.label, (counts.get(c.label) ?? 0) + 1);
+  }
+  const dupes = new Set<string>();
+  for (const [label, count] of counts) {
+    if (count > 1) dupes.add(label);
+  }
+  return dupes;
+});
+
+// G-VSC-04: decide whether to show the source badge for a command. Always
+// show for native/vscode commands; for built-ins only when their label
+// collides with another command (rare, but keeps disambiguation consistent).
+function shouldShowSource(cmd: Command): boolean {
+  if (cmd.source === "native" || cmd.source === "vscode") return true;
+  return duplicateLabels.value.has(cmd.label);
+}
+
+// G-VSC-04: short badge text for a command source.
+function sourceBadge(cmd: Command): string {
+  if (cmd.source === "native") return t("commandPalette.sourceNative");
+  if (cmd.source === "vscode") return t("commandPalette.sourceVscode");
+  return t("commandPalette.sourceBuiltin");
+}
 
 watch(
   () => props.visible,
@@ -136,7 +180,17 @@ function handleTab(e: KeyboardEvent) {
             @click="emit('run', cmd)"
             @mouseenter="selectedIndex = i"
           >
-            <span class="command-palette__label">{{ cmd.label }}</span>
+            <span class="command-palette__label">
+              {{ cmd.label }}
+              <!-- G-VSC-04: source badge for disambiguation. Native plugins
+                   and VS Code extensions always show their source; built-in
+                   commands show a badge only when their label collides. -->
+              <span
+                v-if="shouldShowSource(cmd)"
+                class="command-palette__source-badge"
+                :class="`command-palette__source-badge--${cmd.source ?? 'builtin'}`"
+              >{{ sourceBadge(cmd) }}</span>
+            </span>
             <span v-if="cmd.shortcut" class="command-palette__shortcut">{{ cmd.shortcut }}</span>
           </button>
         </div>
@@ -217,6 +271,45 @@ function handleTab(e: KeyboardEvent) {
 
 .command-palette__item--active {
   background-color: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.command-palette__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* G-VSC-04: source badge for disambiguating native plugins vs VS Code
+   extensions in the unified command palette. */
+.command-palette__source-badge {
+  flex-shrink: 0;
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.12));
+  color: var(--color-text-tertiary);
+  background-color: var(--color-bg-surface-container, rgba(255, 255, 255, 0.04));
+}
+
+.command-palette__source-badge--native {
+  color: var(--color-success, #4caf50);
+  border-color: color-mix(in srgb, var(--color-success, #4caf50) 40%, transparent);
+}
+
+.command-palette__source-badge--vscode {
+  color: var(--color-primary, #4285f4);
+  border-color: color-mix(in srgb, var(--color-primary, #4285f4) 40%, transparent);
+}
+
+.command-palette__source-badge--builtin {
+  color: var(--color-text-tertiary);
 }
 
 .command-palette__shortcut {

@@ -1345,3 +1345,101 @@ html[data-density="spacious"] {
   font-weight: 700;
   color: var(--hljs-strong);
 }
+
+/* ─────────────────────────────────────────────────────────
+   Plan 11 Task 15 — Personalization (Step 4-8)
+   代码编辑器/对话框背景图、字体、气泡样式联动
+   变量由 composables/usePersonalization.ts 设置到 :root
+   ───────────────────────────────────────────────────────── */
+
+/* Step 4: 代码编辑器背景层（覆盖在 Monaco 容器之上、内容之下） */
+.editor-view__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--personalization-editor-bg, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: var(--personalization-editor-bg-opacity, 0);
+  filter: blur(var(--personalization-editor-bg-blur, 0px));
+}
+
+/* 当启用编辑器背景图时，让 Monaco 画布与边距透明，使背景图透过 */
+html[data-editor-bg] .monaco-editor,
+html[data-editor-bg] .monaco-editor .margin,
+html[data-editor-bg] .monaco-editor-background {
+  background: transparent !important;
+}
+
+/* Step 5: 对话框背景层 */
+.ai-msg-list {
+  background-image: var(--personalization-chat-bg, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.ai-msg-list::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgba(0, 0, 0, 0);
+  opacity: var(--personalization-chat-bg-opacity, 0);
+  backdrop-filter: blur(var(--personalization-chat-bg-blur, 0px));
+  pointer-events: none;
+}
+
+/* Step 6: 字体（仅对启用个性化的区域生效） */
+.personalization-font {
+  font-family: var(--personalization-font-family, inherit);
+  font-size: var(--personalization-font-size, inherit);
+}
+
+/* Step 7: 气泡样式 */
+.ai-msg--rounded,
+.ai-msg {
+  border-radius: 8px;
+}
+.ai-msg--sharp {
+  border-radius: 0;
+}
+.ai-msg--bubble {
+  border-radius: 18px;
+}
+.ai-msg {
+  opacity: var(--personalization-bubble-opacity, 1);
+}
+.ai-msg-list {
+  gap: var(--personalization-message-spacing, 12px);
+}
+
+/* Step 8: 明暗模式下背景层叠加柔光，避免图片压字 */
+[data-mode="light"] .editor-view__bg,
+[data-mode="light"] .ai-msg-list::before {
+  background: rgba(255, 255, 255, 0.35);
+}
+[data-mode="dark"] .editor-view__bg,
+[data-mode="dark"] .ai-msg-list::before {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+
+/* prompt-10 10-H: coverage gutter decorations */
+.coverage-gutter--covered {
+  background: rgba(46, 160, 67, 0.85);
+  width: 4px !important;
+  margin-left: 3px;
+}
+.coverage-gutter--uncovered {
+  background: rgba(248, 81, 73, 0.85);
+  width: 4px !important;
+  margin-left: 3px;
+}
+.coverage-line--covered {
+  background: rgba(46, 160, 67, 0.08);
+}
+.coverage-line--uncovered {
+  background: rgba(248, 81, 73, 0.08);
+}

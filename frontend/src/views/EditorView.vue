@@ -2,6 +2,7 @@
 import { computed, ref, watch, onMounted, onBeforeUnmount } from "vue";
 import CodeEditor from "@/components/editor/CodeEditor.vue";
 import TabBar from "@/components/editor/TabBar.vue";
+import MarkdownContent from "@/components/common/MarkdownContent.vue";
 import { Document } from "@element-plus/icons-vue";
 import { appState } from "@/stores/app";
 import {
@@ -9,7 +10,6 @@ import {
   activeFile,
   closeFile,
   updateContent,
-  markSaved,
   setupAutoSave,
   saveOnFocusChange,
   openFileFromPath,
@@ -75,17 +75,9 @@ function handleCursorChange(line: number, column: number) {
 
 async function handleSave() {
   if (!activeFile.value) return;
-  try {
-    await fileService.writeFile(activeFile.value.path, activeFile.value.content);
-    markSaved(activeFile.value.path);
-  } catch (err) {
-    // N-96: surface save failures to the user. Previously this only logged
-    // to console, so Ctrl+S appeared to succeed while the file was NOT
-    // written — closing the tab lost the user's changes silently.
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("Failed to save file:", err);
-    notifyError(t("editor.saveFailed", { path: activeFile.value.path, error: msg }));
-  }
+  // prompt-10 10-B: route through saveFile (FoS + failure UX), not raw writeFile.
+  const { saveFile } = await import("@/stores/editor");
+  await saveFile();
 }
 
 function handleBlur() {
@@ -190,6 +182,8 @@ onBeforeUnmount(() => {
     @dragleave="handleDragLeave"
     @drop="handleDrop"
   >
+    <!-- Plan 11 Task 15 Step 4: 代码编辑器个性化背景层（位于内容之下） -->
+    <div class="editor-view__bg" aria-hidden="true" />
     <TabBar @select="handleTabSelect" @close="handleTabClose" />
 
     <div v-if="isMarkdown && hasOpenFiles" class="editor-view__toolbar">
@@ -231,10 +225,10 @@ onBeforeUnmount(() => {
       </div>
 
       <Transition name="preview-slide">
-        <div
+        <MarkdownContent
           v-if="showPreview && isMarkdown"
           class="editor-area__preview markdown-body"
-          v-html="previewHtml"
+          :html="previewHtml"
         />
       </Transition>
     </div>
@@ -257,6 +251,13 @@ onBeforeUnmount(() => {
   height: 100%;
   background-color: var(--color-bg-base);
   color: var(--color-text-primary);
+}
+
+/* Plan 11 Task 15: 背景层已在 main.css 定义（z-index:0），需确保内容在之上 */
+.editor-area,
+.editor-view :deep(.editor-view__toolbar) {
+  position: relative;
+  z-index: 1;
 }
 
 .editor-area {

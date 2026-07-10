@@ -70,6 +70,21 @@ const policyOptions = computed<{ value: ApprovalPolicy; label: string }[]>(() =>
   { value: "auto-approve", label: t("agentSection.policyAutoApprove") },
   { value: "never-approve", label: t("agentSection.policyNeverApprove") },
 ]);
+
+/** prompt-5 Task E: run/write cannot use auto-approve (forced always-ask or never). */
+function policyOptionsFor(kind: string): { value: ApprovalPolicy; label: string }[] {
+  if (kind === "run" || kind === "write") {
+    return policyOptions.value.filter((o) => o.value !== "auto-approve");
+  }
+  return policyOptions.value;
+}
+
+function setPolicySafe(kind: string, policy: ApprovalPolicy): void {
+  if ((kind === "run" || kind === "write") && policy === "auto-approve") {
+    policy = "always-ask";
+  }
+  setPolicy(kind, policy);
+}
 </script>
 
 <template>
@@ -106,10 +121,10 @@ const policyOptions = computed<{ value: ApprovalPolicy; label: string }[]>(() =>
             size="small"
             style="width: 160px"
             :aria-label="t('agentSection.approvalPolicyAria', { kind })"
-            @change="(val: ApprovalPolicy) => setPolicy(kind, val)"
+            @change="(val: ApprovalPolicy) => setPolicySafe(kind, val)"
           >
             <el-option
-              v-for="opt in policyOptions"
+              v-for="opt in policyOptionsFor(kind)"
               :key="opt.value"
               :label="opt.label"
               :value="opt.value"

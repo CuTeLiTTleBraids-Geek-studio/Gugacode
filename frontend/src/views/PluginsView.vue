@@ -213,6 +213,11 @@ onMounted(() => {
               <div class="plugin-card__title">
                 <h3 class="plugin-card__name">{{ p.manifest.name }}</h3>
                 <span class="plugin-card__version">v{{ p.manifest.version }}</span>
+                <!-- G-VSC-04: source labeling — native plugins take priority
+                     and run in a stricter sandbox than VS Code extensions. -->
+                <el-tag size="small" type="success">
+                  {{ t("plugins.nativeBadge") }}
+                </el-tag>
                 <el-tag size="small" :type="p.source === 'project' ? 'warning' : 'info'">
                   {{ p.source }}
                 </el-tag>

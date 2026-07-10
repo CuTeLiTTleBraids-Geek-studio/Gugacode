@@ -9,6 +9,16 @@ import (
 	"github.com/go-git/go-git/v5"
 )
 
+// expectFile reads a file under dir/rel and fails the test if it is missing.
+func expectFile(t *testing.T, dir, rel string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(dir, rel))
+	if err != nil {
+		t.Fatalf("expected file %s under %s: %v", rel, dir, err)
+	}
+	return string(b)
+}
+
 func TestProjectService_GetRecentProjects_empty(t *testing.T) {
 	svc := &ProjectService{configPath: filepath.Join(t.TempDir(), "projects.json")}
 	projects, err := svc.GetRecentProjects()
@@ -254,5 +264,291 @@ func TestProjectService_AddProject_PropagatesWorkspaceRootToSearchService(t *tes
 	writeFile(t, workspace, "target.txt", "hello")
 	if _, err := searchSvc.Search(workspace, "hello", false); err != nil {
 		t.Errorf("SearchService.Search inside workspace should succeed: %v", err)
+	}
+}
+
+// ============================================================================
+// G-FEAT-01: New Project scaffolding wizard tests.
+// ============================================================================
+
+func TestProjectService_ListProjectTemplates(t *testing.T) {
+	svc := &ProjectService{}
+	templates := svc.ListProjectTemplates()
+	if len(templates) != 5 {
+		t.Fatalf("expected 5 templates, got %d", len(templates))
+	}
+	ids := map[string]bool{}
+	for _, tpl := range templates {
+		if tpl.ID == "" || tpl.Name == "" || tpl.Description == "" || tpl.Language == "" {
+			t.Errorf("template has empty field: %+v", tpl)
+		}
+		ids[tpl.ID] = true
+	}
+	for _, want := range []string{"go", "typescript", "javascript", "monorepo", "fullstack"} {
+		if !ids[want] {
+			t.Errorf("expected template ID %q in list", want)
+		}
+	}
+}
+
+func TestProjectService_CreateProject_Go(t *testing.T) {
+	svc := &ProjectService{}
+	dir := t.TempDir()
+	req := CreateProjectRequest{
+		TemplateID:  "go",
+		ProjectName: "demo-app",
+		TargetDir:   dir,
+		ModuleName:  "github.com/example/demo-app",
+	}
+	out, err := svc.CreateProject(req)
+	if err != nil {
+		t.Fatalf("CreateProject failed: %v", err)
+	}
+	// Verify the expected files exist.
+	goMod := expectFile(t, out, "go.mod")
+	if !strings.Contains(goMod, "module github.com/example/demo-app") {
+		t.Errorf("go.mod missing module line, got:\n%s", goMod)
+	}
+	expectFile(t, out, "cmd/main.go")
+	expectFile(t, out, "Makefile")
+	expectFile(t, out, ".golangci.yml")
+	expectFile(t, out, "Dockerfile")
+	ci := expectFile(t, out, filepath.FromSlash(".github/workflows/ci.yml"))
+	if !strings.Contains(ci, "go-version") {
+		t.Errorf("CI workflow missing go-version, got:\n%s", ci)
+	}
+	// main.go should reference the project name.
+	mainGo := expectFile(t, out, "cmd/main.go")
+	if !strings.Contains(mainGo, "demo-app") {
+		t.Errorf("main.go should reference project name, got:\n%s", mainGo)
+	}
+}
+
+func TestProjectService_CreateProject_TypeScript(t *testing.T) {
+	svc := &ProjectService{}
+	dir := t.TempDir()
+	out, err := svc.CreateProject(CreateProjectRequest{
+		TemplateID:  "typescript",
+		ProjectName: "ts-demo",
+		TargetDir:   dir,
+	})
+	if err != nil {
+		t.Fatalf("CreateProject failed: %v", err)
+	}
+	pkg := expectFile(t, out, "package.json")
+	if !strings.Contains(pkg, `"name": "ts-demo"`) {
+		t.Errorf("package.json missing name, got:\n%s", pkg)
+	}
+	tsconfig := expectFile(t, out, "tsconfig.json")
+	if !strings.Contains(tsconfig, `"strict": true`) {
+		t.Errorf("tsconfig should be strict, got:\n%s", tsconfig)
+	}
+	expectFile(t, out, "src/index.ts")
+	expectFile(t, out, "eslint.config.js")
+	expectFile(t, out, "vitest.config.ts")
+}
+
+func TestProjectService_CreateProject_JavaScript(t *testing.T) {
+	svc := &ProjectService{}
+	dir := t.TempDir()
+	out, err := svc.CreateProject(CreateProjectRequest{
+		TemplateID:  "javascript",
+		ProjectName: "js-demo",
+		TargetDir:   dir,
+	})
+	if err != nil {
+		t.Fatalf("CreateProject failed: %v", err)
+	}
+	pkg := expectFile(t, out, "package.json")
+	if !strings.Contains(pkg, `"name": "js-demo"`) {
+		t.Errorf("package.json missing name, got:\n%s", pkg)
+	}
+	expectFile(t, out, "src/index.js")
+	expectFile(t, out, "eslint.config.js")
+	expectFile(t, out, "vitest.config.ts")
+}
+
+func TestProjectService_CreateProject_Monorepo(t *testing.T) {
+	svc := &ProjectService{}
+	dir := t.TempDir()
+	out, err := svc.CreateProject(CreateProjectRequest{
+		TemplateID:  "monorepo",
+		ProjectName: "mono-demo",
+		TargetDir:   dir,
+	})
+	if err != nil {
+		t.Fatalf("CreateProject failed: %v", err)
+	}
+	ws := expectFile(t, out, "pnpm-workspace.yaml")
+	if !strings.Contains(ws, "apps/*") || !strings.Contains(ws, "packages/*") {
+		t.Errorf("pnpm-workspace.yaml missing globs, got:\n%s", ws)
+	}
+	expectFile(t, out, "package.json")
+	expectFile(t, out, "tsconfig.base.json")
+	webPkg := expectFile(t, out, filepath.FromSlash("apps/web/package.json"))
+	if !strings.Contains(webPkg, "@mono-demo/web") {
+		t.Errorf("web package.json missing scoped name, got:\n%s", webPkg)
+	}
+	sharedPkg := expectFile(t, out, filepath.FromSlash("packages/shared/package.json"))
+	if !strings.Contains(sharedPkg, "@mono-demo/shared") {
+		t.Errorf("shared package.json missing scoped name, got:\n%s", sharedPkg)
+	}
+}
+
+func TestProjectService_CreateProject_Fullstack(t *testing.T) {
+	svc := &ProjectService{}
+	dir := t.TempDir()
+	out, err := svc.CreateProject(CreateProjectRequest{
+		TemplateID:  "fullstack",
+		ProjectName: "fs-demo",
+		TargetDir:   dir,
+		ModuleName:  "github.com/example/fs-demo",
+	})
+	if err != nil {
+		t.Fatalf("CreateProject failed: %v", err)
+	}
+	goMod := expectFile(t, out, filepath.FromSlash("backend/go.mod"))
+	if !strings.Contains(goMod, "module github.com/example/fs-demo") {
+		t.Errorf("backend go.mod missing module line, got:\n%s", goMod)
+	}
+	expectFile(t, out, filepath.FromSlash("backend/cmd/main.go"))
+	fePkg := expectFile(t, out, filepath.FromSlash("frontend/package.json"))
+	if !strings.Contains(fePkg, "fs-demo-frontend") {
+		t.Errorf("frontend package.json missing name, got:\n%s", fePkg)
+	}
+	expectFile(t, out, filepath.FromSlash("frontend/src/main.ts"))
+	expectFile(t, out, filepath.FromSlash("frontend/tsconfig.json"))
+}
+
+func TestProjectService_CreateProject_RejectsInvalidTemplateID(t *testing.T) {
+	svc := &ProjectService{}
+	dir := t.TempDir()
+	_, err := svc.CreateProject(CreateProjectRequest{
+		TemplateID:  "../../../etc",
+		ProjectName: "x",
+		TargetDir:   dir,
+	})
+	if err == nil {
+		t.Fatal("expected error for path-traversal template ID")
+	}
+	if !strings.Contains(err.Error(), "invalid template ID") {
+		t.Errorf("error should mention 'invalid template ID', got: %v", err)
+	}
+}
+
+func TestProjectService_CreateProject_RejectsEmptyProjectName(t *testing.T) {
+	svc := &ProjectService{}
+	_, err := svc.CreateProject(CreateProjectRequest{
+		TemplateID:  "typescript",
+		ProjectName: "   ",
+		TargetDir:   t.TempDir(),
+	})
+	if err == nil {
+		t.Fatal("expected error for empty project name")
+	}
+	if !strings.Contains(err.Error(), "project name is required") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestProjectService_CreateProject_RejectsGoTemplateWithoutModuleName(t *testing.T) {
+	svc := &ProjectService{}
+	_, err := svc.CreateProject(CreateProjectRequest{
+		TemplateID:  "go",
+		ProjectName: "demo",
+		TargetDir:   t.TempDir(),
+		// ModuleName intentionally empty.
+	})
+	if err == nil {
+		t.Fatal("expected error for Go template without module name")
+	}
+	if !strings.Contains(err.Error(), "module name is required") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestProjectService_CreateProject_EscapesShellInjection verifies that a
+// module name containing shell metacharacters (`"; rm -rf /`) is rejected
+// rather than rendered into go.mod, so the generated go.mod stays valid.
+func TestProjectService_CreateProject_EscapesShellInjection(t *testing.T) {
+	svc := &ProjectService{}
+	dir := t.TempDir()
+	_, err := svc.CreateProject(CreateProjectRequest{
+		TemplateID:  "go",
+		ProjectName: "demo",
+		TargetDir:   dir,
+		ModuleName:  `"; rm -rf /`,
+	})
+	if err == nil {
+		t.Fatal("expected error for shell-injection module name")
+	}
+	if !strings.Contains(err.Error(), "invalid module name") {
+		t.Errorf("error should mention 'invalid module name', got: %v", err)
+	}
+	// The target directory should not contain any generated files.
+	entries, _ := os.ReadDir(filepath.Join(dir, "demo"))
+	if len(entries) != 0 {
+		t.Errorf("no files should be written when validation fails, got %d entries", len(entries))
+	}
+}
+
+// TestProjectService_CreateProject_EscapesProjectNameInjection verifies that
+// a project name with shell metacharacters is rejected so package.json
+// cannot be corrupted.
+func TestProjectService_CreateProject_EscapesProjectNameInjection(t *testing.T) {
+	svc := &ProjectService{}
+	_, err := svc.CreateProject(CreateProjectRequest{
+		TemplateID:  "typescript",
+		ProjectName: `evil"; require("child_process")`,
+		TargetDir:   t.TempDir(),
+	})
+	if err == nil {
+		t.Fatal("expected error for shell-injection project name")
+	}
+	if !strings.Contains(err.Error(), "invalid project name") {
+		t.Errorf("error should mention 'invalid project name', got: %v", err)
+	}
+}
+
+func TestProjectService_CreateProject_RejectsNonExistentTargetDirParent(t *testing.T) {
+	svc := &ProjectService{}
+	// A target dir whose parent doesn't exist — MkdirAll should still create
+	// it, but the validation path should not panic. Use a deeply nested path.
+	missing := filepath.Join(t.TempDir(), "does", "not", "exist", "yet")
+	out, err := svc.CreateProject(CreateProjectRequest{
+		TemplateID:  "typescript",
+		ProjectName: "deep",
+		TargetDir:   missing,
+	})
+	if err != nil {
+		t.Fatalf("CreateProject should create nested parents: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(out, "package.json")); err != nil {
+		t.Errorf("expected package.json under %s: %v", out, err)
+	}
+}
+
+func TestProjectService_CreateProject_RefusesNonEmptyTarget(t *testing.T) {
+	svc := &ProjectService{}
+	dir := t.TempDir()
+	// First creation succeeds.
+	if _, err := svc.CreateProject(CreateProjectRequest{
+		TemplateID:  "typescript",
+		ProjectName: "exists",
+		TargetDir:   dir,
+	}); err != nil {
+		t.Fatalf("first CreateProject failed: %v", err)
+	}
+	// Second creation into the same dir/project should be refused.
+	_, err := svc.CreateProject(CreateProjectRequest{
+		TemplateID:  "typescript",
+		ProjectName: "exists",
+		TargetDir:   dir,
+	})
+	if err == nil {
+		t.Fatal("expected error when target directory is non-empty")
+	}
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("error should mention 'already exists', got: %v", err)
 	}
 }

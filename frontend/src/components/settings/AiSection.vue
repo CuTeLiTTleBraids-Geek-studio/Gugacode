@@ -28,6 +28,7 @@ interface DraftConfig {
   provider: string;
   protocol: string;
   apiKey: string;
+  apiKeyConfigured: boolean;
   baseUrl: string;
   model: string;
   temperature: number;
@@ -45,6 +46,11 @@ const editingConfigId = ref<string | null>(null);
 // Local draft of the config being edited. Changes here don't persist until the
 // user clicks "Save"; cancelling just discards this draft.
 const editingDraft = ref<DraftConfig | null>(null);
+// G-SEC-07: the actual key is NOT pre-filled into the edit form (to avoid
+// surfacing it in the DOM). We remember whether the edited config already has
+// a key so we can show a "Key configured" placeholder and preserve the
+// existing key on save when the user doesn't enter a new one.
+const editingOriginalApiKey = ref<string>("");
 
 // All preset Base URLs — used to detect when the user hasn't customized the
 // Base URL yet (so switching providers can auto-fill the new preset's URL).
@@ -96,6 +102,14 @@ const baseUrlPlaceholder = computed(() =>
     : t("aiSection.baseUrlOpenaiPlaceholder"),
 );
 
+// G-SEC-07: when editing a config that already has a key, hint that a key is
+// configured instead of pre-filling the actual key into the input.
+const apiKeyPlaceholder = computed(() =>
+  editingOriginalApiKey.value
+    ? t("aiSection.apiKeyConfigured")
+    : "sk-...",
+);
+
 const protocolDisabled = computed(() => draft.value?.provider === "anthropic");
 
 function providerLabel(providerId: string): string {
@@ -138,6 +152,8 @@ function handleNewConfig() {
   suppressProviderAutoFill = true;
   editingDraft.value = normalizeDraft(cfg);
   editingConfigId.value = cfg.id;
+  // G-SEC-07: new config has no stored key yet.
+  editingOriginalApiKey.value = "";
   testResult.value = null;
   showApiKey.value = false;
 }
@@ -147,6 +163,10 @@ function handleEdit(id: string) {
   if (!cfg) return;
   suppressProviderAutoFill = true;
   editingDraft.value = normalizeDraft(cfg);
+  // G-SEC-07: the backend strips apiKey from configs. Track whether a key
+  // is configured (not the plaintext) so save can preserve it.
+  editingOriginalApiKey.value = cfg.apiKeyConfigured ? "___stored___" : "";
+  editingDraft.value.apiKey = "";
   editingConfigId.value = id;
   testResult.value = null;
   showApiKey.value = false;
@@ -180,6 +200,7 @@ function normalizeDraft(cfg: AIProviderConfig): DraftConfig {
     provider: cfg.provider,
     protocol: cfg.protocol ?? "openai",
     apiKey: cfg.apiKey,
+    apiKeyConfigured: cfg.apiKeyConfigured ?? false,
     baseUrl: cfg.baseUrl,
     model: cfg.model,
     temperature: cfg.temperature ?? 0.7,
@@ -192,17 +213,29 @@ function normalizeDraft(cfg: AIProviderConfig): DraftConfig {
 
 function handleSave() {
   if (!editingDraft.value) return;
+  // G-SEC-07: if the user did not enter a new key, set apiKeyConfigured so
+  // the backend preserves the existing on-disk key. When a new key was
+  // entered, it will be saved and apiKeyConfigured will be true.
+  if (!editingDraft.value.apiKey && editingOriginalApiKey.value) {
+    editingDraft.value.apiKeyConfigured = true;
+  } else if (editingDraft.value.apiKey) {
+    editingDraft.value.apiKeyConfigured = true;
+  } else {
+    editingDraft.value.apiKeyConfigured = false;
+  }
   saveAIConfig(editingDraft.value);
   // Refresh the encryption badge after a delay (apiKey may have changed).
   saveSettingsAndRefreshEncryption();
   editingConfigId.value = null;
   editingDraft.value = null;
+  editingOriginalApiKey.value = "";
   testResult.value = null;
 }
 
 function handleCancel() {
   editingConfigId.value = null;
   editingDraft.value = null;
+  editingOriginalApiKey.value = "";
   testResult.value = null;
 }
 
@@ -235,17 +268,20 @@ async function handleTestConnection() {
   testingConnection.value = true;
   testResult.value = null;
   try {
-    // NOTE: aiService.setConfig's type definition doesn't yet include
-    // temperature/protocol params. The main agent will update
-    // api/services.ts to add them. Cast as any for now so vue-tsc passes.
+    // G-SEC-07: when the user has not entered a new key, use the stored key
+    // (backend fetches from SettingsService via configId). When a new key
+    // was entered, send it directly for the test.
+    const newKey = editingDraft.value.apiKey;
     aiService.setConfig({
-      apiKey: editingDraft.value.apiKey,
+      apiKey: newKey || undefined,
+      useStoredKey: !newKey,
+      configId: editingDraft.value.id,
       baseUrl: editingDraft.value.baseUrl,
       model: editingDraft.value.model,
       systemPrompt: editingDraft.value.systemPrompt ?? "",
       temperature: editingDraft.value.temperature ?? 0.7,
       protocol: editingDraft.value.protocol ?? "openai",
-    } as unknown as Parameters<typeof aiService.setConfig>[0]);
+    });
     const response = await aiService.send([{ role: "user", content: "ping" }]);
     if (response) {
       testResult.value = t("aiSection.testSuccess");
@@ -392,7 +428,7 @@ async function handleTestConnection() {
                 size="default"
                 style="width: 320px"
                 :type="showApiKey ? 'text' : 'password'"
-                placeholder="sk-..."
+                :placeholder="apiKeyPlaceholder"
               >
                 <template #suffix>
                   <el-button

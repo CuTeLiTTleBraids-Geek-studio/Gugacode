@@ -107,7 +107,7 @@ export type WorkerFactory = (workerScriptUrl: string) => WorkerLike;
 // module load time.
 let PluginWorkerCtor: { new (): Worker } | null = null;
 
-async function loadPluginWorkerCtor(): Promise<{ new (): Worker }> {
+export async function loadPluginWorkerCtor(): Promise<{ new (): Worker }> {
   if (PluginWorkerCtor) return PluginWorkerCtor;
   // `?worker` tells Vite to bundle this as a Worker entry.
   const mod = await import("./pluginWorkerBootstrap.ts?worker");

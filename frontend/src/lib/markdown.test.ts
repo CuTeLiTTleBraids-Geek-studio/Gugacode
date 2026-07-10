@@ -139,6 +139,13 @@ describe("renderMarkdown", () => {
     expect(html).toContain(">docs</a>");
   });
 
+  it("forces external links to open with target=_blank and rel=noopener noreferrer", () => {
+    const html = renderMarkdown("[example](https://example.com)");
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).toContain('href="https://example.com"');
+  });
+
   it("renders headers", () => {
     expect(renderMarkdown("# Title")).toContain("<h1>");
     expect(renderMarkdown("## Sub")).toContain("<h2>");

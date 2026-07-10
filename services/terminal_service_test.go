@@ -250,3 +250,49 @@ func TestTerminalService_KillSessionNotFound(t *testing.T) {
 		t.Error("expected error when killing non-existent session")
 	}
 }
+
+// --- HIGH-01: shell whitelist ---
+
+// TestIsAllowedShell verifies that isAllowedShell accepts whitelisted shells
+// (case-insensitive, with/without .exe, with/without path) and rejects
+// non-whitelisted binaries (fish, tcsh, malicious paths).
+func TestIsAllowedShell(t *testing.T) {
+	accepted := []string{
+		"bash", "sh", "zsh", "powershell", "pwsh", "cmd",
+		"BASH", "PowerShell", "PWSH",
+		"bash.exe", "CMD.EXE", "powershell.exe",
+		"/usr/bin/bash", "/bin/sh", "/usr/local/bin/zsh",
+		`C:\Windows\System32\cmd.exe`, `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`,
+	}
+	for _, s := range accepted {
+		if !isAllowedShell(s) {
+			t.Errorf("isAllowedShell(%q) = false, want true (HIGH-01 whitelist)", s)
+		}
+	}
+	rejected := []string{
+		"fish", "tcsh", "csh", "ksh",
+		"bash2", "powershell2",
+		"/tmp/malicious", "./evil",
+		"", "   ",
+	}
+	for _, s := range rejected {
+		if isAllowedShell(s) {
+			t.Errorf("isAllowedShell(%q) = true, want false (HIGH-01 whitelist)", s)
+		}
+	}
+}
+
+// TestTerminalService_StartSession_RejectsNonWhitelistedShell verifies that
+// StartSession rejects a shell not in the whitelist BEFORE attempting to
+// create a PTY. This test does not require a real console (the rejection
+// happens before startPty).
+func TestTerminalService_StartSession_RejectsNonWhitelistedShell(t *testing.T) {
+	ts := NewTerminalService()
+	err := ts.StartSession("session-high01", "", "fish")
+	if err == nil {
+		t.Fatal("expected error for non-whitelisted shell 'fish', got nil (HIGH-01)")
+	}
+	if !strings.Contains(err.Error(), "allowed list") {
+		t.Errorf("expected 'allowed list' error, got: %v", err)
+	}
+}

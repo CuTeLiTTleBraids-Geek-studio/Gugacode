@@ -27,7 +27,7 @@
 **Files:**
 - Create: `LICENSE`
 
-- [ ] **Step 1: Create MIT license file**
+- [x] **Step 1: Create MIT license file**
 
 ```
 MIT License
@@ -53,7 +53,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add LICENSE
@@ -67,13 +67,13 @@ git commit -m "docs: add MIT license"
 **Files:**
 - Rewrite: `README.md`
 
-- [ ] **Step 1: Replace generic Wails README with project-specific README**
+- [x] **Step 1: Replace generic Wails README with project-specific README**
 
 The new README must include: project name + tagline, feature list, screenshots placeholder, prerequisites, install/build/run instructions, project structure overview, AI configuration guide, testing instructions, license reference, contributing link.
 
 See Task 2 implementation for the full content.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add README.md
@@ -87,11 +87,11 @@ git commit -m "docs: rewrite README for gugacode open-source release"
 **Files:**
 - Create: `CONTRIBUTING.md`
 
-- [ ] **Step 1: Create contribution guidelines**
+- [x] **Step 1: Create contribution guidelines**
 
 Include: how to report bugs, how to request features, development setup, code style, testing requirements, PR process, commit message conventions.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add CONTRIBUTING.md
@@ -105,9 +105,9 @@ git commit -m "docs: add contributing guidelines"
 **Files:**
 - Create: `CODE_OF_CONDUCT.md`
 
-- [ ] **Step 1: Create Contributor Covenant 2.1 code of conduct**
+- [x] **Step 1: Create Contributor Covenant 2.1 code of conduct**
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add CODE_OF_CONDUCT.md
@@ -121,11 +121,11 @@ git commit -m "docs: add code of conduct"
 **Files:**
 - Create: `CHANGELOG.md`
 
-- [ ] **Step 1: Create changelog in Keep a Changelog format**
+- [x] **Step 1: Create changelog in Keep a Changelog format**
 
 Document v0.1.0 with all features implemented across Plans 1-5.
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add CHANGELOG.md
@@ -139,11 +139,11 @@ git commit -m "docs: add changelog for v0.1.0"
 **Files:**
 - Modify: `.gitignore`
 
-- [ ] **Step 1: Add missing entries**
+- [x] **Step 1: Add missing entries**
 
 Add: binary artifacts (`*.exe`, `changeme.exe`, `gugacode.exe`), OS files (`.DS_Store`, `Thumbs.db`), IDE files (`.vscode/`, `.idea/`), env files (`.env`, `.env.local`).
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add .gitignore
@@ -157,13 +157,13 @@ git commit -m "chore: update gitignore for open-source hygiene"
 **Files:**
 - Create: `.github/workflows/ci.yml`
 
-- [ ] **Step 1: Create CI pipeline**
+- [x] **Step 1: Create CI pipeline**
 
 Workflow triggers on push/PR to main. Jobs:
 - `go-test`: setup Go 1.25, run `go vet .`, `go build .`, `go test ./services/... -v`
 - `frontend-test`: setup Node 20, cd frontend, npm ci, npx vue-tsc --noEmit, npx vitest run
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add .github/workflows/ci.yml
@@ -174,16 +174,16 @@ git commit -m "ci: add GitHub Actions workflow for Go and frontend tests"
 
 ### Task 8: Verification
 
-- [ ] **Step 1: Verify Go backend**
+- [x] **Step 1: Verify Go backend**
 
 Run: `go vet . && go build . && go test ./services/... -v`
 Expected: all pass
 
-- [ ] **Step 2: Verify frontend**
+- [x] **Step 2: Verify frontend**
 
 Run: `cd frontend && npx vue-tsc --noEmit && npx vitest run`
 Expected: all pass, 77 tests
 
-- [ ] **Step 3: Verify documentation files exist**
+- [x] **Step 3: Verify documentation files exist**
 
 Check: LICENSE, README.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, CHANGELOG.md, .github/workflows/ci.yml all exist and are non-empty.

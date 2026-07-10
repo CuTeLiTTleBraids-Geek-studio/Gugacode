@@ -60,7 +60,10 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at
-**[INSERT CONTACT METHOD]**.
+**security@gugacode.dev** (for security-sensitive reports) or by opening a
+private issue at **https://github.com/gugacode/gugacode/issues** (use the
+"conduct report" label; sensitive details may be redacted from public view
+on request).
 All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the

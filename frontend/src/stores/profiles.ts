@@ -7,7 +7,6 @@
 import { reactive, computed } from "vue";
 import { profileService, layoutService } from "@/api/services";
 import { loadSettings } from "@/stores/app";
-import { loadCustomShortcuts } from "@/composables/useKeyboard";
 import { loadLayoutFromBackend } from "@/stores/layout";
 import { errorMessage } from "@/lib/errors";
 import type { ProfileInfo, ProfileExport } from "@/types";

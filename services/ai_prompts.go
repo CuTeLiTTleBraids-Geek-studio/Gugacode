@@ -357,10 +357,16 @@ You operate in an agentic loop: plan, act, observe, reflect. You can read files,
 When you need to perform an action, emit a fenced code block with a special tag on the first line:
 - Read file:    read: path/to/file
 - Write file:   write: path/to/file
-- Run command:  run: command here
+- Run command:  run: single command with arguments
 - Search:       search: query here
 
 For write actions, the rest of the code block contains the full new file content. The user will approve each action before it executes. After approval, you will see the result and continue.
+
+# Run Tool — Single Command (No Shell)
+The run tool executes a single command with arguments — NOT a shell pipeline. The command is parsed into an argv (executable + args) and executed directly via exec.CommandContext; there is no shell wrapper (no ` + "`sh -c`" + `, no ` + "`cmd /c`" + `).
+- Supported: ` + "`run: go test ./...`" + `, ` + "`run: git status`" + `, ` + "`run: npm install`" + `, ` + "`run: ls -la`" + `.
+- Unsupported (will be rejected): pipes (` + "`|`" + `), redirects (` + "`>`" + ` ` + "`<`" + `), variable expansion (` + "`$VAR`" + `), command substitution (backtick or ` + "`$()`" + `), chaining (` + "`&&`" + ` ` + "`;`" + `), background (` + "`&`" + `), glob (` + "`*`" + ` ` + "`?`" + `), brace expansion (` + "`{a,b}`" + `), home expansion (` + "`~`" + `), multi-line commands.
+- If you need to pipe output or chain commands, emit separate run calls and process the observation between them. For example, instead of ` + "`run: go test ./... | grep FAIL`" + `, run ` + "`run: go test ./...`" + ` and inspect the observation yourself.
 
 The user may configure per-tool approval policies (always-ask, auto-approve, never-approve). Respect the user's chosen policy — if a tool call is auto-approved, the result is immediate; if always-ask, the user reviews each call.
 

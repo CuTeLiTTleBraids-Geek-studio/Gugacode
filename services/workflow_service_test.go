@@ -537,3 +537,94 @@ steps:
 		t.Errorf("expected RunOn to be nil, got %+v", out[0].RunOn)
 	}
 }
+
+// ---- prompt-4 Task 12: Create / Save / Delete / Rename ----
+
+func TestWorkflowService_CreateSaveDeleteRename(t *testing.T) {
+	svc := NewWorkflowService()
+	tmp := t.TempDir()
+
+	def := &WorkflowDef{
+		Name:        "build-test",
+		Description: "build then test",
+		Steps: []WorkflowStep{
+			{Name: "build", Command: "go", Args: []string{"build", "./..."}},
+			{Name: "test", Command: "go", Args: []string{"test", "./..."}, DependsOn: []string{"build"}},
+		},
+	}
+
+	if err := svc.CreateWorkflow(tmp, "build-test", def); err != nil {
+		t.Fatalf("CreateWorkflow: %v", err)
+	}
+	// Duplicate create must fail.
+	if err := svc.CreateWorkflow(tmp, "build-test", def); err == nil {
+		t.Fatal("expected error on duplicate CreateWorkflow")
+	}
+
+	loaded, err := svc.LoadWorkflow(tmp, "build-test")
+	if err != nil {
+		t.Fatalf("LoadWorkflow: %v", err)
+	}
+	if !loaded.RequiresConfirmation {
+		t.Error("expected RequiresConfirmation true for project workflow")
+	}
+	if len(loaded.Steps) != 2 {
+		t.Fatalf("expected 2 steps, got %d", len(loaded.Steps))
+	}
+
+	// Save updates description.
+	loaded.Description = "updated"
+	if err := svc.SaveWorkflow(tmp, "build-test", loaded); err != nil {
+		t.Fatalf("SaveWorkflow: %v", err)
+	}
+	reloaded, err := svc.LoadWorkflow(tmp, "build-test")
+	if err != nil {
+		t.Fatalf("LoadWorkflow after save: %v", err)
+	}
+	if reloaded.Description != "updated" {
+		t.Errorf("description = %q, want updated", reloaded.Description)
+	}
+
+	// Rename.
+	if err := svc.RenameWorkflow(tmp, "build-test", "build-test-v2"); err != nil {
+		t.Fatalf("RenameWorkflow: %v", err)
+	}
+	if _, err := svc.LoadWorkflow(tmp, "build-test"); err == nil {
+		t.Error("old name should not exist after rename")
+	}
+	if _, err := svc.LoadWorkflow(tmp, "build-test-v2"); err != nil {
+		t.Fatalf("new name should exist: %v", err)
+	}
+
+	// Delete.
+	if err := svc.DeleteWorkflow(tmp, "build-test-v2"); err != nil {
+		t.Fatalf("DeleteWorkflow: %v", err)
+	}
+	if _, err := svc.LoadWorkflow(tmp, "build-test-v2"); err == nil {
+		t.Error("expected not found after delete")
+	}
+}
+
+func TestWorkflowService_CreateWorkflow_RejectsTraversal(t *testing.T) {
+	svc := NewWorkflowService()
+	tmp := t.TempDir()
+	def := &WorkflowDef{
+		Name:  "evil",
+		Steps: []WorkflowStep{{Name: "x", Command: "echo"}},
+	}
+	if err := svc.CreateWorkflow(tmp, "../evil", def); err == nil {
+		t.Fatal("expected error for path traversal name")
+	}
+	if err := svc.CreateWorkflow(tmp, "sub/dir", def); err == nil {
+		t.Fatal("expected error for path separator in name")
+	}
+}
+
+func TestWorkflowService_CreateWorkflow_RejectsInvalidDef(t *testing.T) {
+	svc := NewWorkflowService()
+	tmp := t.TempDir()
+	def := &WorkflowDef{Name: "empty", Steps: nil}
+	if err := svc.CreateWorkflow(tmp, "empty", def); err == nil {
+		t.Fatal("expected error for workflow with no steps")
+	}
+}

@@ -68,7 +68,7 @@ frontend/
 - Create: `services/terminal_service.go`
 - Create: `services/terminal_service_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `services/terminal_service_test.go`:
 
@@ -123,12 +123,12 @@ func TestTerminalService_WriteWhenNotRunning(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./services/ -run TestTerminalService -v`
 Expected: FAIL with "undefined: NewTerminalService" or similar compile error.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 First add the dependency:
 ```bash
@@ -306,7 +306,7 @@ func (o *outputBuffer) Read(timeout time.Duration) string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./services/ -run TestTerminalService -v`
 Expected: 3 tests PASS.
@@ -333,7 +333,7 @@ func defaultShell() []string {
 }
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/terminal_service.go services/terminal_service_test.go services/output_buffer.go
@@ -348,7 +348,7 @@ git commit -m "feat: add TerminalService with PTY lifecycle"
 - Modify: `services/terminal_service.go`
 - Modify: `services/terminal_service_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `services/terminal_service_test.go`:
 
@@ -376,12 +376,12 @@ func TestTerminalService_ResizeWhenNotRunning(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./services/ -run TestTerminalService_Resize -v`
 Expected: FAIL with "ts.Resize undefined".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add to `services/terminal_service.go`:
 
@@ -405,12 +405,12 @@ func (t *TerminalService) Resize(cols, rows int) error {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./services/ -run TestTerminalService -v`
 Expected: all 5 TerminalService tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/terminal_service.go services/terminal_service_test.go
@@ -425,7 +425,7 @@ git commit -m "feat: add TerminalService Resize"
 - Create: `services/ai_service.go`
 - Create: `services/ai_service_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `services/ai_service_test.go`:
 
@@ -495,12 +495,12 @@ func TestAIService_SendMissingAPIKey(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./services/ -run TestAIService -v`
 Expected: FAIL with "undefined: NewAIService".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `services/ai_service.go`:
 
@@ -593,12 +593,12 @@ func (a *AIService) Send(messages []ChatMessage) (*ChatResponse, error) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./services/ -run TestAIService -v`
 Expected: 2 tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/ai_service.go services/ai_service_test.go
@@ -613,7 +613,7 @@ git commit -m "feat: add AIService with non-streaming Send"
 - Modify: `services/ai_service.go`
 - Modify: `services/ai_service_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `services/ai_service_test.go`:
 
@@ -662,12 +662,12 @@ func TestAIService_SendStream(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./services/ -run TestAIService_SendStream -v`
 Expected: FAIL with "ai.SendStream undefined".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add to `services/ai_service.go`:
 
@@ -736,12 +736,12 @@ func (a *AIService) SendStream(messages []ChatMessage, onChunk func(chunk string
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./services/ -run TestAIService -v`
 Expected: all 3 AIService tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/ai_service.go services/ai_service_test.go
@@ -756,7 +756,7 @@ git commit -m "feat: add AIService streaming via SSE"
 - Modify: `services/settings_service.go`
 - Modify: `services/settings_service_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `services/settings_service_test.go`:
 
@@ -790,12 +790,12 @@ func TestSettingsService_SaveAndLoadAIConfig(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./services/ -run TestSettingsService_SaveAndLoadAIConfig -v`
 Expected: FAIL with "settings.AIApiKey undefined" (struct lacks these fields).
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 In `services/settings_service.go`, add fields to the `Settings` struct:
 
@@ -835,12 +835,12 @@ func defaultSettings() Settings {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./services/ -run TestSettingsService -v`
 Expected: all settings tests PASS (existing + new).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/settings_service.go services/settings_service_test.go
@@ -854,16 +854,16 @@ git commit -m "feat: add AI config fields to Settings"
 **Files:**
 - Modify: `main.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 No unit test for main.go wiring. Verification is via `go build ./` succeeding.
 
-- [ ] **Step 2: Verify current build**
+- [x] **Step 2: Verify current build**
 
 Run: `go build ./`
 Expected: succeeds (baseline).
 
-- [ ] **Step 3: Modify main.go**
+- [x] **Step 3: Modify main.go**
 
 Update `main.go` to register `TerminalService` and `AIService`, and register events for terminal output and AI streaming:
 
@@ -966,7 +966,7 @@ func main() {
 
 **Note:** The `ReadOutput` polling loop above is a simplified approach. A more robust implementation would use a channel-based callback in TerminalService that emits events directly. If the polling approach causes latency issues, refactor `TerminalService` to accept an `onOutput func(string)` callback in `Start()`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go build ./`
 Expected: succeeds.
@@ -977,7 +977,7 @@ Expected: no errors.
 Run: `go test ./services/ -v`
 Expected: all existing tests still PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add main.go
@@ -992,14 +992,14 @@ git commit -m "feat: register TerminalService and AIService in main.go"
 - Modify: `frontend/package.json`
 - Modify: `frontend/bindings/changeme/services/` (regenerated)
 
-- [ ] **Step 1: Install dependencies**
+- [x] **Step 1: Install dependencies**
 
 ```bash
 cd frontend
 npm install @xterm/xterm @xterm/addon-fit
 ```
 
-- [ ] **Step 2: Regenerate Wails bindings**
+- [x] **Step 2: Regenerate Wails bindings**
 
 ```bash
 cd e:\gugacode\gugacode\gugacode
@@ -1008,7 +1008,7 @@ C:\Users\SurgeFC\go\bin\wails3.exe generate bindings
 
 Expected output: "Processed: ... 7 Services, ... Methods". The `frontend/bindings/changeme/services/` directory should now contain `terminalservice.js` and `aiservice.js`.
 
-- [ ] **Step 3: Verify bindings exist**
+- [x] **Step 3: Verify bindings exist**
 
 List `frontend/bindings/changeme/services/` — should include:
 - `fileservice.js`
@@ -1019,7 +1019,7 @@ List `frontend/bindings/changeme/services/` — should include:
 - `aiservice.js` (NEW)
 - `models.js` (updated with ChatMessage, AIConfig, etc.)
 
-- [ ] **Step 4: Verify TypeScript compiles**
+- [x] **Step 4: Verify TypeScript compiles**
 
 ```bash
 cd frontend
@@ -1027,7 +1027,7 @@ npx vue-tsc --noEmit
 ```
 Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/package.json frontend/package-lock.json frontend/bindings/
@@ -1042,7 +1042,7 @@ git commit -m "chore: install xterm deps and regenerate bindings"
 - Modify: `frontend/src/types/index.ts`
 - Modify: `frontend/src/api/services.ts`
 
-- [ ] **Step 1: Update types**
+- [x] **Step 1: Update types**
 
 Modify `frontend/src/types/index.ts` — add AI config and chat message types. Append to existing types:
 
@@ -1082,7 +1082,7 @@ export interface Settings {
 }
 ```
 
-- [ ] **Step 2: Update API layer**
+- [x] **Step 2: Update API layer**
 
 Modify `frontend/src/api/services.ts` — add re-exports for the new services. Read the file first to see the existing pattern, then add:
 
@@ -1095,7 +1095,7 @@ export { terminalService, aiService };
 
 **Verify the actual export names** by reading `frontend/bindings/changeme/services/terminalservice.js` and `aiservice.js` — the exported singleton name may be `terminalService` or `TerminalService`. Use the actual name.
 
-- [ ] **Step 3: Verify TypeScript compiles**
+- [x] **Step 3: Verify TypeScript compiles**
 
 ```bash
 cd frontend
@@ -1103,7 +1103,7 @@ npx vue-tsc --noEmit
 ```
 Expected: no errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types/index.ts frontend/src/api/services.ts
@@ -1118,7 +1118,7 @@ git commit -m "feat: add AI and terminal types to frontend"
 - Create: `frontend/src/stores/terminal.ts`
 - Create: `frontend/src/stores/terminal.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `frontend/src/stores/terminal.test.ts`:
 
@@ -1168,12 +1168,12 @@ describe("terminal store", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/stores/terminal.test.ts`
 Expected: FAIL with "Cannot find module './terminal'".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `frontend/src/stores/terminal.ts`:
 
@@ -1257,7 +1257,7 @@ export function clearOutput(): void {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/stores/terminal.test.ts`
 Expected: 4 tests PASS.
@@ -1265,7 +1265,7 @@ Expected: 4 tests PASS.
 Then run full suite: `npx vitest run`
 Expected: all tests PASS (existing 40 + new 4).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/stores/terminal.ts frontend/src/stores/terminal.test.ts
@@ -1279,15 +1279,15 @@ git commit -m "feat: add terminal store with event streaming"
 **Files:**
 - Modify: `frontend/src/components/layout/TerminalPanel.vue`
 
-- [ ] **Step 1: No unit test (xterm needs real DOM)**
+- [x] **Step 1: No unit test (xterm needs real DOM)**
 
 xterm.js requires a real DOM/canvas and cannot run in jsdom. This task is verified via `vue-tsc --noEmit` and manual testing.
 
-- [ ] **Step 2: Read current TerminalPanel.vue**
+- [x] **Step 2: Read current TerminalPanel.vue**
 
 Read `frontend/src/components/layout/TerminalPanel.vue` to understand the existing template and styles.
 
-- [ ] **Step 3: Modify TerminalPanel.vue**
+- [x] **Step 3: Modify TerminalPanel.vue**
 
 Replace the `<script setup>` block and the terminal body section. Keep the header (tabs + close button) and styles. The key changes:
 
@@ -1522,7 +1522,7 @@ onBeforeUnmount(() => {
 </style>
 ```
 
-- [ ] **Step 4: Verify TypeScript compiles**
+- [x] **Step 4: Verify TypeScript compiles**
 
 Run: `npx vue-tsc --noEmit`
 Expected: no errors (existing tests still pass).
@@ -1530,7 +1530,7 @@ Expected: no errors (existing tests still pass).
 Run: `npx vitest run`
 Expected: all existing tests PASS (no new tests — xterm can't run in jsdom).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/layout/TerminalPanel.vue
@@ -1545,7 +1545,7 @@ git commit -m "feat: integrate xterm.js into TerminalPanel"
 - Create: `frontend/src/stores/ai.ts`
 - Create: `frontend/src/stores/ai.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `frontend/src/stores/ai.test.ts`:
 
@@ -1602,12 +1602,12 @@ describe("ai store", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx vitest run src/stores/ai.test.ts`
 Expected: FAIL with "Cannot find module './ai'".
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `frontend/src/stores/ai.ts`:
 
@@ -1661,7 +1661,7 @@ export function clearMessages(): void {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run src/stores/ai.test.ts`
 Expected: 3 tests PASS.
@@ -1669,7 +1669,7 @@ Expected: 3 tests PASS.
 Run: `npx vitest run`
 Expected: all tests PASS (existing + new).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/stores/ai.ts frontend/src/stores/ai.test.ts
@@ -1683,13 +1683,13 @@ git commit -m "feat: add AI store with streaming send"
 **Files:**
 - Modify: `frontend/src/components/layout/AiChatPanel.vue`
 
-- [ ] **Step 1: No unit test (UI component, manual verification)**
+- [x] **Step 1: No unit test (UI component, manual verification)**
 
-- [ ] **Step 2: Read current AiChatPanel.vue**
+- [x] **Step 2: Read current AiChatPanel.vue**
 
 Read `frontend/src/components/layout/AiChatPanel.vue` to understand the existing template and styles.
 
-- [ ] **Step 3: Modify AiChatPanel.vue**
+- [x] **Step 3: Modify AiChatPanel.vue**
 
 Replace the `<script setup>` block and the chat body section. Keep the header, input area styling, and transitions. Key changes:
 
@@ -2074,7 +2074,7 @@ watch(
 </style>
 ```
 
-- [ ] **Step 4: Verify TypeScript compiles**
+- [x] **Step 4: Verify TypeScript compiles**
 
 Run: `npx vue-tsc --noEmit`
 Expected: no errors.
@@ -2082,7 +2082,7 @@ Expected: no errors.
 Run: `npx vitest run`
 Expected: all existing tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/layout/AiChatPanel.vue
@@ -2097,13 +2097,13 @@ git commit -m "feat: wire AiChatPanel with message list and streaming"
 - Modify: `frontend/src/views/SettingsView.vue`
 - Modify: `frontend/src/stores/app.ts`
 
-- [ ] **Step 1: No unit test (settings UI form)**
+- [x] **Step 1: No unit test (settings UI form)**
 
-- [ ] **Step 2: Read current SettingsView.vue and app.ts**
+- [x] **Step 2: Read current SettingsView.vue and app.ts**
 
 Read both files to understand the existing settings form structure and the appState fields.
 
-- [ ] **Step 3: Modify app.ts — add AI config fields**
+- [x] **Step 3: Modify app.ts — add AI config fields**
 
 In `frontend/src/stores/app.ts`, add to the `AppState` interface:
 
@@ -2178,7 +2178,7 @@ export function saveSettings(): void {
 }
 ```
 
-- [ ] **Step 4: Modify SettingsView.vue — add AI config section**
+- [x] **Step 4: Modify SettingsView.vue — add AI config section**
 
 Read the existing `frontend/src/views/SettingsView.vue`. Find the AI settings section (it likely exists as a tab/section). Add form fields for:
 
@@ -2233,7 +2233,7 @@ import { appState, saveSettings } from "@/stores/app";
 
 **Important:** Match the existing SettingsView's exact structure, classes, and patterns. The above is a template — adapt to fit.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 Run: `npx vue-tsc --noEmit`
 Expected: no errors.
@@ -2252,22 +2252,22 @@ git commit -m "feat: add AI config section to SettingsView"
 
 **Files:** None (verification only)
 
-- [ ] **Step 1: Run all Go tests**
+- [x] **Step 1: Run all Go tests**
 
 Run from project root: `go test ./services/ -v`
 Expected: all tests PASS (FileService 7 + ProjectService 5 + SettingsService 4 + TerminalService 5 + AIService 3 = 24 tests)
 
-- [ ] **Step 2: Run all frontend tests**
+- [x] **Step 2: Run all frontend tests**
 
 Run from `frontend/`: `npx vitest run`
 Expected: all tests PASS (Plan 1's 40 + terminal 4 + ai 3 = 47 tests)
 
-- [ ] **Step 3: Verify TypeScript compiles**
+- [x] **Step 3: Verify TypeScript compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors
 
-- [ ] **Step 4: Start dev mode and manually verify**
+- [x] **Step 4: Start dev mode and manually verify**
 
 Run from project root: `wails3 dev`
 
@@ -2290,7 +2290,7 @@ Manual test checklist:
 16. Change Base URL → it persists after app restart
 17. Change Model → AiChatPanel model selector reflects new default
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git add -A

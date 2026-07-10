@@ -8,11 +8,18 @@ import type { Events } from "@wailsio/runtime";
 declare module "@wailsio/runtime" {
     namespace Events {
         interface CustomEvents {
-            "ai:chunk": string;
-            "ai:done": string;
-            "ai:error": string;
+            "agent:pending-updated": { [_ in string]?: any };
+            "ai:apply-to-editor": { [_ in string]?: string };
+            "ai:chunk": { [_ in string]?: any };
+            "ai:done": { [_ in string]?: any };
+            "ai:error": { [_ in string]?: any };
+            "ai:selection": { [_ in string]?: string };
+            "ai:stream-busy": { [_ in string]?: any };
+            "ai:tool_calls": { [_ in string]?: any };
+            "conversation:saved": { [_ in string]?: any };
             "file:saved": string;
-            "terminal:output": { [_ in string]?: string } | null;
+            "settings:changed": { [_ in string]?: any };
+            "terminal:output": { [_ in string]?: string };
             "time": string;
             "window:maximised": boolean;
         }

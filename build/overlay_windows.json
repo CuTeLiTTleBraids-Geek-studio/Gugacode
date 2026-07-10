@@ -1,0 +1,11 @@
+{
+  "Replace": {
+    "C:/Users/Cute_/go/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-alpha2.111/pkg/application/clipboard_windows.go": "e:/gugacode/Gugacode-main/build/overlay_empty.go",
+    "C:/Users/Cute_/go/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-alpha2.111/pkg/application/dialogs_windows.go": "e:/gugacode/Gugacode-main/build/overlay_empty.go",
+    "C:/Users/Cute_/go/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-alpha2.111/pkg/application/single_instance_windows.go": "e:/gugacode/Gugacode-main/build/overlay_empty.go",
+    "C:/Users/Cute_/go/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-alpha2.111/pkg/application/systemtray_windows.go": "e:/gugacode/Gugacode-main/build/overlay_empty.go",
+    "C:/Users/Cute_/go/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-alpha2.111/pkg/application/webview_window_windows.go": "e:/gugacode/Gugacode-main/build/overlay_empty.go",
+    "C:/Users/Cute_/go/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-alpha2.111/pkg/application/events_common_windows.go": "e:/gugacode/Gugacode-main/build/overlay_empty.go",
+    "C:/Users/Cute_/go/pkg/mod/github.com/wailsapp/wails/v3@v3.0.0-alpha2.111/pkg/application/mainthread_windows.go": "e:/gugacode/Gugacode-main/build/overlay_empty.go"
+  }
+}

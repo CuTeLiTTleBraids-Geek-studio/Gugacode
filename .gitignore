@@ -5,9 +5,12 @@
 # Go 二进制文件 / Go binaries
 bin/
 *.exe
+*.run
 gugacode.exe
 gugacode
 gugacode.app
+gugacode-server*
+gugacode-server-linux-amd64
 miaomiaocode
 miaomiaocode.exe
 nknk-coding
@@ -121,3 +124,7 @@ coverage/
 
 # 哈希测试调试工具 / Hash debug tool
 tools/hashtest6/
+
+# Local lint dumps
+frontend/eslint_output.json
+

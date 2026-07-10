@@ -41,6 +41,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": resolve(__dirname, "src"),
+      // prompt-5 Task D / BUG-M3: monaco-editor cannot resolve fully under
+      // vitest/jsdom; stub it so suites that transitively import
+      // monaco-themes (e.g. ExtensionPermissionDialog via app store) load.
+      "monaco-editor": resolve(__dirname, "src/test-stubs/monaco-editor.ts"),
     },
   },
 });

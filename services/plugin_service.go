@@ -605,15 +605,6 @@ func (s *PluginService) savePluginState(state pluginStateFile) error {
 		return fmt.Errorf("user config directory is not configured")
 	}
 	path := filepath.Join(s.configDir, "gugacode", pluginStateFileName)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create plugins state directory: %w", err)
-	}
-	data, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal plugins state: %w", err)
-	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		return fmt.Errorf("write plugins state: %w", err)
-	}
-	return nil
+	// M-5: atomic write (temp+rename+0600) prevents half-written state.
+	return atomicWriteJSON(path, state, 0600)
 }

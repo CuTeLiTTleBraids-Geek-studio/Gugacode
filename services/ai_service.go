@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -122,8 +124,10 @@ func splitSystemPrompt(messages []ChatMessage) (string, []ChatMessage) {
 }
 
 // parseAIError extracts a human-readable error message from a non-2xx response.
+// parseAIError reads the error response body capped at 64 KiB (G-SEC-08 / M-2)
+// to prevent a malicious provider from exhausting memory with a huge body.
 func parseAIError(resp *http.Response) error {
-	body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	var aiErr aiErrorResponse
 	if err := json.Unmarshal(body, &aiErr); err == nil && aiErr.Error.Message != "" {
 		return fmt.Errorf("AI API error (status %d): %s", resp.StatusCode, aiErr.Error.Message)
@@ -139,6 +143,29 @@ type ChatMessage struct {
 type ChatResponse struct {
 	Content      string
 	FinishReason string
+}
+
+// AIToolFunction is the function body of an OpenAI-compatible tool definition
+// (prompt-5 Task H — native function calling dual-track with fence parsing).
+type AIToolFunction struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Parameters  map[string]interface{} `json:"parameters"`
+}
+
+// AIToolDef is an OpenAI-compatible tools[] entry.
+type AIToolDef struct {
+	Type     string         `json:"type"` // "function"
+	Function AIToolFunction `json:"function"`
+}
+
+// NativeToolCall is a completed tool call assembled from streaming deltas
+// (OpenAI tool_calls) or Anthropic tool_use blocks. Emitted as JSON on
+// the "ai:tool_calls" event after the stream completes.
+type NativeToolCall struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"` // raw JSON object string
 }
 
 type AIConfig struct {
@@ -168,6 +195,18 @@ type AIConfig struct {
 	// completions + Bearer) or "anthropic" (/v1/messages + x-api-key +
 	// anthropic-version). Empty defaults to "openai".
 	Protocol string
+	// G-SEC-07: when UseStoredKey is true, the service fetches the decrypted
+	// key from SettingsService using ConfigID instead of using the APIKey
+	// field. This lets the frontend call SetConfig without ever holding the
+	// plaintext key. When APIKey is non-empty (user entered a new key), it
+	// takes precedence over UseStoredKey.
+	UseStoredKey bool
+	ConfigID     string
+	// prompt-5 Task H: optional OpenAI-compatible tool definitions. When
+	// non-empty, StartStream attaches them to the request (OpenAI tools /
+	// Anthropic tools). Models may return native tool_calls; the frontend
+	// still accepts fence-parsed tool calls as a dual-track fallback.
+	Tools []AIToolDef
 }
 
 // defaultChatMaxTokens is the default response token cap for chat requests
@@ -277,11 +316,23 @@ type AIService struct {
 	// with == in Go (function values are not comparable). Wrapping it
 	// in a struct pointer allows the compare-and-swap pattern: only
 	// clear a.cancel if it still points to OUR streamCancel.
-	cancel        *streamCancel
-	presetService *PresetService
+	cancel *streamCancel
+	// prompt-6 Task 2: active stream id (empty when idle). Emitted on all
+	// ai:* stream events so dual windows can route/filter payloads.
+	activeStreamID string
+	presetService  *PresetService
 	// projectRoot is the currently open project root, used by the preset
 	// service to locate project-level presets. Set via SetProjectRoot.
 	projectRoot string
+	// G-SEC-07: settingsService is used to fetch stored API keys when
+	// UseStoredKey is true, so keys never cross the Wails binding.
+	settingsService *SettingsService
+	// Plan 11 Task 12 Step 3: permissionService provides per-operation
+	// model assignment + fallback. When set, ResolveModelFor returns the
+	// config for a specific operation (chat/agent/review/etc.) instead
+	// of the global config. Callers (agent_service, frontend store) use
+	// it to route each operation to its assigned model.
+	permissionService *AIPermissionService
 }
 
 // aiSnapshot is a point-in-time copy of the AIService's configuration
@@ -294,6 +345,9 @@ type aiSnapshot struct {
 	app           *application.App
 	presetService *PresetService
 	projectRoot   string
+	// G-SEC-07: settingsService is used to fetch stored API keys when
+	// UseStoredKey is true, so keys never cross the Wails binding.
+	settingsService *SettingsService
 }
 
 // snapshot returns a copy of the service's configuration fields under the
@@ -317,11 +371,40 @@ type streamCancel struct {
 	fn context.CancelFunc
 }
 
+// newStreamID returns a random hex stream id (prompt-6 Task 2).
+func newStreamID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// Extremely unlikely; fall back to timestamp-based id.
+		return fmt.Sprintf("s%x", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b[:])
+}
+
+// emitAIStreamEvent emits a structured AI stream event with streamId
+// (prompt-6 Task 2). Payload shape is always a map so dual-window
+// clients can ignore events for other streams.
+func emitAIStreamEvent(app *application.App, name, streamID string, fields map[string]interface{}) {
+	if app == nil {
+		return
+	}
+	payload := map[string]interface{}{"streamId": streamID}
+	for k, v := range fields {
+		payload[k] = v
+	}
+	app.Event.Emit(name, payload)
+}
+
 func NewAIService() *AIService {
 	return &AIService{}
 }
 
-func (a *AIService) SetConfig(config AIConfig) {
+// SetConfig validates and stores the AI configuration.
+// G-SEC-01: BaseURL is validated via ValidateBaseURL before writing. An
+// invalid BaseURL (SSRF vector, non-http scheme, non-loopback http) is
+// rejected and the previous config is preserved. An empty BaseURL is
+// allowed (unconfigured state).
+func (a *AIService) SetConfig(config AIConfig) error {
 	// N-71 / Proposal AG: cap the SystemPromptOverride length to prevent
 	// an excessively long override from consuming the model's context window
 	// or acting as an injection vector. Log a warning and truncate.
@@ -330,10 +413,28 @@ func (a *AIService) SetConfig(config AIConfig) {
 			"len", len(config.SystemPrompt), "max", MaxSystemPromptOverrideLen)
 		config.SystemPrompt = config.SystemPrompt[:MaxSystemPromptOverrideLen]
 	}
+	// G-SEC-01: validate BaseURL to prevent SSRF / API key exfiltration.
+	if config.BaseURL != "" {
+		if err := ValidateBaseURL(config.BaseURL); err != nil {
+			slog.Warn("ai setconfig: rejected base URL", "baseURL", config.BaseURL, "err", err)
+			return fmt.Errorf("invalid base URL: %w", err)
+		}
+	}
+	// G-SEC-07: when UseStoredKey is true and no plaintext key was provided,
+	// fetch the key from SettingsService so the frontend never has to send it.
+	if config.APIKey == "" && config.UseStoredKey && config.ConfigID != "" {
+		ss := a.settingsService
+		if ss != nil {
+			if key, kerr := ss.GetAPIKeyForConfig(config.ConfigID); kerr == nil && key != "" {
+				config.APIKey = key
+			}
+		}
+	}
 	// N-93: write lock protects against concurrent reads in StartStream goroutine.
 	a.mu.Lock()
 	a.config = config
 	a.mu.Unlock()
+	return nil
 }
 
 // SetPresetService injects a PresetService so the AI service can resolve
@@ -359,6 +460,86 @@ func (a *AIService) SetApp(app *application.App) {
 	a.mu.Lock()
 	a.app = app
 	a.mu.Unlock()
+}
+
+// SetSettingsService injects a SettingsService so AIService can fetch stored
+// API keys (G-SEC-07). When SetConfig is called with UseStoredKey=true, the
+// service reads the decrypted key from settings.json via this reference.
+func (a *AIService) SetSettingsService(ss *SettingsService) {
+	a.mu.Lock()
+	a.settingsService = ss
+	a.mu.Unlock()
+}
+
+// SetPermissionService injects the AIPermissionService (Plan 11 Task 12 Step 3).
+// When set, ResolveModelFor returns per-operation model assignments instead
+// of the global config. Callers use it to route operations (chat/agent/review)
+// to their assigned models with fallback support (Step 4).
+func (a *AIService) SetPermissionService(ps *AIPermissionService) {
+	a.mu.Lock()
+	a.permissionService = ps
+	a.mu.Unlock()
+}
+
+// ResolveModelFor returns the AIConfig for a specific operation (Step 3).
+//
+// Plan 11 Task 12 Step 3-4:
+//   - If permissionService is set and the operation has an assignment with
+//     a non-empty Model, returns a config derived from the global config
+//     but with the operation's model/provider/temperature/maxTokens.
+//   - G-SEC-07 (Step 9): UseStoredKey=true + ConfigID=ProviderID so the
+//     key is fetched from SettingsService (never crosses Wails binding).
+//   - Step 6: If the operation is disabled, returns ErrNotAllowed.
+//   - Step 4: The returned fallback config (if any) is used when the primary
+//     call fails (429/timeout). The caller records usage via RecordUsage.
+//
+// When permissionService is nil or no assignment exists, returns the global
+// config (backward compatible).
+func (a *AIService) ResolveModelFor(op AIOperation) (AIConfig, *AIConfig, error) {
+	a.mu.RLock()
+	globalConfig := a.config
+	ps := a.permissionService
+	a.mu.RUnlock()
+
+	if ps == nil {
+		return globalConfig, nil, nil
+	}
+
+	// Step 6: check if operation is disabled
+	if ps.IsDisabled(op) {
+		return AIConfig{}, nil, fmt.Errorf("%w: operation %q is disabled", ErrNotAllowed, op)
+	}
+
+	resolution := ps.GetModelFor(op)
+	primary := resolution.Primary
+
+	// If no model assigned, fall back to global config
+	if primary.Model == "" {
+		return globalConfig, nil, nil
+	}
+
+	// Build primary config derived from global (keeps BaseURL/Protocol/SystemPrompt)
+	cfg := globalConfig
+	cfg.Model = primary.Model
+	cfg.UseStoredKey = true // G-SEC-07
+	cfg.ConfigID = primary.ProviderID
+	if primary.Temperature > 0 {
+		cfg.Temperature = primary.Temperature
+	}
+	if primary.MaxTokens > 0 {
+		cfg.MaxTokens = primary.MaxTokens
+	}
+
+	// Step 4: build fallback config if configured
+	var fallback *AIConfig
+	if resolution.Fallback != nil {
+		fb := cfg
+		fb.Model = resolution.Fallback.Model
+		fb.ConfigID = resolution.Fallback.ProviderID
+		fallback = &fb
+	}
+
+	return cfg, fallback, nil
 }
 
 // GetDefaultSystemPrompt returns the built-in default system prompt.
@@ -679,12 +860,20 @@ func (a *AIService) completeSystemPrompt(language string) string {
 }
 
 // Complete sends a non-streaming completion request and returns the suggested text.
+// prompt-6 Task 8 / BUG-M9: skip when a main chat stream is active so inline
+// completion does not compete for the same provider quota.
 func (a *AIService) Complete(req CompletionRequest) (*CompletionResponse, error) {
 	// N-93: snapshot once; use throughout.
 	snap := a.snapshot()
 	cfg := snap.config
 	if cfg.APIKey == "" {
 		return nil, errors.New("API key not configured")
+	}
+	a.mu.RLock()
+	busy := a.cancel != nil
+	a.mu.RUnlock()
+	if busy {
+		return nil, errors.New("inline completion paused while a chat stream is active")
 	}
 	if isAnthropicProtocol(cfg) {
 		// Anthropic protocol doesn't support inline completion in this build;
@@ -906,9 +1095,18 @@ func (a *AIService) SendStream(messages []ChatMessage, onChunk func(chunk string
 // "Provider returned malformed SSE stream" rather than appearing to succeed
 // with no chunks emitted.
 func parseSSEStream(r io.Reader, onChunk func(string)) error {
+	_, err := parseSSEStreamWithTools(r, onChunk)
+	return err
+}
+
+// parseSSEStreamWithTools is like parseSSEStream but also accumulates
+// OpenAI-style delta.tool_calls for native function calling (prompt-5 Task H).
+func parseSSEStreamWithTools(r io.Reader, onChunk func(string)) ([]NativeToolCall, error) {
 	reader := bufio.NewReader(r)
 	consecutiveErrors := 0
 	const maxConsecutiveErrors = 5
+	// index → partial tool call (name/arguments may arrive across chunks)
+	acc := map[int]*NativeToolCall{}
 	for {
 		line, err := reader.ReadString('\n')
 		// Process the line even if err is io.EOF (last line may lack \n).
@@ -918,12 +1116,21 @@ func parseSSEStream(r io.Reader, onChunk func(string)) error {
 			if len(line) >= 6 && line[:6] == "data: " {
 				data := line[6:]
 				if data == "[DONE]" {
-					return nil
+					return finalizeNativeToolCalls(acc), nil
 				}
 				var result struct {
 					Choices []struct {
 						Delta struct {
-							Content string `json:"content"`
+							Content   string `json:"content"`
+							ToolCalls []struct {
+								Index    int    `json:"index"`
+								ID       string `json:"id"`
+								Type     string `json:"type"`
+								Function struct {
+									Name      string `json:"name"`
+									Arguments string `json:"arguments"`
+								} `json:"function"`
+							} `json:"tool_calls"`
 						} `json:"delta"`
 					} `json:"choices"`
 				}
@@ -938,12 +1145,31 @@ func parseSSEStream(r io.Reader, onChunk func(string)) error {
 					slog.Warn("ai sse: failed to parse data line", "err", perr, "preview", preview)
 					consecutiveErrors++
 					if consecutiveErrors >= maxConsecutiveErrors {
-						return fmt.Errorf("provider returned %d consecutive malformed SSE chunks (last error: %w); check base URL compatibility", consecutiveErrors, perr)
+						return nil, fmt.Errorf("provider returned %d consecutive malformed SSE chunks (last error: %w); check base URL compatibility", consecutiveErrors, perr)
 					}
 				} else {
 					consecutiveErrors = 0
-					if len(result.Choices) > 0 && result.Choices[0].Delta.Content != "" {
-						onChunk(result.Choices[0].Delta.Content)
+					if len(result.Choices) > 0 {
+						delta := result.Choices[0].Delta
+						if delta.Content != "" {
+							onChunk(delta.Content)
+						}
+						for _, tc := range delta.ToolCalls {
+							cur, ok := acc[tc.Index]
+							if !ok {
+								cur = &NativeToolCall{}
+								acc[tc.Index] = cur
+							}
+							if tc.ID != "" {
+								cur.ID = tc.ID
+							}
+							if tc.Function.Name != "" {
+								cur.Name = tc.Function.Name
+							}
+							if tc.Function.Arguments != "" {
+								cur.Arguments += tc.Function.Arguments
+							}
+						}
 					}
 				}
 			}
@@ -955,27 +1181,64 @@ func parseSSEStream(r io.Reader, onChunk func(string)) error {
 			// comparison missed wrapped EOFs, causing normal stream
 			// completions to be reported as errors.
 			if errors.Is(err, io.EOF) {
-				return nil
+				return finalizeNativeToolCalls(acc), nil
 			}
-			return err
+			return nil, err
 		}
 	}
 }
 
+func finalizeNativeToolCalls(acc map[int]*NativeToolCall) []NativeToolCall {
+	if len(acc) == 0 {
+		return nil
+	}
+	// Preserve index order.
+	maxIdx := -1
+	for i := range acc {
+		if i > maxIdx {
+			maxIdx = i
+		}
+	}
+	out := make([]NativeToolCall, 0, len(acc))
+	for i := 0; i <= maxIdx; i++ {
+		if tc, ok := acc[i]; ok && tc.Name != "" {
+			out = append(out, *tc)
+		}
+	}
+	return out
+}
+
+// anthropicToolAcc accumulates a single Anthropic tool_use content block
+// across content_block_start / input_json_delta events (prompt-6 Task 3).
+type anthropicToolAcc struct {
+	id   string
+	name string
+	args string
+}
+
 // parseAnthropicSSEStream reads an Anthropic-style Server-Sent Events stream
-// from r and invokes onChunk for each text delta. Anthropic SSE events use a
-// different shape than OpenAI: the relevant events are
-//   - event: content_block_delta  → data.delta.type == "text_delta", data.delta.text
-//   - event: message_stop         → stream is done
-//
-// Mirrors parseSSEStream's resilience: JSON parse errors are logged via
-// slog.Warn (data truncated to 200 chars) and after 5 consecutive parse
-// errors an error is returned so callers can surface malformed streams
-// instead of appearing to succeed with no chunks.
+// from r and invokes onChunk for each text delta.
 func parseAnthropicSSEStream(r io.Reader, onChunk func(string)) error {
+	_, err := parseAnthropicSSEStreamWithTools(r, onChunk)
+	return err
+}
+
+// parseAnthropicSSEStreamWithTools is like parseAnthropicSSEStream but also
+// accumulates native tool_use blocks (prompt-6 Task 3 / BUG-H5).
+//
+// Relevant Anthropic SSE events:
+//   - content_block_start  → content_block.type == "tool_use" (id, name)
+//   - content_block_delta  → text_delta | input_json_delta
+//   - content_block_stop   → finalizes the current block
+//   - message_stop         → stream done
+func parseAnthropicSSEStreamWithTools(r io.Reader, onChunk func(string)) ([]NativeToolCall, error) {
 	reader := bufio.NewReader(r)
 	consecutiveErrors := 0
 	const maxConsecutiveErrors = 5
+
+	toolsByIndex := map[int]*anthropicToolAcc{}
+	openToolIndex := -1
+
 	for {
 		line, err := reader.ReadString('\n')
 		if line != "" {
@@ -983,10 +1246,17 @@ func parseAnthropicSSEStream(r io.Reader, onChunk func(string)) error {
 			if len(line) >= 6 && line[:6] == "data: " {
 				data := line[6:]
 				var evt struct {
-					Type  string `json:"type"`
-					Delta struct {
+					Type         string `json:"type"`
+					Index        int    `json:"index"`
+					ContentBlock struct {
 						Type string `json:"type"`
-						Text string `json:"text"`
+						ID   string `json:"id"`
+						Name string `json:"name"`
+					} `json:"content_block"`
+					Delta struct {
+						Type        string `json:"type"`
+						Text        string `json:"text"`
+						PartialJSON string `json:"partial_json"`
 					} `json:"delta"`
 				}
 				if perr := json.Unmarshal([]byte(data), &evt); perr != nil {
@@ -997,28 +1267,77 @@ func parseAnthropicSSEStream(r io.Reader, onChunk func(string)) error {
 					slog.Warn("ai anthropic sse: failed to parse data line", "err", perr, "preview", preview)
 					consecutiveErrors++
 					if consecutiveErrors >= maxConsecutiveErrors {
-						return fmt.Errorf("provider returned %d consecutive malformed SSE chunks (last error: %w); check base URL compatibility", consecutiveErrors, perr)
+						return finalizeAnthropicNativeTools(toolsByIndex), fmt.Errorf("provider returned %d consecutive malformed SSE chunks (last error: %w); check base URL compatibility", consecutiveErrors, perr)
 					}
 				} else {
 					consecutiveErrors = 0
 					switch evt.Type {
-					case "content_block_delta":
-						if evt.Delta.Type == "text_delta" && evt.Delta.Text != "" {
-							onChunk(evt.Delta.Text)
+					case "content_block_start":
+						if evt.ContentBlock.Type == "tool_use" {
+							toolsByIndex[evt.Index] = &anthropicToolAcc{
+								id:   evt.ContentBlock.ID,
+								name: evt.ContentBlock.Name,
+							}
+							openToolIndex = evt.Index
+						} else {
+							openToolIndex = -1
 						}
+					case "content_block_delta":
+						switch evt.Delta.Type {
+						case "text_delta":
+							if evt.Delta.Text != "" {
+								onChunk(evt.Delta.Text)
+							}
+						case "input_json_delta":
+							idx := evt.Index
+							if acc, ok := toolsByIndex[idx]; ok {
+								acc.args += evt.Delta.PartialJSON
+							} else if openToolIndex >= 0 {
+								if acc, ok := toolsByIndex[openToolIndex]; ok {
+									acc.args += evt.Delta.PartialJSON
+								}
+							}
+						}
+					case "content_block_stop":
+						openToolIndex = -1
 					case "message_stop":
-						return nil
+						return finalizeAnthropicNativeTools(toolsByIndex), nil
 					}
 				}
 			}
 		}
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				return nil
+				return finalizeAnthropicNativeTools(toolsByIndex), nil
 			}
-			return err
+			return finalizeAnthropicNativeTools(toolsByIndex), err
 		}
 	}
+}
+
+// finalizeAnthropicNativeTools converts index-keyed tool accumulators into
+// the shared NativeToolCall slice (prompt-6 Task 3).
+func finalizeAnthropicNativeTools(acc map[int]*anthropicToolAcc) []NativeToolCall {
+	if len(acc) == 0 {
+		return nil
+	}
+	maxIdx := -1
+	for i := range acc {
+		if i > maxIdx {
+			maxIdx = i
+		}
+	}
+	out := make([]NativeToolCall, 0, len(acc))
+	for i := 0; i <= maxIdx; i++ {
+		if tc, ok := acc[i]; ok && tc != nil && tc.name != "" {
+			out = append(out, NativeToolCall{
+				ID:        tc.id,
+				Name:      tc.name,
+				Arguments: tc.args,
+			})
+		}
+	}
+	return out
 }
 
 // SendStreamWithContext streams the response and respects ctx cancellation.
@@ -1103,35 +1422,52 @@ func (a *AIService) SendStreamWithContext(ctx context.Context, messages []ChatMe
 	return parseSSEStream(resp.Body, onChunk)
 }
 
+// ErrStreamBusy is returned by StartStream when another stream is already
+// active (prompt-5 Task B / BUG-H1: mutual exclusion across main + AI windows).
+var ErrStreamBusy = errors.New("another AI stream is already in progress; stop it before starting a new one")
+
 // StartStream begins an async streaming request. Chunks are emitted via the
 // "ai:chunk" event; completion via "ai:done"; errors via "ai:error".
-// Returns immediately after starting the goroutine.
+// Returns the streamId immediately after starting the goroutine (prompt-6 Task 2).
+//
+// prompt-5 Task B / BUG-H1: if a stream is already running, returns
+// ErrStreamBusy instead of cancelling the previous stream. This prevents
+// dual-window interleaving where chunks from two conversations would
+// corrupt each other's UI. Call StopStream first to replace a stream.
 //
 // N-93: a snapshot of the config and app is taken before the goroutine
 // launches, so a concurrent SetConfig call cannot race with the goroutine's
 // reads. The goroutine uses the snapshot exclusively.
-func (a *AIService) StartStream(messages []ChatMessage) error {
+func (a *AIService) StartStream(messages []ChatMessage) (string, error) {
 	snap := a.snapshot()
 	if snap.config.APIKey == "" {
 		slog.Error("ai startstream: api key not configured")
-		return errors.New("API key not configured")
+		return "", errors.New("API key not configured")
 	}
 	if snap.app == nil {
 		slog.Error("ai startstream: app not initialized")
-		return errors.New("application not initialized")
+		return "", errors.New("application not initialized")
 	}
 
-	// Cancel any existing stream (write lock on cancel field).
+	streamID := newStreamID()
+
+	// Mutual exclusion: do not cancel an existing stream — reject instead.
 	a.mu.Lock()
 	if a.cancel != nil {
-		a.cancel.fn()
+		a.mu.Unlock()
+		slog.Warn("ai startstream: rejected, stream already active")
+		return "", ErrStreamBusy
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	sc := &streamCancel{fn: cancel}
 	a.cancel = sc
+	a.activeStreamID = streamID
 	a.mu.Unlock()
 
-	slog.Info("ai startstream: starting", "model", snap.config.Model, "messages", len(messages))
+	// Notify all webviews that a global stream is busy (UI can disable send).
+	emitAIStreamEvent(snap.app, "ai:stream-busy", streamID, map[string]interface{}{"busy": true})
+
+	slog.Info("ai startstream: starting", "model", snap.config.Model, "messages", len(messages), "streamId", streamID)
 
 	go func() {
 		// N-52: compare-and-swap cleanup. Only clear a.cancel if it
@@ -1145,27 +1481,46 @@ func (a *AIService) StartStream(messages []ChatMessage) error {
 			a.mu.Lock()
 			if a.cancel == sc {
 				a.cancel = nil
+				if a.activeStreamID == streamID {
+					a.activeStreamID = ""
+				}
+			}
+			stillBusy := a.cancel != nil
+			idleStreamID := streamID
+			if stillBusy {
+				idleStreamID = a.activeStreamID
 			}
 			a.mu.Unlock()
+			if !stillBusy {
+				emitAIStreamEvent(snap.app, "ai:stream-busy", idleStreamID, map[string]interface{}{"busy": false})
+			}
 		}()
 
-		err := a.streamWithEvents(ctx, messages, snap)
+		err := a.streamWithEvents(ctx, messages, snap, streamID)
 		if err != nil {
-			slog.Error("ai startstream: failed", "model", snap.config.Model, "err", err)
-			snap.app.Event.Emit("ai:error", err.Error())
+			slog.Error("ai startstream: failed", "model", snap.config.Model, "err", err, "streamId", streamID)
+			emitAIStreamEvent(snap.app, "ai:error", streamID, map[string]interface{}{"data": err.Error()})
 			return
 		}
-		slog.Info("ai startstream: completed", "model", snap.config.Model)
-		snap.app.Event.Emit("ai:done", "")
+		slog.Info("ai startstream: completed", "model", snap.config.Model, "streamId", streamID)
+		emitAIStreamEvent(snap.app, "ai:done", streamID, map[string]interface{}{"data": ""})
 	}()
 
-	return nil
+	return streamID, nil
+}
+
+// IsStreaming reports whether a stream is currently active (prompt-5 Task B).
+func (a *AIService) IsStreaming() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.cancel != nil
 }
 
 // streamWithEvents sends the streaming request and emits "ai:chunk" for each chunk.
 // N-93: uses the provided snapshot instead of reading a.config / a.app, so
 // concurrent SetConfig calls do not cause data races.
-func (a *AIService) streamWithEvents(ctx context.Context, messages []ChatMessage, snap aiSnapshot) error {
+// prompt-6 Task 2: streamID is attached to every emitted event payload.
+func (a *AIService) streamWithEvents(ctx context.Context, messages []ChatMessage, snap aiSnapshot, streamID string) error {
 	cfg := snap.config
 	// N-61: prepareMessages applies context-window truncation to prevent
 	// long conversations from exceeding the model's token limit.
@@ -1184,6 +1539,22 @@ func (a *AIService) streamWithEvents(ctx context.Context, messages []ChatMessage
 			"system":      systemPrompt,
 			"messages":    chatMessages,
 			"stream":      true,
+		}
+		// prompt-5 Task H: Anthropic tools shape (name/description/input_schema).
+		if len(cfg.Tools) > 0 {
+			anthTools := make([]map[string]interface{}, 0, len(cfg.Tools))
+			for _, t := range cfg.Tools {
+				params := t.Function.Parameters
+				if params == nil {
+					params = map[string]interface{}{"type": "object", "properties": map[string]interface{}{}}
+				}
+				anthTools = append(anthTools, map[string]interface{}{
+					"name":         t.Function.Name,
+					"description":  t.Function.Description,
+					"input_schema": params,
+				})
+			}
+			reqBody["tools"] = anthTools
 		}
 		bodyBytes, err := json.Marshal(reqBody)
 		if err != nil {
@@ -1208,9 +1579,20 @@ func (a *AIService) streamWithEvents(ctx context.Context, messages []ChatMessage
 		}
 
 		app := snap.app
-		return parseAnthropicSSEStream(resp.Body, func(chunk string) {
-			app.Event.Emit("ai:chunk", chunk)
+		// prompt-6 Task 3: full Anthropic tool_use streaming + text dual-track.
+		toolCalls, perr := parseAnthropicSSEStreamWithTools(resp.Body, func(chunk string) {
+			emitAIStreamEvent(app, "ai:chunk", streamID, map[string]interface{}{"data": chunk})
 		})
+		if perr != nil {
+			return perr
+		}
+		if len(toolCalls) > 0 {
+			payload, merr := json.Marshal(toolCalls)
+			if merr == nil {
+				emitAIStreamEvent(app, "ai:tool_calls", streamID, map[string]interface{}{"data": string(payload)})
+			}
+		}
+		return nil
 	}
 
 	reqBody := map[string]interface{}{
@@ -1219,6 +1601,11 @@ func (a *AIService) streamWithEvents(ctx context.Context, messages []ChatMessage
 		"stream":      true,
 		"max_tokens":  maxTok, // N-65: bound response length
 		"temperature": effectiveTemperature(cfg),
+	}
+	// prompt-5 Task H: OpenAI-compatible tools + auto tool_choice.
+	if len(cfg.Tools) > 0 {
+		reqBody["tools"] = cfg.Tools
+		reqBody["tool_choice"] = "auto"
 	}
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
@@ -1244,19 +1631,36 @@ func (a *AIService) streamWithEvents(ctx context.Context, messages []ChatMessage
 	}
 
 	app := snap.app
-	return parseSSEStream(resp.Body, func(chunk string) {
-		app.Event.Emit("ai:chunk", chunk)
+	toolCalls, err := parseSSEStreamWithTools(resp.Body, func(chunk string) {
+		emitAIStreamEvent(app, "ai:chunk", streamID, map[string]interface{}{"data": chunk})
 	})
+	if err != nil {
+		return err
+	}
+	if len(toolCalls) > 0 {
+		payload, merr := json.Marshal(toolCalls)
+		if merr == nil {
+			emitAIStreamEvent(app, "ai:tool_calls", streamID, map[string]interface{}{"data": string(payload)})
+		}
+	}
+	return nil
 }
 
 // StopStream cancels an in-progress stream.
 func (a *AIService) StopStream() error {
 	a.mu.Lock()
+	had := a.cancel != nil
+	streamID := a.activeStreamID
 	if a.cancel != nil {
 		a.cancel.fn()
 		a.cancel = nil
 	}
+	a.activeStreamID = ""
+	app := a.app
 	a.mu.Unlock()
+	if had && app != nil {
+		emitAIStreamEvent(app, "ai:stream-busy", streamID, map[string]interface{}{"busy": false})
+	}
 	return nil
 }
 
@@ -1284,6 +1688,25 @@ func (a *AIService) ListModels(baseURL, apiKey string) ([]string, error) {
 	if err := ValidateBaseURL(baseURL); err != nil {
 		slog.Warn("ai listmodels: rejected base URL", "baseURL", baseURL, "err", err)
 		return nil, err
+	}
+	// CRIT-01/G-SEC-07: when the caller passes an empty apiKey, fall back to
+	// the backend's stored key so the frontend never has to hold plaintext.
+	// Resolution order:
+	//   1. a.config.APIKey (populated by SetConfig via UseStoredKey path)
+	//   2. SettingsService.GetAPIKeyForConfig(a.config.ConfigID)
+	// If neither yields a key, the request is sent without auth — this
+	// preserves the local-provider (Ollama) behavior covered by
+	// TestAIService_ListModels_NoAPIKey.
+	if apiKey == "" {
+		a.mu.RLock()
+		if a.config.APIKey != "" {
+			apiKey = a.config.APIKey
+		} else if a.config.ConfigID != "" && a.settingsService != nil {
+			if key, kerr := a.settingsService.GetAPIKeyForConfig(a.config.ConfigID); kerr == nil && key != "" {
+				apiKey = key
+			}
+		}
+		a.mu.RUnlock()
 	}
 	req, err := http.NewRequest("GET", baseURL+"/v1/models", nil)
 	if err != nil {

@@ -20,9 +20,16 @@
 //
 // Event channels:
 //
-//	ai:chunk            string              — a streamed token from the AI
-//	ai:done             string              — finish reason (may be "")
-//	ai:error            string              — error message
+//	ai:chunk            {streamId, data}    — a streamed token from the AI
+//	ai:done             {streamId, data}    — finish reason (data may be "")
+//	ai:error            {streamId, data}    — error message
+//	ai:stream-busy      {streamId, busy}    — process-wide stream mutex (prompt-5/6)
+//	ai:tool_calls       {streamId, data}    — JSON array of native tool calls
+//	ai:selection        {code,language,...} — main → AI window selection
+//	ai:apply-to-editor  {code,filePath,...} — AI window → main apply request
+//	settings:changed    {origin, at}        — dual-window settings SSOT (prompt-6)
+//	conversation:saved  {origin, id, ...}   — dual-window conversation SSOT
+//	agent:pending-updated {origin, count}   — agent approval queue summary
 //	file:saved          string              — absolute path of saved file
 //	terminal:output     {sessionId, data}   — a single PTY stdout/stderr chunk
 //	terminal:exited     {sessionId}         — PTY process exited
@@ -31,9 +38,10 @@
 // The frontend types are:
 //
 //	type WailsEvent<T> = { data: T; name?: string }
-//	type AIChunkEvent         = WailsEvent<string>
-//	type AIDoneEvent          = WailsEvent<string>
-//	type AIErrorEvent         = WailsEvent<string>
+//	type AIStreamPayload      = { streamId: string; data?: string; busy?: boolean }
+//	type AIChunkEvent         = WailsEvent<AIStreamPayload | string>
+//	type AIDoneEvent          = WailsEvent<AIStreamPayload | string>
+//	type AIErrorEvent         = WailsEvent<AIStreamPayload | string>
 //	type FileSavedEvent       = WailsEvent<string>
 //	type TerminalOutputEvent  = WailsEvent<{ sessionId: string; data: string }>
 //	type TerminalExitedEvent  = WailsEvent<{ sessionId: string }>

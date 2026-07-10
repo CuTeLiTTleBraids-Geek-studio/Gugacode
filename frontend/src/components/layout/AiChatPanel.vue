@@ -2,9 +2,11 @@
 import { appState, toggleAiChat, saveSettings, activateAIConfig } from "@/stores/app";
 import { computed, ref, nextTick, watch } from "vue";
 import { VueMonacoDiffEditor } from "@guolao/vue-monaco-editor";
-import { Close, Promotion, VideoPause, CopyDocument, ChatDotRound, Clock, Edit, Aim, Document, Search, VideoPlay, EditPen, Check, Close as CloseIcon, List, Setting, MagicStick } from "@element-plus/icons-vue";
+import MarkdownContent from "@/components/common/MarkdownContent.vue";
+import { Close, Promotion, VideoPause, CopyDocument, ChatDotRound, Clock, Edit, Aim, Document, Search, VideoPlay, EditPen, Check, Close as CloseIcon, List, Setting, MagicStick, FullScreen, Monitor } from "@element-plus/icons-vue";
 import { ElMessageBox } from "element-plus";
 import { aiState, sendMessage, clearMessages, stopGeneration, clearContext, loadConversation, addMentionedFile, removeMentionedFile, renameConversation, setSystemPromptOverride } from "@/stores/ai";
+import { openStandalonePage, openAIDesktopWindow } from "@/stores/aiAssistant";
 import {
   agentState,
   isAgentMode,
@@ -20,7 +22,7 @@ import {
 import type { RiskLevel } from "@/types";
 import { conversationService, fileService } from "@/api/services";
 import { activeFile, updateContent } from "@/stores/editor";
-import type { Conversation, FileContextEntry, RulesFileCandidate } from "@/types";
+import type { Conversation, RulesFileCandidate } from "@/types";
 import {
   rulesState,
   rules as currentRules,
@@ -41,6 +43,7 @@ import { errorMessage } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
 import { aiService } from "@/api/services";
 import { Refresh } from "@element-plus/icons-vue";
+import { connectivityState } from "@/lib/connectivity";
 
 const { t } = useI18n();
 
@@ -84,7 +87,10 @@ async function refreshModelList() {
   }
   refreshingModels.value = true;
   try {
-    const models = await aiService.listModels(baseURL, appState.aiApiKey);
+    // CRIT-01/G-SEC-07: pass an empty apiKey so the backend uses the stored
+    // key (a.config.APIKey, populated via SetConfig's UseStoredKey path).
+    // The frontend never holds plaintext keys.
+    const models = await aiService.listModels(baseURL, "");
     if (models.length > 0) {
       onlineModels.value = models;
       notifySuccess(t("aiChat.refreshModelsSuccess", { count: models.length }));
@@ -157,7 +163,10 @@ async function toggleHistory() {
   showHistory.value = !showHistory.value;
   if (showHistory.value) {
     try {
-      conversations.value = await conversationService.list();
+      // Plan 11 Task 2: exclude soft-deleted conversations (DeletedAt > 0)
+      // from the inline history list. The trash view lives in ConversationSidebar.
+      const all = await conversationService.list();
+      conversations.value = all.filter((c) => !c.deleted_at);
     } catch (e) {
       console.error("Failed to load conversations:", e);
     }
@@ -208,6 +217,11 @@ function formatTime(ts: number): string {
 
 // --- Agent mode helpers ---
 const pendingToolCalls = computed(() => agentState.pendingToolCalls);
+// G-SEC-02: show the denylist warning banner when there is at least one
+// pending `run` tool call — shell commands always require manual approval.
+const hasPendingRunToolCalls = computed(() =>
+  pendingToolCalls.value.some((tc) => tc.kind === "run"),
+);
 
 function toolCallIcon(kind: ToolCallKind) {
   switch (kind) {
@@ -363,6 +377,8 @@ function openRulesConfig() {
   };
   rulesConfigVisible.value = true;
 }
+// Exposed for template / command palette hooks (eslint may not see template use).
+void openRulesConfig;
 
 function addRulesCandidate() {
   rulesConfigDraft.value.candidates = [
@@ -613,6 +629,26 @@ watch(
               <Refresh />
             </el-icon>
           </button>
+          <!-- Plan 11 Task 1 Step 5 — 展开为独立全屏页面 /ai -->
+          <button
+            type="button"
+            class="ai-chat-panel__expand"
+            :aria-label="t('aiChat.expandStandalone')"
+            :title="t('aiChat.expandStandalone')"
+            @click="openStandalonePage"
+          >
+            <el-icon :size="14"><FullScreen /></el-icon>
+          </button>
+          <!-- prompt-4 — 打开 OS 级 AI 伴侣窗口 -->
+          <button
+            type="button"
+            class="ai-chat-panel__expand"
+            :aria-label="t('aiChat.openAIWindow')"
+            :title="t('aiChat.openAIWindow')"
+            @click="openAIDesktopWindow"
+          >
+            <el-icon :size="14"><Monitor /></el-icon>
+          </button>
           <button
             type="button"
             v-if="hasMessages"
@@ -822,9 +858,9 @@ watch(
                 <el-icon :size="12"><CopyDocument /></el-icon>
               </button>
             </div>
-            <div
+            <MarkdownContent
               class="ai-chat-panel__message-content markdown-body"
-              v-html="renderContent(cleanedMessageCache[i] ?? msg.content)"
+              :html="renderContent(cleanedMessageCache[i] ?? msg.content)"
               @click="handleContentClick"
             />
           </div>
@@ -844,6 +880,9 @@ watch(
                 :title="t('aiChat.clearToolCalls')"
                 @click="clearPendingToolCalls"
               >×</button>
+            </div>
+            <div v-if="hasPendingRunToolCalls" class="agent-approvals__denylist-warning">
+              {{ t("aiChat.denylistWarning") }}
             </div>
             <div
               v-for="tc in pendingToolCalls"
@@ -965,8 +1004,8 @@ watch(
             v-else
             class="ai-chat-panel__send"
             :aria-label="t('aiChat.sendMessage')"
-            :title="t('aiChat.sendMessage')"
-            :disabled="!inputText.trim()"
+            :title="!connectivityState.online ? t('aiChat.sendDisabledOffline') : t('aiChat.sendMessage')"
+            :disabled="!inputText.trim() || !connectivityState.online"
             @click="handleSend"
           >
             <el-icon :size="14"><Promotion /></el-icon>
@@ -2112,6 +2151,21 @@ watch(
 .agent-approvals__clear:hover {
   color: var(--color-text-primary);
   background-color: var(--color-bg-surface-container-high);
+}
+
+/* G-SEC-02: denylist warning banner — always visible when run tool calls
+   are pending, reminding the user that the denylist is not a security
+   boundary and all commands require manual approval. */
+.agent-approvals__denylist-warning {
+  padding: var(--space-xxs) var(--space-xs);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.43;
+  letter-spacing: -0.224px;
+  color: var(--color-warning);
+  background: var(--color-warning-container);
+  border-radius: var(--radius-sm);
+  border-left: 2px solid var(--color-warning);
 }
 
 .tool-call-card {

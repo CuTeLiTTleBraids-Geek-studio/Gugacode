@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from "vue";
+import { ElMessageBox } from "element-plus";
 import {
   presetsState,
   loadPresets,
@@ -100,7 +101,15 @@ async function savePreset() {
 
 async function removePreset(p: PresetWithSource) {
   if (p.source === "builtin") return;
-  if (!confirm(t("presets.deleteConfirm", { name: p.name }))) return;
+  try {
+    await ElMessageBox.confirm(
+      t("presets.deleteConfirm", { name: p.name }),
+      t("common.confirm"),
+      { type: "warning", confirmButtonText: t("common.confirm"), cancelButtonText: t("common.cancel") },
+    );
+  } catch {
+    return;
+  }
   try {
     if (p.source === "project") {
       await deleteProjectPreset(p.name);

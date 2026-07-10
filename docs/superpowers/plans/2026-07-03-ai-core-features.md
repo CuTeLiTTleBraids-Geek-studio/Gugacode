@@ -27,7 +27,7 @@
 **Files:**
 - Create: `frontend/src/lib/notifications.ts`
 
-- [ ] **Step 1: Create the notification helper**
+- [x] **Step 1: Create the notification helper**
 
 Create `frontend/src/lib/notifications.ts`:
 
@@ -88,12 +88,12 @@ export function notifyInfo(message: string, title?: string): void {
 }
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/lib/notifications.ts
@@ -108,7 +108,7 @@ git commit -m "feat: add notification system with ElNotification wrapper"
 - Modify: `frontend/src/stores/ai.ts`
 - Modify: `frontend/src/stores/editor.ts`
 
-- [ ] **Step 1: Replace console.error with notifyError in ai.ts**
+- [x] **Step 1: Replace console.error with notifyError in ai.ts**
 
 In `frontend/src/stores/ai.ts`, add import:
 
@@ -131,7 +131,7 @@ In `sendMessage` catch block, add:
     notifyError(e?.message ?? "AI request failed", "AI Error");
 ```
 
-- [ ] **Step 2: Replace console.error with notifyError in editor.ts**
+- [x] **Step 2: Replace console.error with notifyError in editor.ts**
 
 In `frontend/src/stores/editor.ts`, add import:
 
@@ -148,17 +148,17 @@ with:
     notifyError(`Failed to open file: ${e instanceof Error ? e.message : String(e)}`);
 ```
 
-- [ ] **Step 3: Verify build**
+- [x] **Step 3: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/stores/ai.ts frontend/src/stores/editor.ts
@@ -172,7 +172,7 @@ git commit -m "feat: wire notification system into error paths"
 **Files:**
 - Modify: `frontend/src/components/editor/CodeEditor.vue`
 
-- [ ] **Step 1: Add AI actions to Monaco context menu**
+- [x] **Step 1: Add AI actions to Monaco context menu**
 
 In `frontend/src/components/editor/CodeEditor.vue`, find where the Monaco editor actions are registered (the `actions` array in `registerEditorActions`). The actions already exist for the command palette. Add context menu actions by registering them with Monaco's `addAction`:
 
@@ -225,7 +225,7 @@ import { appState } from "@/stores/app";
 import type { AIActionName } from "@/types";
 ```
 
-- [ ] **Step 2: Call registerContextMenuActions after editor mount**
+- [x] **Step 2: Call registerContextMenuActions after editor mount**
 
 Find the `onMounted` or editor initialization code and add:
 
@@ -235,17 +235,17 @@ registerContextMenuActions();
 
 after `editor = monaco.editor.create(...)` or after the `vue-monaco-editor` `handleMount`.
 
-- [ ] **Step 3: Verify build**
+- [x] **Step 3: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/editor/CodeEditor.vue
@@ -260,7 +260,7 @@ git commit -m "feat: add AI Code Actions to Monaco context menu"
 - Modify: `frontend/src/types/index.ts`
 - Modify: `frontend/src/stores/ai.ts`
 
-- [ ] **Step 1: Add multi-file context type**
+- [x] **Step 1: Add multi-file context type**
 
 In `frontend/src/types/index.ts`, add a new type:
 
@@ -276,7 +276,7 @@ export interface AIMentionContext {
 }
 ```
 
-- [ ] **Step 2: Extend AIState with mentioned files**
+- [x] **Step 2: Extend AIState with mentioned files**
 
 In `frontend/src/stores/ai.ts`, add to `AIState`:
 
@@ -295,7 +295,7 @@ Add import:
 import type { ChatMessage, AIContextAttachment, AIActionName, Conversation, FileContextEntry } from "@/types";
 ```
 
-- [ ] **Step 3: Add mention management functions**
+- [x] **Step 3: Add mention management functions**
 
 In `frontend/src/stores/ai.ts`, add:
 
@@ -325,7 +325,7 @@ export function clearMentionedFiles(): void {
 }
 ```
 
-- [ ] **Step 4: Update buildUserMessage to include mentioned files**
+- [x] **Step 4: Update buildUserMessage to include mentioned files**
 
 In `frontend/src/stores/ai.ts`, update `buildUserMessage`:
 
@@ -356,7 +356,7 @@ function buildUserMessage(content: string): string {
 }
 ```
 
-- [ ] **Step 5: Clear mentioned files after sending**
+- [x] **Step 5: Clear mentioned files after sending**
 
 In `sendMessage`, after pushing the user message, add:
 
@@ -365,17 +365,17 @@ In `sendMessage`, after pushing the user message, add:
   clearMentionedFiles();
 ```
 
-- [ ] **Step 6: Verify build**
+- [x] **Step 6: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 7: Run tests**
+- [x] **Step 7: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add frontend/src/types/index.ts frontend/src/stores/ai.ts
@@ -389,11 +389,11 @@ git commit -m "feat: add @-mention multi-file context support for AI chat"
 **Files:**
 - Modify: `frontend/src/components/ai/AiChatPanel.vue`
 
-- [ ] **Step 1: Read current AiChatPanel structure**
+- [x] **Step 1: Read current AiChatPanel structure**
 
 Read `frontend/src/components/ai/AiChatPanel.vue` to understand the input area structure.
 
-- [ ] **Step 2: Add @-mention file picker**
+- [x] **Step 2: Add @-mention file picker**
 
 In the `<script setup>`, add imports:
 
@@ -442,7 +442,7 @@ async function addFileByPath(filePath: string) {
 }
 ```
 
-- [ ] **Step 3: Add @-mention button and file list to template**
+- [x] **Step 3: Add @-mention button and file list to template**
 
 In the chat input area, add a button before the send button:
 
@@ -478,7 +478,7 @@ Add mentioned files display above the input:
 </div>
 ```
 
-- [ ] **Step 4: Add CSS for mention UI**
+- [x] **Step 4: Add CSS for mention UI**
 
 Add to the `<style scoped>` section:
 
@@ -535,17 +535,17 @@ Add to the `<style scoped>` section:
 }
 ```
 
-- [ ] **Step 5: Verify build**
+- [x] **Step 5: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/components/ai/AiChatPanel.vue
@@ -556,27 +556,27 @@ git commit -m "feat: add @-mention file picker UI in AiChatPanel"
 
 ### Task 6: Full verification
 
-- [ ] **Step 1: Run Go tests**
+- [x] **Step 1: Run Go tests**
 
 Run: `go test ./services/... -count=1 -timeout 60s`
 Expected: all PASS
 
-- [ ] **Step 2: Run Go build**
+- [x] **Step 2: Run Go build**
 
 Run: `go build .`
 Expected: success
 
-- [ ] **Step 3: Run frontend type check**
+- [x] **Step 3: Run frontend type check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 4: Run frontend tests**
+- [x] **Step 4: Run frontend tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 5: Commit if any fixup needed**
+- [x] **Step 5: Commit if any fixup needed**
 
 ```bash
 git add -A

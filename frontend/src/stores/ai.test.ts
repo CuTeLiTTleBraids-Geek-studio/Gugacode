@@ -16,14 +16,16 @@ vi.mock("@wailsio/runtime", () => ({
   Events: {
     On: vi.fn((event: string, handler: (...args: any[]) => void) => {
       eventHandlers[event] = handler;
+      return () => undefined;
     }),
+    Emit: vi.fn(),
   },
 }));
 
 vi.mock("@/api/services", () => ({
   aiService: {
     setConfig: vi.fn().mockResolvedValue(undefined),
-    startStream: vi.fn().mockResolvedValue(undefined),
+    startStream: vi.fn().mockResolvedValue("stream-test-1"),
     stopStream: vi.fn().mockResolvedValue(undefined),
     send: vi.fn().mockResolvedValue({ Content: "ok", FinishReason: "stop" }),
     getPresetPrompt: vi.fn().mockResolvedValue("Explain this code."),
@@ -57,12 +59,16 @@ import {
   clearMessages,
   setSystemPromptOverride,
   loadConversation,
+  parseAIStreamPayload,
+  isOwnedStreamEvent,
 } from "./ai";
 
 describe("ai store", () => {
   beforeEach(() => {
     aiState.messages = [];
     aiState.streaming = false;
+    aiState.globalStreamBusy = false;
+    aiState.activeStreamId = null;
     aiState.error = null;
     aiState.context = null;
     aiState.currentConversationId = null;
@@ -73,16 +79,29 @@ describe("ai store", () => {
 
   it("sends a message and appends assistant response via events", async () => {
     const promise = sendMessage("hi");
-    // Simulate backend emitting chunks (Wails wraps data in { data: ... })
-    eventHandlers["ai:chunk"]?.({ data: "hello" });
-    eventHandlers["ai:chunk"]?.({ data: " world" });
-    eventHandlers["ai:done"]?.();
     await promise;
+    // prompt-6 Task 2: structured payloads with streamId
+    const sid = aiState.activeStreamId || "stream-test-1";
+    eventHandlers["ai:chunk"]?.({ data: { streamId: sid, data: "hello" } });
+    eventHandlers["ai:chunk"]?.({ data: { streamId: sid, data: " world" } });
+    eventHandlers["ai:done"]?.({ data: { streamId: sid, data: "" } });
+    eventHandlers["ai:stream-busy"]?.({ data: { streamId: sid, busy: false } });
 
     expect(aiState.messages.length).toBe(2);
     expect(aiState.messages[0].role).toBe("user");
     expect(aiState.messages[1].role).toBe("assistant");
     expect(aiState.messages[1].content).toBe("hello world");
+  });
+
+  it("ignores chunks for a foreign streamId (prompt-6 Task 2)", async () => {
+    const promise = sendMessage("hi");
+    await promise;
+    const sid = aiState.activeStreamId || "stream-test-1";
+    eventHandlers["ai:chunk"]?.({ data: { streamId: "other-stream", data: "LEAK" } });
+    eventHandlers["ai:chunk"]?.({ data: { streamId: sid, data: "ok" } });
+    eventHandlers["ai:done"]?.({ data: { streamId: sid, data: "" } });
+    expect(aiState.messages[1].content).toBe("ok");
+    expect(aiState.messages[1].content).not.toContain("LEAK");
   });
 
   it("includes context prefix when attached", async () => {
@@ -95,27 +114,47 @@ describe("ai store", () => {
       endLine: 1,
     });
     const promise = sendMessage("explain");
-    eventHandlers["ai:done"]?.();
     await promise;
+    const sid = aiState.activeStreamId || "stream-test-1";
+    eventHandlers["ai:done"]?.({ data: { streamId: sid, data: "" } });
 
     expect(aiState.messages[0].content).toContain("const x = 1");
     expect(aiState.messages[0].content).toContain("/test.ts");
     expect(aiState.messages[0].content).toContain("explain");
   });
 
-  it("stops generation", async () => {
+  it("stops generation without clearing globalStreamBusy locally (Task 5)", async () => {
     aiState.streaming = true;
+    aiState.globalStreamBusy = true;
     await stopGeneration();
     expect(aiState.streaming).toBe(false);
+    // busy only cleared by backend event
+    expect(aiState.globalStreamBusy).toBe(true);
+    eventHandlers["ai:stream-busy"]?.({ data: { streamId: "x", busy: false } });
+    expect(aiState.globalStreamBusy).toBe(false);
   });
 
   it("handles error event", async () => {
     const promise = sendMessage("hi");
-    eventHandlers["ai:error"]?.({ data: "network error" });
     await promise;
+    const sid = aiState.activeStreamId || "stream-test-1";
+    eventHandlers["ai:error"]?.({ data: { streamId: sid, data: "network error" } });
 
     expect(aiState.error).toBe("network error");
     expect(aiState.streaming).toBe(false);
+  });
+
+  it("parseAIStreamPayload accepts legacy string chunks", () => {
+    const p = parseAIStreamPayload({ data: "token" });
+    expect(p.data).toBe("token");
+    expect(p.streamId).toBe("");
+  });
+
+  it("isOwnedStreamEvent rejects mismatch when activeStreamId set", () => {
+    aiState.activeStreamId = "mine";
+    expect(isOwnedStreamEvent("mine")).toBe(true);
+    expect(isOwnedStreamEvent("theirs")).toBe(false);
+    expect(isOwnedStreamEvent("")).toBe(true); // legacy while active
   });
 
   it("clears context", () => {

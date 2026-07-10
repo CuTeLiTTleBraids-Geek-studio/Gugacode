@@ -219,14 +219,8 @@ func (s *RulesService) SaveRulesConfig(projectRoot string, cfg RulesConfig) erro
 		return fmt.Errorf("project root is required")
 	}
 	full := filepath.Join(projectRoot, projectRulesConfigPath)
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-		return fmt.Errorf("create rules config directory: %w", err)
-	}
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal rules config: %w", err)
-	}
-	if err := os.WriteFile(full, data, 0o644); err != nil {
+	// G-SEC-09: atomic write (temp file + rename).
+	if err := atomicWriteJSON(full, cfg, 0644); err != nil {
 		return fmt.Errorf("write rules config: %w", err)
 	}
 	return nil
@@ -239,14 +233,8 @@ func (s *RulesService) SaveUserRulesConfig(cfg RulesConfig) error {
 		return fmt.Errorf("user config directory is not configured")
 	}
 	full := filepath.Join(s.configDir, userRulesConfigDir, rulesConfigFileName)
-	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-		return fmt.Errorf("create user rules config directory: %w", err)
-	}
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal user rules config: %w", err)
-	}
-	if err := os.WriteFile(full, data, 0o644); err != nil {
+	// G-SEC-09: atomic write (temp file + rename).
+	if err := atomicWriteJSON(full, cfg, 0644); err != nil {
 		return fmt.Errorf("write user rules config: %w", err)
 	}
 	return nil
@@ -286,7 +274,8 @@ func (s *RulesService) SaveRules(projectRoot, relPath, content string) error {
 	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 		return fmt.Errorf("create rules directory: %w", err)
 	}
-	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+	// M-5: atomic write (temp+rename) prevents half-written rules file.
+	if err := atomicWriteFile(full, []byte(content), 0644); err != nil {
 		return fmt.Errorf("write rules file: %w", err)
 	}
 	return nil

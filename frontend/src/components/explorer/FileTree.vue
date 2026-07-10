@@ -11,6 +11,12 @@ import { useI18n } from "@/lib/i18n";
 
 const { t } = useI18n();
 
+/** prompt-5 Task J: window virtualization threshold for large directories. */
+const VIRTUALIZE_THRESHOLD = 80;
+const ROW_HEIGHT = 26;
+const VIEWPORT_HEIGHT = 400;
+const OVERSCAN = 8;
+
 const props = withDefaults(defineProps<{
   path: string;
   name: string;
@@ -30,6 +36,41 @@ const loading = ref(false);
 const loaded = ref(false);
 const errorMessage = ref<string | null>(null);
 const children = ref<DirEntry[]>([]);
+const scrollTop = ref(0);
+
+const useVirtual = computed(
+  () => children.value.length >= VIRTUALIZE_THRESHOLD,
+);
+
+const virtualWindow = computed(() => {
+  if (!useVirtual.value) {
+    return {
+      start: 0,
+      end: children.value.length,
+      offsetY: 0,
+      totalH: children.value.length * ROW_HEIGHT,
+    };
+  }
+  const total = children.value.length;
+  const start = Math.max(0, Math.floor(scrollTop.value / ROW_HEIGHT) - OVERSCAN);
+  const visible = Math.ceil(VIEWPORT_HEIGHT / ROW_HEIGHT) + OVERSCAN * 2;
+  const end = Math.min(total, start + visible);
+  return {
+    start,
+    end,
+    offsetY: start * ROW_HEIGHT,
+    totalH: total * ROW_HEIGHT,
+  };
+});
+
+const visibleChildren = computed(() =>
+  children.value.slice(virtualWindow.value.start, virtualWindow.value.end),
+);
+
+function onChildrenScroll(e: Event): void {
+  const el = e.target as HTMLElement;
+  scrollTop.value = el.scrollTop;
+}
 
 const contextMenuVisible = ref(false);
 const contextMenuX = ref(0);
@@ -242,7 +283,28 @@ const indent = { paddingLeft: `${props.depth * 12 + 8}px` };
       {{ errorMessage }}
     </div>
 
-    <div v-if="expanded && !loading && !errorMessage" class="file-tree__children">
+    <!-- prompt-5 Task J: virtualize large directories to keep DOM bounded -->
+    <div
+      v-if="expanded && !loading && !errorMessage && useVirtual"
+      class="file-tree__children file-tree__children--virtual"
+      :style="{ maxHeight: VIEWPORT_HEIGHT + 'px' }"
+      @scroll.passive="onChildrenScroll"
+    >
+      <div class="file-tree__virt-spacer" :style="{ height: virtualWindow.totalH + 'px' }">
+        <div :style="{ transform: `translateY(${virtualWindow.offsetY}px)` }">
+          <FileTree
+            v-for="child in visibleChildren"
+            :key="child.path"
+            :path="child.path"
+            :name="child.name"
+            :is-dir="child.isDir"
+            :depth="depth + 1"
+            @select="emit('select', $event)"
+          />
+        </div>
+      </div>
+    </div>
+    <div v-else-if="expanded && !loading && !errorMessage" class="file-tree__children">
       <FileTree
         v-for="child in children"
         :key="child.path"
@@ -316,6 +378,16 @@ const indent = { paddingLeft: `${props.depth * 12 + 8}px` };
 .file-tree__icon {
   color: var(--color-text-tertiary);
   flex-shrink: 0;
+}
+
+.file-tree__children--virtual {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.file-tree__virt-spacer {
+  position: relative;
+  width: 100%;
 }
 
 .file-tree__name {

@@ -50,11 +50,13 @@ func TestAIService_SendReturnsResponse(t *testing.T) {
 	defer server.Close()
 
 	ai := NewAIService()
-	ai.SetConfig(AIConfig{
+	if err := ai.SetConfig(AIConfig{
 		APIKey:  "test-key",
 		BaseURL: server.URL,
 		Model:   "gpt-4o",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	resp, err := ai.Send([]ChatMessage{{Role: "user", Content: "hi"}})
 	if err != nil {
@@ -98,11 +100,13 @@ func TestAIService_SendStream(t *testing.T) {
 	defer server.Close()
 
 	ai := NewAIService()
-	ai.SetConfig(AIConfig{
+	if err := ai.SetConfig(AIConfig{
 		APIKey:  "test-key",
 		BaseURL: server.URL,
 		Model:   "gpt-4o",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	var collected string
 	err := ai.SendStream([]ChatMessage{{Role: "user", Content: "hi"}}, func(chunk string) {
@@ -138,12 +142,14 @@ func TestAIService_Send_includesSystemPrompt(t *testing.T) {
 	defer server.Close()
 
 	svc := &AIService{}
-	svc.SetConfig(AIConfig{
+	if err := svc.SetConfig(AIConfig{
 		APIKey:       "test-key",
 		BaseURL:      server.URL,
 		Model:        "test-model",
 		SystemPrompt: "You are a test assistant.",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	resp, err := svc.Send([]ChatMessage{{Role: "user", Content: "hi"}})
 	if err != nil {
@@ -173,11 +179,13 @@ func TestAIService_Send_usesDefaultSystemPromptWhenNoneSet(t *testing.T) {
 	defer server.Close()
 
 	svc := &AIService{}
-	svc.SetConfig(AIConfig{
+	if err := svc.SetConfig(AIConfig{
 		APIKey:  "test-key",
 		BaseURL: server.URL,
 		Model:   "test-model",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	_, err := svc.Send([]ChatMessage{{Role: "user", Content: "hi"}})
 	if err != nil {
@@ -197,11 +205,13 @@ func TestAIService_SendStream_isCancellable(t *testing.T) {
 	defer server.Close()
 
 	svc := &AIService{}
-	svc.SetConfig(AIConfig{
+	if err := svc.SetConfig(AIConfig{
 		APIKey:  "test-key",
 		BaseURL: server.URL,
 		Model:   "test-model",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	chunks := []string{}
@@ -236,11 +246,13 @@ func TestAIService_SendReturnsErrorOnNonOKStatus(t *testing.T) {
 	defer server.Close()
 
 	ai := NewAIService()
-	ai.SetConfig(AIConfig{
+	if err := ai.SetConfig(AIConfig{
 		APIKey:  "bad-key",
 		BaseURL: server.URL,
 		Model:   "gpt-4o",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	_, err := ai.Send([]ChatMessage{{Role: "user", Content: "hi"}})
 	if err == nil {
@@ -259,11 +271,13 @@ func TestAIService_SendStreamReturnsErrorOnNonOKStatus(t *testing.T) {
 	defer server.Close()
 
 	ai := NewAIService()
-	ai.SetConfig(AIConfig{
+	if err := ai.SetConfig(AIConfig{
 		APIKey:  "test-key",
 		BaseURL: server.URL,
 		Model:   "gpt-4o",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	err := ai.SendStream([]ChatMessage{{Role: "user", Content: "hi"}}, func(chunk string) {})
 	if err == nil {
@@ -404,7 +418,9 @@ func TestAIService_Complete_ReturnsText(t *testing.T) {
 	defer srv.Close()
 
 	svc := NewAIService()
-	svc.SetConfig(AIConfig{APIKey: "test-key", BaseURL: srv.URL, Model: "gpt-4o"})
+	if err := svc.SetConfig(AIConfig{APIKey: "test-key", BaseURL: srv.URL, Model: "gpt-4o"}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	resp, err := svc.Complete(CompletionRequest{
 		Prefix:   "package main\n\nfunc main() {\n    ",
@@ -438,7 +454,9 @@ func TestAIService_SetsUserAgent(t *testing.T) {
 	defer srv.Close()
 
 	svc := NewAIService()
-	svc.SetConfig(AIConfig{APIKey: "k", BaseURL: srv.URL, Model: "m"})
+	if err := svc.SetConfig(AIConfig{APIKey: "k", BaseURL: srv.URL, Model: "m"}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 	_, _ = svc.Send([]ChatMessage{{Role: "user", Content: "hi"}})
 	if capturedUA == "" {
 		t.Error("expected non-empty User-Agent header")
@@ -460,7 +478,9 @@ func TestAIService_DoesNotFollowRedirects(t *testing.T) {
 	defer srv.Close()
 
 	svc := NewAIService()
-	svc.SetConfig(AIConfig{APIKey: "k", BaseURL: srv.URL + "/redirect", Model: "m"})
+	if err := svc.SetConfig(AIConfig{APIKey: "k", BaseURL: srv.URL + "/redirect", Model: "m"}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 	_, err := svc.Send([]ChatMessage{{Role: "user", Content: "hi"}})
 	if err == nil {
 		t.Error("expected error due to redirect being blocked")
@@ -475,7 +495,9 @@ func TestAIService_StructuredErrorOn4xx(t *testing.T) {
 	defer srv.Close()
 
 	svc := NewAIService()
-	svc.SetConfig(AIConfig{APIKey: "k", BaseURL: srv.URL, Model: "m"})
+	if err := svc.SetConfig(AIConfig{APIKey: "k", BaseURL: srv.URL, Model: "m"}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 	_, err := svc.Send([]ChatMessage{{Role: "user", Content: "hi"}})
 	if err == nil {
 		t.Fatal("expected error for 401")
@@ -555,6 +577,73 @@ func TestAIService_N52_StopStreamClearsCancel(t *testing.T) {
 	}
 	if svc.cancel != nil {
 		t.Error("StopStream should have cleared a.cancel")
+	}
+}
+
+// TestNewStreamID_NonEmpty verifies stream ids are generated (prompt-6 Task 2).
+func TestNewStreamID_NonEmpty(t *testing.T) {
+	a := newStreamID()
+	b := newStreamID()
+	if a == "" || b == "" {
+		t.Fatal("stream id must be non-empty")
+	}
+	if a == b {
+		t.Fatal("consecutive stream ids should differ")
+	}
+}
+
+// TestAIService_Prompt5_ParseSSEStreamWithTools accumulates OpenAI tool_calls deltas.
+func TestAIService_Prompt5_ParseSSEStreamWithTools(t *testing.T) {
+	// Two tool_call deltas for index 0: name then arguments, plus content chunk.
+	sse := strings.Join([]string{
+		`data: {"choices":[{"delta":{"content":"thinking"}}]}`,
+		`data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"read","arguments":""}}]}}]}`,
+		`data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"path\":\"a.go\"}"}}]}}]}`,
+		`data: [DONE]`,
+		"",
+	}, "\n")
+	var chunks []string
+	calls, err := parseSSEStreamWithTools(strings.NewReader(sse), func(s string) {
+		chunks = append(chunks, s)
+	})
+	if err != nil {
+		t.Fatalf("parseSSEStreamWithTools: %v", err)
+	}
+	if strings.Join(chunks, "") != "thinking" {
+		t.Fatalf("content chunks = %v", chunks)
+	}
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 tool call, got %d: %+v", len(calls), calls)
+	}
+	if calls[0].Name != "read" || calls[0].ID != "call_1" {
+		t.Fatalf("unexpected tool call: %+v", calls[0])
+	}
+	if calls[0].Arguments != `{"path":"a.go"}` {
+		t.Fatalf("arguments = %q", calls[0].Arguments)
+	}
+}
+
+// TestAIService_Prompt5_IsStreamingAndStop verifies mutual-exclusion helpers
+// (prompt-5 Task B / BUG-H1): IsStreaming reflects cancel; StopStream clears it.
+// Full StartStream→ErrStreamBusy needs a non-nil *application.App (integration).
+func TestAIService_Prompt5_IsStreamingAndStop(t *testing.T) {
+	svc := &AIService{}
+	if svc.IsStreaming() {
+		t.Fatal("expected not streaming initially")
+	}
+	_, cancel := context.WithCancel(context.Background())
+	svc.cancel = &streamCancel{fn: cancel}
+	if !svc.IsStreaming() {
+		t.Fatal("expected IsStreaming true when cancel is set")
+	}
+	if ErrStreamBusy == nil || ErrStreamBusy.Error() == "" {
+		t.Fatal("ErrStreamBusy must be a non-empty sentinel")
+	}
+	if err := svc.StopStream(); err != nil {
+		t.Fatalf("StopStream: %v", err)
+	}
+	if svc.IsStreaming() {
+		t.Fatal("expected not streaming after StopStream")
 	}
 }
 

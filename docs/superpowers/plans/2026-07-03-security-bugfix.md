@@ -18,9 +18,9 @@
 - Modify: `services/output_buffer.go`
 - Test: `services/output_buffer_test.go` (new)
 
-- [ ] **Step 1: Write failing test** — append data, read, then read again; second read must be empty
-- [ ] **Step 2: Fix** — add `o.buf.Reset()` after `o.buf.String()`
-- [ ] **Step 3: Verify** — `go test ./services/... -run TestOutputBuffer -v`
+- [x] **Step 1: Write failing test** — append data, read, then read again; second read must be empty
+- [x] **Step 2: Fix** — add `o.buf.Reset()` after `o.buf.String()`
+- [x] **Step 3: Verify** — `go test ./services/... -run TestOutputBuffer -v`
 
 ---
 
@@ -31,10 +31,10 @@
 **Files:**
 - Modify: `services/ai_service.go`
 
-- [ ] **Step 1:** Add module-level `var aiHTTPClient = &http.Client{Timeout: 120 * time.Second}` for non-streaming
-- [ ] **Step 2:** Add `var aiStreamHTTPClient = &http.Client{}` (no total timeout for long streams; context handles cancellation) for streaming
-- [ ] **Step 3:** Replace `http.DefaultClient.Do(req)` with `aiHTTPClient.Do(req)` in `Send()` and `aiStreamHTTPClient.Do(req)` in `SendStreamWithContext()`
-- [ ] **Step 4:** Verify existing tests still pass
+- [x] **Step 1:** Add module-level `var aiHTTPClient = &http.Client{Timeout: 120 * time.Second}` for non-streaming
+- [x] **Step 2:** Add `var aiStreamHTTPClient = &http.Client{}` (no total timeout for long streams; context handles cancellation) for streaming
+- [x] **Step 3:** Replace `http.DefaultClient.Do(req)` with `aiHTTPClient.Do(req)` in `Send()` and `aiStreamHTTPClient.Do(req)` in `SendStreamWithContext()`
+- [x] **Step 4:** Verify existing tests still pass
 
 ---
 
@@ -46,9 +46,9 @@
 - Modify: `services/ai_service.go`
 - Test: `services/ai_service_test.go`
 
-- [ ] **Step 1: Write failing test** — server returns 401, expect descriptive error
-- [ ] **Step 2: Fix** — add status code check after `resp, err := client.Do(req)` in both `Send()` and `SendStreamWithContext()`
-- [ ] **Step 3: Verify**
+- [x] **Step 1: Write failing test** — server returns 401, expect descriptive error
+- [x] **Step 2: Fix** — add status code check after `resp, err := client.Do(req)` in both `Send()` and `SendStreamWithContext()`
+- [x] **Step 3: Verify**
 
 ---
 
@@ -60,13 +60,13 @@
 - Modify: `services/terminal_service.go`
 - Test: `services/terminal_service_test.go`
 
-- [ ] **Step 1: Write failing test** — `Start("/nonexistent/path")` should return error
-- [ ] **Step 2: Fix** — add `os.Stat()` check before `startPty()`
-- [ ] **Step 3: Verify**
+- [x] **Step 1: Write failing test** — `Start("/nonexistent/path")` should return error
+- [x] **Step 2: Fix** — add `os.Stat()` check before `startPty()`
+- [x] **Step 3: Verify**
 
 ---
 
 ### Task 5: Full Verification
 
-- [ ] `go vet . && go build . && go test ./services/... -v`
-- [ ] `cd frontend && npx vue-tsc --noEmit && npx vitest run`
+- [x] `go vet . && go build . && go test ./services/... -v`
+- [x] `cd frontend && npx vue-tsc --noEmit && npx vitest run`

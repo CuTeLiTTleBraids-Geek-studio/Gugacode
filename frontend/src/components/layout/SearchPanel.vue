@@ -34,7 +34,7 @@ function handleClear() {
   clearSearch();
 }
 
-async function handleMatchClick(filePath: string, line: number) {
+async function handleMatchClick(filePath: string, _line: number) {
   if (!repoPath.value) return;
   const fullPath = repoPath.value + "/" + filePath;
   await openFileFromPath(fullPath);

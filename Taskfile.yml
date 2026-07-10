@@ -19,6 +19,29 @@ includes:
   android: ./build/android/Taskfile.yml
 
 tasks:
+  # prompt-5 Task I: engineering gates
+  bindings:check:
+    summary: Verify frontend Wails bindings still export required symbols
+    dir: .
+    cmds:
+      - node scripts/check-bindings.mjs
+
+  docs:check:
+    summary: Verify README numbers match code constants (MAX_TOOL_CALLS)
+    dir: .
+    cmds:
+      - node scripts/check-doc-numbers.mjs
+
+  frontend:check:
+    summary: Run vitest + eslint + vue-tsc + bindings/docs gates
+    dir: frontend
+    cmds:
+      - node node_modules/vitest/vitest.mjs run
+      - node node_modules/eslint/bin/eslint.js src
+      - node node_modules/vue-tsc/bin/vue-tsc.js --noEmit
+      - task: :bindings:check
+      - task: :docs:check
+
   build:
     summary: Builds the application
     cmds:

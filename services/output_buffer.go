@@ -13,6 +13,11 @@ import (
 //
 // 1 MiB is large enough to keep recent scrollback visible after a Read,
 // but small enough that a runaway process can't exhaust the heap.
+//
+// G-PERF-03: the 1 MiB cap is the performance/memory gate for terminal
+// output. It must not be raised without revisiting the frontend xterm
+// scrollback limit (see TerminalPanel.vue scrollback: 5000) — together
+// they bound peak memory per terminal session.
 const outputBufferMaxBytes = 1 << 20
 
 type outputBuffer struct {

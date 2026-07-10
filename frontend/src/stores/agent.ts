@@ -3,11 +3,14 @@
 // blocks whose first line is `read:`, `write:`, `run:`, or `search:`
 // followed by the target. See AgentSystemPrompt in services/ai_prompts.go.
 import { reactive, computed, ref } from "vue";
-import { fileService, searchService, agentService, aiService } from "@/api/services";
+import { Events } from "@wailsio/runtime";
+import { fileService, searchService, agentService, aiService, windowService } from "@/api/services";
 import { appState } from "@/stores/app";
 import { pushOutput } from "@/stores/output";
-import { notifyError, notifySuccess, notifyWarning } from "@/lib/notifications";
+import { notifyError, notifySuccess, notifyWarning, notifyInfo } from "@/lib/notifications";
 import { errorMessage } from "@/lib/errors";
+import { getWindowOriginId, unwrapEventData, parseSyncOrigin } from "@/lib/windowOrigin";
+import { translate } from "@/lib/i18n";
 import type { RiskLevel, ApprovalPolicy } from "@/types";
 
 export type AgentMode = "chat" | "agent";
@@ -29,7 +32,8 @@ export type ToolCallStatus =
 // starting a new session to avoid token exhaustion and runaway API
 // costs. The user can still approve additional calls, but the warning
 // is surfaced each time new calls are emitted beyond the limit.
-const MAX_TOOL_CALLS = 20;
+/** Exported for README/docs alignment and dual-track tool budget (prompt-5). */
+export const MAX_TOOL_CALLS = 20;
 
 export interface ToolCall {
   id: string;
@@ -347,6 +351,10 @@ export function getToolSchemaList(): string {
 // --- Built-in tool executors ---
 
 async function executeReadTool(tc: ToolCall): Promise<string> {
+  // prompt-7 Task G / BUG-M18: Agent reads require an open project root.
+  if (!appState.currentProject) {
+    throw new Error("no workspace root: open a project before Agent read tools");
+  }
   const resolved = resolveProjectPath(tc.target);
   if (!resolved.ok) {
     throw new Error(resolved.error);
@@ -375,7 +383,12 @@ async function executeWriteTool(tc: ToolCall): Promise<string> {
 }
 
 async function executeRunTool(tc: ToolCall): Promise<string> {
-  const cwd = appState.currentProject ?? "";
+  // prompt-5 Task E: refuse run when no workspace is open (empty root would
+  // widen the process cwd sandbox surface).
+  const cwd = appState.currentProject;
+  if (!cwd) {
+    throw new Error("No project open: run tool requires an open workspace");
+  }
   const result = await agentService.execCommand(tc.target, cwd);
   const summary =
     `Ran: ${result.command}\n` +
@@ -391,7 +404,11 @@ async function executeRunTool(tc: ToolCall): Promise<string> {
 }
 
 async function executeSearchTool(tc: ToolCall): Promise<string> {
-  const root = appState.currentProject ?? "";
+  // prompt-7 Task G: Agent search also requires project root.
+  const root = appState.currentProject;
+  if (!root) {
+    throw new Error("no workspace root: open a project before Agent search tools");
+  }
   const results = await searchService.search(root, tc.target, true);
   // Flatten results: each SearchResult has a path + matches[].
   const allMatches: { path: string; line: number; column: number; preview: string }[] = [];
@@ -439,7 +456,7 @@ registerTool({
 registerTool({
   kind: "run",
   schema: {
-    description: "Execute a shell command in the project root. Subject to sandbox validation and risk classification.",
+    description: "Execute a single command with arguments in the project root. The command is parsed into an argv and executed directly (no shell wrapper: no `sh -c`, no `cmd /c`). Pipes (|), redirects (> <), variable expansion ($VAR), command substitution (backtick or $()), chaining (&& ;), background (&), glob (* ?), brace expansion ({a,b}), and home expansion (~) are rejected. To pipe or chain, emit separate run calls and inspect the observation between them. Subject to sandbox validation and risk classification.",
     dangerLevel: "elevated",
   },
   execute: executeRunTool,
@@ -563,15 +580,24 @@ export function getApprovalPolicy(kind: ToolCallKind): ApprovalPolicy {
 
 /**
  * shouldAutoApprove determines whether a tool call should be auto-approved
- * based on the configured policy. `run` tools are never auto-approved when
- * the command is blocked by the denylist (the user must see the block
- * reason). For other kinds, the policy applies directly.
+ * based on the configured policy.
+ *
+ * G-SEC-02: `run` tools are NEVER auto-approved — every shell command
+ * requires explicit manual approval, regardless of the configured policy
+ * or risk level. The denylist is not a security boundary (only auxiliary
+ * filtering), so even "Safe"-classified or unblocked commands must be
+ * approved by the user.
+ *
+ * prompt-5 Task E / BUG-M4: `write` tools are also NEVER auto-approved so
+ * a hallucinating agent cannot silently modify files. Only `read`/`search`
+ * (and other safe tools) may use auto-approve.
  */
 export function shouldAutoApprove(tc: ToolCall): boolean {
+  // G-SEC-02: run commands always require manual approval.
+  if (tc.kind === "run") return false;
+  // prompt-5 Task E: write always requires manual approval.
+  if (tc.kind === "write") return false;
   if (getApprovalPolicy(tc.kind) !== "auto-approve") return false;
-  // `run` tools: respect the denylist. Blocked commands stay in the
-  // pending queue so the user sees the block reason.
-  if (tc.kind === "run" && tc.blockReason) return false;
   return true;
 }
 
@@ -580,24 +606,27 @@ export function shouldAutoApprove(tc: ToolCall): boolean {
  * tool call (Plan 47). Called fire-and-forget from onAssistantFinished.
  *
  * - "auto-approve": executes the call and feeds the observation back to
- *   the AI without waiting for user interaction. Blocked `run` commands
- *   fall back to "always-ask" so the user sees the block reason.
+ *   the AI without waiting for user interaction.
  * - "never-approve": rejects the call and feeds the rejection back.
  * - "always-ask": no-op (the call stays in the pending queue).
  *
- * For `run` tools, this waits for the risk check to complete before
- * applying the policy, so the denylist has a chance to block auto-approval.
+ * G-SEC-02: `run` tools are NEVER auto-approved. Even when the policy is
+ * "auto-approve", run commands stay in the pending queue for mandatory
+ * manual approval. The denylist is not a security boundary, so no command
+ * bypasses approval — blocked or not. For `run` tools, this still waits
+ * for the risk check to complete so the risk badge is populated in the UI.
  */
 export async function applyApprovalPolicy(tc: ToolCall): Promise<void> {
-  // For `run` tools, wait for the risk check so we can respect the denylist.
+  // For `run` tools, wait for the risk check so the UI badge is populated.
   if (tc.kind === "run" && tc._riskCheckPromise) {
     await tc._riskCheckPromise;
   }
   if (tc.status !== "pending") return;
+  // G-SEC-02: run commands always require manual approval — never
+  // auto-approve, regardless of the configured policy.
+  if (tc.kind === "run") return;
   const policy = getApprovalPolicy(tc.kind);
   if (policy === "auto-approve") {
-    // Blocked `run` commands stay pending for user visibility.
-    if (tc.kind === "run" && tc.blockReason) return;
     pushOutput(
       "agent",
       "info",
@@ -615,23 +644,172 @@ export async function applyApprovalPolicy(tc: ToolCall): Promise<void> {
 }
 
 /**
- * onAssistantFinished should be called by the ai store when an assistant
- * message finishes streaming in agent mode. Parses tool calls from the
- * message and appends them to the pending queue for user approval.
- *
- * Returns the number of tool calls added (0 if none).
+ * buildNativeToolDefs returns OpenAI-compatible tool definitions for every
+ * registered agent tool (prompt-5 Task H). Passed to AIService.SetConfig so
+ * the model can use native function calling; fence parsing remains as fallback.
  */
-export function onAssistantFinished(assistantContent: string): number {
-  if (!assistantContent) return 0;
-  const calls = parseToolCalls(assistantContent);
+export function buildNativeToolDefs(): Array<{
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}> {
+  return getRegisteredTools().map((td) => {
+    const kind = td.kind;
+    const properties: Record<string, unknown> = {};
+    const required: string[] = [];
+    if (kind === "write") {
+      properties.path = { type: "string", description: "Relative path within the project" };
+      properties.content = { type: "string", description: "Full file content to write" };
+      required.push("path", "content");
+    } else if (kind === "run") {
+      properties.command = { type: "string", description: "Command and arguments (no shell)" };
+      required.push("command");
+    } else if (kind === "search") {
+      properties.query = { type: "string", description: "Search query" };
+      required.push("query");
+    } else {
+      // read + custom tools default to path/target
+      properties.path = { type: "string", description: "Relative path or tool target" };
+      required.push("path");
+    }
+    return {
+      type: "function" as const,
+      function: {
+        name: kind,
+        description: td.schema.description || `Agent tool: ${kind}`,
+        parameters: {
+          type: "object",
+          properties,
+          required,
+        },
+      },
+    };
+  });
+}
+
+export interface NativeToolCallPayload {
+  id?: string;
+  name: string;
+  arguments: string;
+}
+
+/**
+ * parseNativeToolCalls converts OpenAI/Anthropic native tool_calls into the
+ * same ToolCall shape used by the fence parser (prompt-5 Task H dual-track).
+ */
+export function parseNativeToolCalls(payloads: NativeToolCallPayload[]): ToolCall[] {
+  const out: ToolCall[] = [];
+  for (const p of payloads) {
+    if (!p?.name) continue;
+    let args: Record<string, unknown> = {};
+    try {
+      args = p.arguments ? (JSON.parse(p.arguments) as Record<string, unknown>) : {};
+    } catch {
+      args = {};
+    }
+    const kind = p.name;
+    let target = "";
+    let content: string | undefined;
+    if (kind === "write") {
+      target = String(args.path ?? args.target ?? "");
+      content = args.content != null ? String(args.content) : undefined;
+    } else if (kind === "run") {
+      target = String(args.command ?? args.target ?? "");
+    } else if (kind === "search") {
+      target = String(args.query ?? args.target ?? "");
+    } else {
+      target = String(args.path ?? args.target ?? args.query ?? "");
+    }
+    if (!target && !content) continue;
+    out.push({
+      id: p.id || nextToolCallId(),
+      kind,
+      target,
+      content,
+      status: "pending",
+    });
+  }
+  return out;
+}
+
+/** prompt-6 Task 11: stable dedup key including content hash for write. */
+export function toolCallDedupKey(tc: { kind: string; target: string; content?: string }): string {
+  const content = tc.content ?? "";
+  // Simple non-crypto hash for dual-track dedup (same content → same key).
+  let h = 0;
+  for (let i = 0; i < content.length; i++) {
+    h = (Math.imul(31, h) + content.charCodeAt(i)) | 0;
+  }
+  return `${tc.kind}\0${tc.target}\0${h.toString(36)}`;
+}
+
+/**
+ * prompt-7 Task D / BUG-H7 (D1): pending approvals stay on the originating
+ * window. Peers get a toast + product copy; origin may focus its own window.
+ */
+function emitPendingUpdated(): void {
+  try {
+    const pending = agentState.pendingToolCalls.filter((tc) => tc.status === "pending");
+    void Events.Emit("agent:pending-updated", {
+      origin: getWindowOriginId(),
+      count: pending.length,
+      kinds: pending.map((tc) => tc.kind),
+      // Signal peers that full approval UI is only on the origin window.
+      approveOnlyOnOrigin: true,
+      at: Date.now(),
+    });
+    if (pending.length > 0) {
+      // Local strong guidance so the user does not leave without approving.
+      notifyInfo(
+        translate("agent.pendingApproveHere"),
+        translate("agent.pendingApproveTitle"),
+      );
+    }
+  } catch {
+    // Events unavailable in tests.
+  }
+}
+
+// Peer listener: show guidance when another window has pending tool calls.
+let agentPendingListenerRegistered = false;
+export function initAgentPendingSyncListener(): void {
+  if (agentPendingListenerRegistered) return;
+  agentPendingListenerRegistered = true;
+  try {
+    Events.On("agent:pending-updated", (event: unknown) => {
+      const payload = unwrapEventData(event) as {
+        origin?: string;
+        count?: number;
+      } | null;
+      const origin = parseSyncOrigin(payload);
+      if (origin && origin === getWindowOriginId()) return;
+      const count = typeof payload?.count === "number" ? payload.count : 0;
+      if (count <= 0) return;
+      notifyWarning(
+        translate("agent.pendingOnOtherWindow", { count: String(count) }),
+        translate("agent.pendingApproveTitle"),
+      );
+      // Best-effort: bring main window forward so user can find the approval card
+      // if the origin was the main editor (common for embedded chat).
+      void windowService.focusMainWindow().catch(() => undefined);
+    });
+  } catch {
+    agentPendingListenerRegistered = false;
+  }
+}
+
+initAgentPendingSyncListener();
+
+/**
+ * enqueueToolCalls is the shared path for fence-parsed and native tool calls.
+ */
+export function enqueueToolCalls(calls: ToolCall[]): number {
   if (calls.length === 0) return 0;
   agentState.pendingToolCalls.push(...calls);
   agentState.toolCallCount += calls.length;
-  // Asynchronously classify risk level for `run` tool calls so the
-  // approval UI can show a risk badge (N-1). Best-effort — if the
-  // check fails, the risk level stays undefined and the UI shows no
-  // badge. The promise is stored on the tool call so applyApprovalPolicy
-  // can await it without re-triggering the check (Plan 47).
   for (const tc of calls) {
     if (tc.kind === "run" && tc.status === "pending") {
       tc._riskCheckPromise = checkRunRisk(tc);
@@ -642,9 +820,6 @@ export function onAssistantFinished(assistantContent: string): number {
     "info",
     `Agent emitted ${calls.length} tool call(s) awaiting approval`,
   );
-  // N-10: warn the user when the conversation has accumulated too many
-  // tool calls. The user can still approve, but the warning surfaces
-  // the risk of token exhaustion and runaway API costs.
   if (maxIterationsReached.value) {
     notifyWarning(
       `Agent has emitted ${agentState.toolCallCount} tool calls. Consider starting a new conversation to avoid token exhaustion.`,
@@ -655,23 +830,45 @@ export function onAssistantFinished(assistantContent: string): number {
       `Max iteration threshold reached (${agentState.toolCallCount}/${MAX_TOOL_CALLS}). Consider starting a new conversation.`,
     );
   }
-  // Plan 47 / N-45 (Proposal T): apply per-tool approval policy.
-  // N-45 fix: Previously, `void applyApprovalPolicy(tc)` fired all calls
-  // in parallel. But sendMessage has a `if (aiState.streaming) return;`
-  // guard, so concurrent auto-approved calls would silently lose
-  // observations — the second call's observation was never sent to the
-  // model. Now we serialize: each applyApprovalPolicy fully completes
-  // (including feeding the observation back) before the next starts.
-  // The for-loop is wrapped in an async IIFE because onAssistantFinished
-  // returns the call count synchronously.
+  emitPendingUpdated();
   void (async () => {
     for (const tc of calls) {
       if (tc.status === "pending") {
         await applyApprovalPolicy(tc);
       }
     }
+    emitPendingUpdated();
   })();
   return calls.length;
+}
+
+/**
+ * onNativeToolCalls handles ai:tool_calls events from the backend.
+ */
+export function onNativeToolCalls(payloads: NativeToolCallPayload[]): number {
+  return enqueueToolCalls(parseNativeToolCalls(payloads));
+}
+
+/**
+ * onAssistantFinished should be called by the ai store when an assistant
+ * message finishes streaming in agent mode. Parses tool calls from the
+ * message (fence dual-track) and appends them to the pending queue.
+ * Native tool_calls may already have been enqueued via onNativeToolCalls;
+ * fence parse still runs for models that only speak the text protocol.
+ *
+ * Returns the number of tool calls added (0 if none).
+ */
+export function onAssistantFinished(assistantContent: string): number {
+  if (!assistantContent) return 0;
+  const calls = parseToolCalls(assistantContent);
+  if (calls.length === 0) return 0;
+  // Dual-track: if native tool_calls already populated the queue, skip fence
+  // duplicates by kind+target+content hash (prompt-6 Task 11 / BUG-L12).
+  const existing = new Set(
+    agentState.pendingToolCalls.map((tc) => toolCallDedupKey(tc)),
+  );
+  const fresh = calls.filter((tc) => !existing.has(toolCallDedupKey(tc)));
+  return enqueueToolCalls(fresh);
 }
 
 /**

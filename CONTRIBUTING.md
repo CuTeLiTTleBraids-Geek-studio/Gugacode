@@ -53,6 +53,21 @@ npm run dev
 go run .
 ```
 
+### Language servers (prompt-8)
+
+For real-project LSP checks (optional, not required for unit tests):
+
+```bash
+# Go
+go install golang.org/x/tools/gopls@latest
+
+# TypeScript / JavaScript — use an LSP wrapper, NOT raw tsserver
+npm i -D typescript-language-server typescript
+# or: npm i -D @vtsls/language-server
+```
+
+Unit tests mock LSP over stdio (`TestLSP_syncDocument_DidOpenThenDidChange`). When adding toolchain parsers, put fixtures under `services/` tests and keep commands as argv arrays (no shell).
+
 ### Running Tests
 
 ```bash

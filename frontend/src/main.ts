@@ -10,11 +10,19 @@ import router from "./router";
 import { loadSettings, initThemes, startSystemModeListener, initWindowMaximiseListener, appState } from "@/stores/app";
 import { setSandboxMode } from "@/lib/pluginRegistry";
 import { loadLayoutFromBackend } from "@/stores/layout";
-import { loadWorkflows, runStartupWorkflows } from "@/stores/workflows";
+import { loadWorkflows } from "@/stores/workflows";
 import { loadPlugins, activateStartupPlugins } from "@/stores/plugins";
 import { layoutService } from "@/api/services";
 import { notifyError } from "@/lib/notifications";
 import { pushOutput } from "@/stores/output";
+import { initConnectivityListener } from "@/lib/connectivity";
+import { initLSPStore } from "@/stores/lsp";
+// Plan 11 Task 15: 个性化运行时（背景图/字体/气泡 CSS 变量应用）
+import { initPersonalization } from "@/composables/usePersonalization";
+import { Events } from "@wailsio/runtime";
+import { requestApplyToEditor } from "@/stores/editor";
+import { setSnapshotWorkspaceRoot } from "@/stores/snapshot";
+import { translate } from "@/lib/i18n";
 
 // Monaco editor: configure the @guolao/vue-monaco-editor loader to use the
 // locally bundled monaco-editor package instead of loading from CDN.
@@ -73,6 +81,29 @@ async function bootstrap(): Promise<void> {
     // This also hydrates appState with the user's preferences.
     await loadSettings();
 
+    // Stage 3.1 (Task 15): apply personalization CSS variables now that
+    // appState.personalization is hydrated, and watch for later changes.
+    try {
+      initPersonalization();
+    } catch (e: unknown) {
+      console.error("Personalization init failed:", e);
+    }
+
+    // Stage 3.5 (G-FEAT-02): Start connectivity listener now that aiBaseUrl
+    // is hydrated, and probe for installed LSP servers (gopls / tsserver).
+    // Both are best-effort and must never block bootstrap — failures only
+    // mean offline completion is unavailable, not that the IDE won't start.
+    try {
+      initConnectivityListener();
+    } catch (e: unknown) {
+      console.error("Connectivity listener init failed:", e);
+    }
+    try {
+      void initLSPStore();
+    } catch (e: unknown) {
+      console.error("LSP store init failed:", e);
+    }
+
     // Stage 4: Enable plugin sandbox based on the loaded setting.
     // N-29: sandbox is on by default; users can disable it in Settings.
     setSandboxMode(appState.enablePluginSandbox);
@@ -96,13 +127,41 @@ async function bootstrap(): Promise<void> {
     // N-30: each profile has its own layout; falls back to default on error.
     await loadLayoutFromBackend(layoutService.loadLayout);
 
-    // Stage 6: Load workflow definitions and run startup-triggered workflows.
-    // Proposal J (prompt-4.md): workflows with `runOn.event === "startup"`
-    // auto-run after the IDE finishes loading. Best-effort — errors are
-    // logged by runWorkflow and do not block other workflows.
+    // Stage 6: Load workflow definitions.
+    // G-SEC-03: Startup workflows are NOT auto-run on project load. They are
+    // exposed via the pendingStartupWorkflows computed in the workflows store
+    // so the UI can present them as "Pending Confirmation" and require the
+    // user to explicitly click "Run". This prevents malicious startup
+    // workflows in cloned repositories from auto-running shell commands.
     if (appState.currentProject) {
       await loadWorkflows(appState.currentProject);
-      void runStartupWorkflows(appState.currentProject);
+      // prompt-4 Task 10: 项目打开后激活快照工作区根
+      setSnapshotWorkspaceRoot(appState.currentProject);
+    }
+
+    // Stage 7 (prompt-4 Task 5 / prompt-5 Task A): 主窗口监听 AI 伴侣窗口的
+    // 「应用到编辑器」事件。AI 窗口是独立 Webview，不共享 Vue 状态，只能通过
+    // Wails 事件回写。打开文件失败会 rethrow；写入前走 Diff 预览确认，避免假成功。
+    // 仅在非 /ai-window 路由下注册，避免 AI 窗口自身重复处理。
+    try {
+      if (!window.location.hash.includes("ai-window")) {
+        Events.On("ai:apply-to-editor", (event: unknown) => {
+          const raw = (event as { data?: unknown } | null)?.data;
+          const payload = (Array.isArray(raw) ? raw[0] : raw) as
+            | { code?: string; filePath?: string; language?: string }
+            | undefined;
+          if (!payload?.code) return;
+          // filePath 必须由发送方携带（选中发送时缓存）；不再静默写空路径。
+          const path = (payload.filePath || "").trim();
+          if (!path) {
+            notifyError(translate("aiWindow.noActiveFile"), translate("aiWindow.applyTitle"));
+            return;
+          }
+          void requestApplyToEditor(path, payload.code);
+        });
+      }
+    } catch (e: unknown) {
+      console.error("ai:apply-to-editor listener failed:", e);
     }
   } catch (e: unknown) {
     // N-118: surface bootstrap failures to the user instead of letting

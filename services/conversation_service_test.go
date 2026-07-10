@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -45,6 +46,58 @@ func TestConversationService_Save_andLoad(t *testing.T) {
 	}
 	if loaded.Messages[1].Content != "hi there" {
 		t.Errorf("expected second message 'hi there', got %q", loaded.Messages[1].Content)
+	}
+	if loaded.Revision != 1 {
+		t.Errorf("expected revision 1 after first save, got %d", loaded.Revision)
+	}
+	if loaded.UpdatedAt == 0 {
+		t.Error("expected UpdatedAt set after save")
+	}
+}
+
+// prompt-7 Task C / BUG-H6: CAS rejects stale ExpectedRevision.
+func TestConversationService_Save_CASConflict(t *testing.T) {
+	dir := t.TempDir()
+	svc := &ConversationService{storageDir: dir}
+	if err := svc.Save(Conversation{ID: "c1", Title: "v1", Messages: nil}); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := svc.Load("c1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Concurrent writer advances revision.
+	if err := svc.Save(Conversation{ID: "c1", Title: "v2", Messages: nil}); err != nil {
+		t.Fatal(err)
+	}
+	stale := loaded.Revision // 1
+	base := stale
+	err = svc.Save(Conversation{
+		ID:               "c1",
+		Title:            "stale",
+		Messages:         nil,
+		ExpectedRevision: &base,
+	})
+	if err == nil {
+		t.Fatal("expected conflict error")
+	}
+	if !errors.Is(err, ErrConversationConflict) {
+		t.Fatalf("want ErrConversationConflict, got %v", err)
+	}
+	// Matching base should succeed.
+	cur, _ := svc.Load("c1")
+	match := cur.Revision
+	if err := svc.Save(Conversation{
+		ID:               "c1",
+		Title:            "v3",
+		Messages:         nil,
+		ExpectedRevision: &match,
+	}); err != nil {
+		t.Fatalf("matching CAS should succeed: %v", err)
+	}
+	final, _ := svc.Load("c1")
+	if final.Title != "v3" || final.Revision != match+1 {
+		t.Fatalf("got title=%q rev=%d", final.Title, final.Revision)
 	}
 }
 
@@ -91,7 +144,7 @@ func TestConversationService_List_returnsAllSortedByCreatedDesc(t *testing.T) {
 	}
 }
 
-func TestConversationService_Delete_removesFile(t *testing.T) {
+func TestConversationService_Delete_softDeletes(t *testing.T) {
 	dir := t.TempDir()
 	svc := &ConversationService{storageDir: dir}
 
@@ -110,9 +163,47 @@ func TestConversationService_Delete_removesFile(t *testing.T) {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
+	// Plan 11 Task 2: Delete is now a soft-delete. The file must still exist
+	// on disk (so it can be restored), but DeletedAt must be set.
 	path := filepath.Join(dir, "to-delete.json")
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Errorf("expected file to be deleted, stat err=%v", err)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Fatalf("expected file to be retained for trash restore, but it was removed")
+	}
+	loaded, err := svc.Load("to-delete")
+	if err != nil {
+		t.Fatalf("Load after soft-delete failed: %v", err)
+	}
+	if loaded.DeletedAt == 0 {
+		t.Error("expected DeletedAt to be set after soft-delete, got 0")
+	}
+	// Plan 11 Task 2: List() returns all conversations (including soft-deleted);
+	// the frontend filters DeletedAt == 0 for the active list and DeletedAt > 0
+	// for the trash view. ListWithFilter(IncludeTrash: false) excludes them.
+	list, err := svc.List()
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	var found bool
+	for _, c := range list {
+		if c.ID == "to-delete" {
+			found = true
+			if c.DeletedAt == 0 {
+				t.Error("soft-deleted conversation in List() must carry DeletedAt")
+			}
+		}
+	}
+	if !found {
+		t.Error("soft-deleted conversation should still appear in List() (frontend filters by DeletedAt)")
+	}
+	// ListWithFilter (default, IncludeTrash=false) must exclude soft-deleted.
+	filtered, err := svc.ListWithFilter(ConversationFilter{})
+	if err != nil {
+		t.Fatalf("ListWithFilter failed: %v", err)
+	}
+	for _, c := range filtered {
+		if c.ID == "to-delete" {
+			t.Error("ListWithFilter(IncludeTrash=false) should exclude soft-deleted conversations")
+		}
 	}
 }
 
@@ -406,5 +497,280 @@ func TestConversationService_N91_LegitimateIDStillWorks(t *testing.T) {
 	}
 	if err := svc.Delete(id); err != nil {
 		t.Fatalf("Delete with generated ID failed: %v", err)
+	}
+}
+
+// --- Plan 11 Task 2: Conversation organization & filtering ---
+
+func TestConversationService_Task2_ListWithFilter_Query(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewConversationService(dir)
+	must := func(err error) { t.Helper(); if err != nil { t.Fatal(err) } }
+	must(svc.Save(Conversation{ID: "a", Title: "Refactor auth module", CreatedAt: 3,
+		Messages: []ConversationMessage{{Role: "user", Content: "help me with login"}}}))
+	must(svc.Save(Conversation{ID: "b", Title: "Chat about UI", CreatedAt: 2,
+		Messages: []ConversationMessage{{Role: "user", Content: "make it pretty"}}}))
+	must(svc.Save(Conversation{ID: "c", Title: "auth bug fix", CreatedAt: 1,
+		Messages: []ConversationMessage{{Role: "user", Content: "token expires"}}}))
+
+	// Query matches title.
+	got, err := svc.ListWithFilter(ConversationFilter{Query: "auth"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 matches for 'auth', got %d", len(got))
+	}
+	// Query matches message content.
+	got, err = svc.ListWithFilter(ConversationFilter{Query: "token"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != "c" {
+		t.Errorf("expected message-content match (c), got %v", got)
+	}
+	// Case-insensitive.
+	got, err = svc.ListWithFilter(ConversationFilter{Query: "PRETTY"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != "b" {
+		t.Errorf("expected case-insensitive match (b), got %v", got)
+	}
+}
+
+func TestConversationService_Task2_ListWithFilter_Metadata(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewConversationService(dir)
+	must := func(err error) { t.Helper(); if err != nil { t.Fatal(err) } }
+	must(svc.Save(Conversation{ID: "a", Title: "A", CreatedAt: 3, Tags: []string{"go"}, Favorite: true, Group: "work", PersonaID: "reviewer", Mode: "agent"}))
+	must(svc.Save(Conversation{ID: "b", Title: "B", CreatedAt: 2, Tags: []string{"vue"}, Favorite: false, Group: "personal", Mode: "chat"}))
+
+	fav := true
+	got, err := svc.ListWithFilter(ConversationFilter{Favorite: &fav})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != "a" {
+		t.Errorf("favorite filter expected (a), got %v", got)
+	}
+	got, err = svc.ListWithFilter(ConversationFilter{Tag: "go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != "a" {
+		t.Errorf("tag filter expected (a), got %v", got)
+	}
+	got, err = svc.ListWithFilter(ConversationFilter{Group: "personal"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != "b" {
+		t.Errorf("group filter expected (b), got %v", got)
+	}
+	got, err = svc.ListWithFilter(ConversationFilter{PersonaID: "reviewer"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != "a" {
+		t.Errorf("persona filter expected (a), got %v", got)
+	}
+	got, err = svc.ListWithFilter(ConversationFilter{Mode: "agent"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].ID != "a" {
+		t.Errorf("mode filter expected (a), got %v", got)
+	}
+}
+
+func TestConversationService_Task2_Restore(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewConversationService(dir)
+	if err := svc.Save(Conversation{ID: "r", Title: "Restore me", CreatedAt: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Delete("r"); err != nil {
+		t.Fatal(err)
+	}
+	// Default filter excludes it.
+	got, err := svc.ListWithFilter(ConversationFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range got {
+		if c.ID == "r" {
+			t.Fatal("soft-deleted should be excluded by default filter")
+		}
+	}
+	// IncludeTrash shows it.
+	got, err = svc.ListWithFilter(ConversationFilter{IncludeTrash: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, c := range got {
+		if c.ID == "r" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("IncludeTrash should show soft-deleted conversation")
+	}
+	// Restore.
+	if err := svc.Restore("r"); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := svc.Load("r")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.DeletedAt != 0 {
+		t.Errorf("Restore should clear DeletedAt, got %d", loaded.DeletedAt)
+	}
+	// Default filter now includes it.
+	got, err = svc.ListWithFilter(ConversationFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored bool
+	for _, c := range got {
+		if c.ID == "r" {
+			restored = true
+		}
+	}
+	if !restored {
+		t.Error("restored conversation should appear in default filter")
+	}
+}
+
+func TestConversationService_Task2_PurgeExpiredTrash(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewConversationService(dir)
+	// An old soft-deleted conversation (DeletedAt 40 days ago).
+	old := time.Now().Add(-40 * 24 * time.Hour).Unix()
+	if err := svc.Save(Conversation{ID: "old", Title: "old", CreatedAt: 1, DeletedAt: old}); err != nil {
+		t.Fatal(err)
+	}
+	// A recent soft-deleted conversation (1 day ago).
+	recent := time.Now().Add(-24 * time.Hour).Unix()
+	if err := svc.Save(Conversation{ID: "recent", Title: "recent", CreatedAt: 2, DeletedAt: recent}); err != nil {
+		t.Fatal(err)
+	}
+	// An active conversation.
+	if err := svc.Save(Conversation{ID: "active", Title: "active", CreatedAt: 3}); err != nil {
+		t.Fatal(err)
+	}
+	// Purge trash older than 30 days.
+	purged, err := svc.PurgeExpiredTrash(30 * 24 * time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if purged != 1 {
+		t.Errorf("expected 1 purged, got %d", purged)
+	}
+	// old should be gone.
+	if _, err := svc.Load("old"); err == nil {
+		t.Error("old soft-deleted conversation should have been purged")
+	}
+	// recent should still exist.
+	if _, err := svc.Load("recent"); err != nil {
+		t.Error("recent soft-deleted conversation should still exist")
+	}
+	// active should still exist.
+	if _, err := svc.Load("active"); err != nil {
+		t.Error("active conversation should still exist")
+	}
+}
+
+func TestConversationService_Task2_UpdateMetadata(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewConversationService(dir)
+	if err := svc.Save(Conversation{ID: "m", Title: "Meta", CreatedAt: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.UpdateTags("m", []string{"bug", "urgent"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.UpdateFavorite("m", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.UpdateGroup("m", "sprint-1"); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := svc.Load("m")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Tags) != 2 || loaded.Tags[0] != "bug" {
+		t.Errorf("tags mismatch: %v", loaded.Tags)
+	}
+	if !loaded.Favorite {
+		t.Error("favorite should be true")
+	}
+	if loaded.Group != "sprint-1" {
+		t.Errorf("group mismatch: %q", loaded.Group)
+	}
+}
+
+// Plan 11 Task 2 Step 6: UpdateSortOrder persists the manual drag-and-drop
+// order on the conversation, and the field round-trips through Save/Load.
+func TestConversationService_Task2_UpdateSortOrder(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewConversationService(dir)
+	if err := svc.Save(Conversation{ID: "s1", Title: "first", CreatedAt: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Save(Conversation{ID: "s2", Title: "second", CreatedAt: 2}); err != nil {
+		t.Fatal(err)
+	}
+	// Assign manual order: s2 -> 1, s1 -> 2 (reversed from created_at-desc).
+	if err := svc.UpdateSortOrder("s2", 1); err != nil {
+		t.Fatalf("UpdateSortOrder s2: %v", err)
+	}
+	if err := svc.UpdateSortOrder("s1", 2); err != nil {
+		t.Fatalf("UpdateSortOrder s1: %v", err)
+	}
+	loaded1, err := svc.Load("s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	loaded2, err := svc.Load("s2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded1.SortOrder != 2 {
+		t.Errorf("s1 SortOrder = %d, want 2", loaded1.SortOrder)
+	}
+	if loaded2.SortOrder != 1 {
+		t.Errorf("s2 SortOrder = %d, want 1", loaded2.SortOrder)
+	}
+	// Clearing the order (0) is supported — falls back to created_at-desc.
+	if err := svc.UpdateSortOrder("s2", 0); err != nil {
+		t.Fatalf("UpdateSortOrder clear: %v", err)
+	}
+	loaded2, _ = svc.Load("s2")
+	if loaded2.SortOrder != 0 {
+		t.Errorf("s2 SortOrder = %d, want 0 after clear", loaded2.SortOrder)
+	}
+}
+
+// Plan 11 Task 2 Step 6: SortOrder is omitted from JSON when 0 (omitempty),
+// so legacy conversations without the field load with SortOrder == 0.
+func TestConversationService_Task2_SortOrder_LegacyOmitted(t *testing.T) {
+	dir := t.TempDir()
+	svc := NewConversationService(dir)
+	// Legacy file without sort_order field.
+	legacyJSON := `{"id":"legacy","title":"Legacy","created_at":1,"messages":[]}`
+	path := filepath.Join(dir, "legacy.json")
+	if err := os.WriteFile(path, []byte(legacyJSON), 0644); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := svc.Load("legacy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.SortOrder != 0 {
+		t.Errorf("legacy conversation SortOrder = %d, want 0", loaded.SortOrder)
 	}
 }

@@ -62,8 +62,14 @@ export default [
       // be intentional (re-exports, etc.).
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-      // `any` is flagged as a warning so we can incrementally tighten.
-      "@typescript-eslint/no-explicit-any": "warn",
+      // G-QUAL-03 / P1: `any` is now an error. API-compatibility call sites
+      // (e.g. the VS Code extension host bridge) that must keep `any` to match
+      // the upstream API contract use inline eslint-disable comments.
+      "@typescript-eslint/no-explicit-any": "error",
+      // G-SEC-11 gate 3: ban v-html to prevent XSS in Vue templates.
+      // v-html renders raw HTML, which can execute attacker-controlled
+      // scripts if the input is not strictly sanitized.
+      "vue/no-v-html": "error",
     },
   },
 

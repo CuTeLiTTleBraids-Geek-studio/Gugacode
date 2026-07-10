@@ -92,6 +92,11 @@ func (t *TerminalService) SetWorkspaceRoot(root string) error {
 }
 
 // validateWorkingDir checks that the path is within the workspace root (if set).
+//
+// G-SEC-06: validation is delegated to ValidatePathWithinRoot, which
+// resolves symlinks on both the target and the root before comparing.
+// The previous lexical-only check (filepath.Abs + filepath.Rel) could
+// be bypassed by a symlink inside the workspace pointing outside.
 func (t *TerminalService) validateWorkingDir(workingDir string) error {
 	if workingDir == "" {
 		return nil
@@ -102,21 +107,36 @@ func (t *TerminalService) validateWorkingDir(workingDir string) error {
 	if root == "" {
 		return nil
 	}
-	abs, err := filepath.Abs(workingDir)
-	if err != nil {
-		return err
-	}
-	rel, err := filepath.Rel(root, abs)
-	if err != nil {
-		return err
-	}
-	if strings.HasPrefix(rel, "..") || rel == ".." {
-		return fmt.Errorf("working directory %s is outside the workspace", workingDir)
-	}
-	return nil
+	_, err := ValidatePathWithinRoot(root, workingDir)
+	return err
 }
 
 // StartSession creates and starts a new terminal session with the given ID.
+// allowedShells is the whitelist of shell base names that can be used in
+// StartSession (M-4). The check is on the base name of the shell path, so
+// "/usr/bin/bash" and "bash" both match. On Windows, the comparison is
+// case-insensitive (and the .exe suffix is stripped).
+var allowedShells = map[string]bool{
+	"bash":       true,
+	"sh":         true,
+	"zsh":        true,
+	"powershell": true,
+	"pwsh":       true,
+	"cmd":        true,
+}
+
+// isAllowedShell returns true if the shell's base name (with .exe stripped
+// on Windows) is in the allowedShells whitelist. This prevents the frontend
+// from launching an arbitrary binary as a terminal shell (M-4).
+func isAllowedShell(shell string) bool {
+	base := filepath.Base(shell)
+	// HIGH-01: lowercase before trimming .exe so "CMD.EXE" / "PowerShell.exe"
+	// normalize correctly (previously TrimSuffix(".exe") missed uppercase).
+	base = strings.ToLower(base)
+	base = strings.TrimSuffix(base, ".exe")
+	return allowedShells[base]
+}
+
 func (t *TerminalService) StartSession(id string, workingDir string, shell string) error {
 	if id == "" {
 		return fmt.Errorf("session ID cannot be empty")
@@ -147,6 +167,10 @@ func (t *TerminalService) StartSession(id string, workingDir string, shell strin
 
 	resolvedShell := defaultShell()
 	if shell != "" {
+		if !isAllowedShell(shell) {
+			slog.Warn("terminal: rejected shell not in whitelist", "sessionId", id, "shell", shell)
+			return fmt.Errorf("shell %q is not in the allowed list (M-4: bash/sh/zsh/powershell/pwsh/cmd)", shell)
+		}
 		resolvedShell = []string{shell}
 	}
 

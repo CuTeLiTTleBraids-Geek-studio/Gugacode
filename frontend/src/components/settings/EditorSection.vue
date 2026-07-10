@@ -156,6 +156,18 @@ const { t } = useI18n();
         <span class="setting-hint">{{ t("editorSection.inlineCompletionHint") }}</span>
       </div>
     </div>
+
+    <div class="setting-row">
+      <label class="setting-label">{{ t("editorSection.formatOnSave") }}</label>
+      <div class="setting-control">
+        <el-switch
+          v-model="appState.formatOnSave"
+          :aria-label="t('editorSection.formatOnSaveAria')"
+          @change="saveSettings"
+        />
+        <span class="setting-hint">{{ t("editorSection.formatOnSaveHint") }}</span>
+      </div>
+    </div>
   </section>
 </template>
 

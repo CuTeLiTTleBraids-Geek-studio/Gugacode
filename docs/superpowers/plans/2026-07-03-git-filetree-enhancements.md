@@ -38,7 +38,7 @@
 - Modify: `services/git_service.go`
 - Modify: `services/git_service_test.go`
 
-- [ ] **Step 1: Write failing tests for branch methods**
+- [x] **Step 1: Write failing tests for branch methods**
 
 Append to `services/git_service_test.go`:
 
@@ -148,12 +148,12 @@ func TestGitService_DeleteCurrentBranch_Fails(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./services/ -run TestGitService_ListBranches -v -count=1`
 Expected: FAIL with "ListBranches undefined" or compile error
 
-- [ ] **Step 3: Implement BranchRef type and branch methods**
+- [x] **Step 3: Implement BranchRef type and branch methods**
 
 In `services/git_service.go`, add after the `BranchInfo` struct:
 
@@ -258,12 +258,12 @@ func (g *GitService) DeleteBranch(repoPath string, name string) error {
 
 Add `"github.com/go-git/go-git/v5/config"` to the import block.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./services/ -run "TestGitService_(ListBranches|CreateAndCheckoutBranch|DeleteBranch|DeleteCurrentBranch)" -v -count=1`
 Expected: All 4 tests PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/git_service.go services/git_service_test.go
@@ -278,7 +278,7 @@ git commit -m "feat: add Git branch management (list/create/checkout/delete)"
 - Modify: `services/search_service.go`
 - Modify: `services/search_service_test.go`
 
-- [ ] **Step 1: Write failing tests for Replace**
+- [x] **Step 1: Write failing tests for Replace**
 
 Append to `services/search_service_test.go`:
 
@@ -349,12 +349,12 @@ func TestSearchService_Replace_Regex(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./services/ -run TestSearchService_Replace -v -count=1`
 Expected: FAIL with "Replace undefined" or compile error
 
-- [ ] **Step 3: Implement Replace method**
+- [x] **Step 3: Implement Replace method**
 
 In `services/search_service.go`, add the import `"regexp"` (if not already present) and append:
 
@@ -405,12 +405,12 @@ func (s *SearchService) Replace(filePath string, pattern string, replacement str
 
 Ensure `"os"` and `"fmt"` are imported (they likely already are).
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./services/ -run TestSearchService_Replace -v -count=1`
 Expected: All 3 tests PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/search_service.go services/search_service_test.go
@@ -427,7 +427,7 @@ git commit -m "feat: add SearchService.Replace for regex-based find-and-replace"
 - Modify: `frontend/src/types/index.ts`
 - Modify: `frontend/src/api/services.ts`
 
-- [ ] **Step 1: Compute FNV-1a binding IDs**
+- [x] **Step 1: Compute FNV-1a binding IDs**
 
 Create a temporary Go file `services/_compute_ids.go` and run it to compute the binding IDs for the new methods. The binding ID format is `changeme/services.TypeName.MethodName`.
 
@@ -464,7 +464,7 @@ func main() {
 Run: `go run services/_compute_ids.go`
 Record the 5 IDs. Delete the temp file afterward.
 
-- [ ] **Step 2: Add branch method bindings to gitservice.js**
+- [x] **Step 2: Add branch method bindings to gitservice.js**
 
 In `frontend/bindings/changeme/services/gitservice.js`, add (using the computed IDs — placeholder values shown, REPLACE with actual computed values):
 
@@ -488,7 +488,7 @@ export function DeleteBranch(path, name) {
 
 Replace `COMPUTED_ID_*` with the actual uint32 values from Step 1.
 
-- [ ] **Step 3: Add Replace binding to searchservice.js**
+- [x] **Step 3: Add Replace binding to searchservice.js**
 
 In `frontend/bindings/changeme/services/searchservice.js`, add:
 
@@ -500,7 +500,7 @@ export function Replace(filePath, pattern, replacement, caseSensitive) {
 
 Replace `COMPUTED_ID_REPLACE` with the actual value from Step 1.
 
-- [ ] **Step 4: Add BranchRef and ReplaceResult types**
+- [x] **Step 4: Add BranchRef and ReplaceResult types**
 
 In `frontend/src/types/index.ts`, add:
 
@@ -515,7 +515,7 @@ export interface ReplaceResult {
 }
 ```
 
-- [ ] **Step 5: Add API wrappers in services.ts**
+- [x] **Step 5: Add API wrappers in services.ts**
 
 In `frontend/src/api/services.ts`:
 
@@ -540,7 +540,7 @@ In `frontend/src/api/services.ts`:
     SearchServiceBindings.Replace(filePath, pattern, replacement, caseSensitive) as Promise<ReplaceResult>,
 ```
 
-- [ ] **Step 6: Delete temp file and verify build**
+- [x] **Step 6: Delete temp file and verify build**
 
 Delete `services/_compute_ids.go`.
 
@@ -550,7 +550,7 @@ Expected: success (exit 0)
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/bindings/changeme/services/gitservice.js frontend/bindings/changeme/services/searchservice.js frontend/src/types/index.ts frontend/src/api/services.ts
@@ -565,7 +565,7 @@ git commit -m "feat: add frontend bindings for Git branch + Search replace"
 - Modify: `frontend/src/stores/git.ts`
 - Modify: `frontend/src/components/layout/GitPanel.vue`
 
-- [ ] **Step 1: Add branch state and actions to git store**
+- [x] **Step 1: Add branch state and actions to git store**
 
 In `frontend/src/stores/git.ts`, add:
 
@@ -611,7 +611,7 @@ export async function deleteBranch(repoPath: string, name: string) {
 
 (Adjust imports as needed — `refreshStatus` should already exist in the store. If not, call whatever function loads `gitState.changes`.)
 
-- [ ] **Step 2: Add branch selector dropdown to GitPanel.vue**
+- [x] **Step 2: Add branch selector dropdown to GitPanel.vue**
 
 In `frontend/src/components/layout/GitPanel.vue`:
 
@@ -718,12 +718,12 @@ async function handleBranchCommand(name: string) {
 }
 ```
 
-- [ ] **Step 3: Verify type check**
+- [x] **Step 3: Verify type check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/stores/git.ts frontend/src/components/layout/GitPanel.vue
@@ -737,7 +737,7 @@ git commit -m "feat: add Git branch selector dropdown with create/checkout"
 **Files:**
 - Modify: `frontend/src/components/explorer/FileTree.vue`
 
-- [ ] **Step 1: Add context menu state and handlers**
+- [x] **Step 1: Add context menu state and handlers**
 
 In `frontend/src/components/explorer/FileTree.vue`, add to `<script setup>`:
 
@@ -855,7 +855,7 @@ async function reloadChildren() {
 }
 ```
 
-- [ ] **Step 2: Add context menu trigger to the file row**
+- [x] **Step 2: Add context menu trigger to the file row**
 
 In the template, add `@contextmenu="onContextMenu"` to the `.file-tree__row` div:
 
@@ -868,7 +868,7 @@ In the template, add `@contextmenu="onContextMenu"` to the `.file-tree__row` div
 >
 ```
 
-- [ ] **Step 3: Add context menu component to template**
+- [x] **Step 3: Add context menu component to template**
 
 Append before the closing `</div>` of `.file-tree`:
 
@@ -890,7 +890,7 @@ Append before the closing `</div>` of `.file-tree`:
 </Teleport>
 ```
 
-- [ ] **Step 4: Add context menu styles**
+- [x] **Step 4: Add context menu styles**
 
 ```css
 .file-tree__context-menu {
@@ -925,12 +925,12 @@ Append before the closing `</div>` of `.file-tree`:
 }
 ```
 
-- [ ] **Step 5: Verify type check**
+- [x] **Step 5: Verify type check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/components/explorer/FileTree.vue
@@ -945,7 +945,7 @@ git commit -m "feat: add file tree context menu (new file/folder, rename, delete
 - Modify: `frontend/src/stores/search.ts`
 - Modify: `frontend/src/components/layout/SearchPanel.vue`
 
-- [ ] **Step 1: Add replace action to search store**
+- [x] **Step 1: Add replace action to search store**
 
 In `frontend/src/stores/search.ts`, add:
 
@@ -969,7 +969,7 @@ export async function replaceAll(pattern: string, replacement: string, caseSensi
 
 (If `repoPath` is not a module-level variable in search.ts, pass it as a parameter instead. Adjust to fit the existing store structure.)
 
-- [ ] **Step 2: Add replace UI to SearchPanel.vue**
+- [x] **Step 2: Add replace UI to SearchPanel.vue**
 
 In `frontend/src/components/layout/SearchPanel.vue`:
 
@@ -1095,12 +1095,12 @@ import { Search, Switch } from "@element-plus/icons-vue";
 }
 ```
 
-- [ ] **Step 3: Verify type check**
+- [x] **Step 3: Verify type check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/stores/search.ts frontend/src/components/layout/SearchPanel.vue
@@ -1115,7 +1115,7 @@ git commit -m "feat: add search & replace UI with regex support"
 - Modify: `frontend/src/stores/editor.ts`
 - Modify: `frontend/src/views/EditorView.vue`
 
-- [ ] **Step 1: Add auto-save timer to editor store**
+- [x] **Step 1: Add auto-save timer to editor store**
 
 In `frontend/src/stores/editor.ts`, add:
 
@@ -1148,7 +1148,7 @@ export function saveOnFocusChange() {
 
 (Adjust `editorState.activeFile` references to match the actual editor store structure. The key is: watch content changes, debounce by `autoSaveDelay`, then call `saveFile()`.)
 
-- [ ] **Step 2: Wire auto-save in EditorView**
+- [x] **Step 2: Wire auto-save in EditorView**
 
 In `frontend/src/views/EditorView.vue`:
 
@@ -1169,12 +1169,12 @@ onBeforeUnmount(() => {
 
 2. Ensure `onMounted` and `onBeforeUnmount` are imported from "vue".
 
-- [ ] **Step 3: Verify type check**
+- [x] **Step 3: Verify type check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/stores/editor.ts frontend/src/views/EditorView.vue
@@ -1187,27 +1187,27 @@ git commit -m "feat: implement auto-save (afterDelay + onFocusChange modes)"
 
 **Files:** None (verification only)
 
-- [ ] **Step 1: Run Go tests**
+- [x] **Step 1: Run Go tests**
 
 Run: `go test ./services/... -count=1 -timeout 60s`
 Expected: `ok changeme/services` (exit 0)
 
-- [ ] **Step 2: Run Go build**
+- [x] **Step 2: Run Go build**
 
 Run: `go build .`
 Expected: exit 0
 
-- [ ] **Step 3: Run vue-tsc**
+- [x] **Step 3: Run vue-tsc**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 4: Run vitest**
+- [x] **Step 4: Run vitest**
 
 Run: `cd frontend && npx vitest run`
 Expected: All tests pass (9+ files, 82+ tests)
 
-- [ ] **Step 5: Final commit (if any remaining changes)**
+- [x] **Step 5: Final commit (if any remaining changes)**
 
 ```bash
 git add -A

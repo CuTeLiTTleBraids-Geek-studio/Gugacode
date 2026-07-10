@@ -22,7 +22,7 @@ gugacode is a desktop IDE built with **Go (Wails v3)** backend and **Vue 3 + Typ
 gugacode/
 ├── main.go                    # App entry: service registration, event wiring
 ├── go.mod                     # Module: gugacode
-├── services/                  # Go backend services (17 services)
+├── services/                  # Go backend services (~35+ service types; see registry below)
 │   ├── file_service.go        # File I/O with workspace sandboxing
 │   ├── project_service.go     # Recent projects management
 │   ├── settings_service.go    # XDG-path settings persistence
@@ -43,7 +43,11 @@ gugacode/
 │   ├── profile_service.go     # Settings profiles (switch/import/export)
 │   ├── layout_service.go      # Persistent layout profiles
 │   ├── plugin_service.go      # Plugin discovery + asset serving
-│   ├── loglevel_service.go    # Runtime log level control
+│   ├── marketplace_service.go # VS Code extension marketplace (Open VSX)
+│   ├── extension_security_service.go # Extension security classification + approval
+│   ├── extension_blacklist.go # Extension blacklist enforcement
+│   ├── lsp_service.go         # LSP client (gopls/tsserver) for completions + diagnostics
+│   ├── toolchain_service.go   # Build/lint/format toolchain (G-FEAT-03)
 │   ├── output_buffer.go       # Thread-safe terminal output buffer
 │   ├── pathsec.go             # Shared path traversal validation
 │   ├── myers_diff.go          # Myers diff algorithm for git diffs
@@ -54,7 +58,7 @@ gugacode/
 ├── frontend/
 │   ├── src/
 │   │   ├── api/services.ts    # Typed Wails binding wrappers
-│   │   ├── stores/            # Vue reactive state (17 stores)
+│   │   ├── stores/            # Vue reactive state (~50+ store modules)
 │   │   ├── components/
 │   │   │   ├── editor/        # CodeEditor (Monaco), DiffView, TabBar
 │   │   │   ├── explorer/      # FileTree with context menu
@@ -73,7 +77,9 @@ gugacode/
 
 Each backend service is a Go struct registered with `application.NewService()`. Wails v3 computes method-binding IDs using FNV-1a 32-bit hash of `{modulePath}.{TypeName}.{MethodName}`. The frontend calls these via `$Call.ByID(bindingID, ...args)`.
 
-### Service Registry (main.go — 17 services)
+### Service Registry (main.go — core + Plan 11 modules)
+
+Core services include File, Project, Settings, Window, Terminal, AI, Conversation, Git, Search, Agent, Task, Workflow, Rules, Preset, Profile, Layout, Plugin, Marketplace, ExtensionSecurity, LSP, Toolchain, Diff, Snapshot, MCP, Skills, ComputerUse (experimental stub), IM, Persona, AIPlan, AIGoal, AIPermission, and related helpers (`pathsec`, `secrets`, `output_buffer`, …). Count grows with Plan 11 modules; treat ARCHITECTURE service list as representative, not a hard number.
 
 | Service | Responsibility |
 |---|---|
@@ -97,17 +103,24 @@ Each backend service is a Go struct registered with `application.NewService()`. 
 
 ### Event System
 
-Wails v3 events are used for streaming data:
+Wails v3 events are used for streaming data and dual-window sync (see `docs/ai-windows.md`):
 - `terminal:output` — terminal output chunks (emitted from Go poll loop)
-- `ai:chunk` — AI streaming response chunks
-- `ai:done` — AI stream completion
-- `ai:error` — AI stream error
+- `ai:chunk` — AI streaming response chunks (`{streamId, data}`)
+- `ai:done` — AI stream completion (`{streamId, data}`)
+- `ai:error` — AI stream error (`{streamId, data}`)
+- `ai:stream-busy` — process-wide stream mutex (`{streamId, busy}`)
+- `ai:tool_calls` — native OpenAI/Anthropic tool calls (`{streamId, data}`)
+- `ai:selection` — main window selection → AI companion window
+- `ai:apply-to-editor` — AI window apply request → main editor
+- `settings:changed` — settings SSOT sync across webviews (`{origin}`)
+- `conversation:saved` — conversation list/content SSOT (`{origin, id}`)
+- `agent:pending-updated` — agent approval queue summary (`{origin, count}`)
 - `file:saved` — emitted after FileService.WriteFile succeeds
 - `time` — clock tick for status bar
 
 ### Path Sandboxing
 
-`FileService.SetWorkspaceRoot(path)` sets the allowed directory. All file operations (including `ListDirectory`) validate paths against this root using `filepath.Rel()` to prevent directory traversal. `TerminalService` has an equivalent `validateWorkingDir()` that ensures the working directory is within the workspace.
+`FileService.SetWorkspaceRoot(path)` sets the allowed directory. Read operations validate against this root when set. **Mutating** operations (`WriteFile` / `CreateFile` / `CreateDirectory` / `DeletePath` / `RenamePath`) **require a non-empty root** (prompt-6 Task 4 / BUG-M5). With a root set, paths are checked via `ValidatePathWithinRoot` (symlink-aware). `TerminalService` has an equivalent `validateWorkingDir()` that ensures the working directory is within the workspace.
 
 ## Frontend State Management
 

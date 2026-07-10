@@ -1,10 +1,17 @@
 import { computed } from "vue";
 import { appState, saveSettings } from "@/stores/app";
 import { aiService } from "@/api/services";
+import { aiState } from "@/stores/ai";
 
 /**
  * Minimum milliseconds between completion requests per file (N-43).
  * Per-file debounce prevents A tab's request from blocking B tab's request.
+ *
+ * G-PERF-02: this debounce (combined with the AbortController below) is the
+ * performance gate for inline completions. Debounce caps request frequency
+ * while typing, and aborting the previous in-flight request avoids wasted
+ * work (and wasted AI tokens) when the user keeps typing. Both must remain
+ * in place; removing either re-introduces a per-keystroke request storm.
  */
 const DEBOUNCE_MS = 300;
 
@@ -76,6 +83,8 @@ export async function requestCompletion(
 ): Promise<string> {
   if (!appState.inlineCompletionEnabled) return "";
   if (prefix.length < MIN_PREFIX_LENGTH) return "";
+  // prompt-6 Task 8 / BUG-M9: do not compete with main chat stream for quota.
+  if (aiState.streaming || aiState.globalStreamBusy) return "";
 
   // N-43: Dedup — check BEFORE debounce. If a concurrent caller already
   // started the same request, reuse its promise regardless of the debounce

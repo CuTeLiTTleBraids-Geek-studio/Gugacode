@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useRoute } from "vue-router";
 import {
   appState,
   setPanelTab,
+  setExtensionsSubview,
   toggleTerminal,
   toggleActivityBar,
   toggleStatusBar,
   saveSettings,
+  openProject,
 } from "@/stores/app";
 import { saveFile } from "@/stores/editor";
 import { clearMessages } from "@/stores/ai";
@@ -23,6 +25,9 @@ import TerminalPanel from "./TerminalPanel.vue";
 import StatusBar from "./StatusBar.vue";
 import CommandPalette from "./CommandPalette.vue";
 import QuickOpen from "./QuickOpen.vue";
+// G-FEAT-01: New Project scaffolding wizard.
+import NewProjectWizard from "../modals/NewProjectWizard.vue";
+import ApplyDiffModal from "../modals/ApplyDiffModal.vue";
 import LayoutLeafView from "./LayoutLeafView.vue";
 import LayoutSplitView from "./LayoutSplitView.vue";
 import {
@@ -30,8 +35,9 @@ import {
   setActiveLeaf,
   saveLayoutToBackend,
 } from "@/stores/layout";
-import { layoutService } from "@/api/services";
-import { listPluginCommands, executePluginCommand } from "@/lib/pluginRegistry";
+import { layoutService, projectService } from "@/api/services";
+import { getUnifiedPaletteCommands } from "@/lib/unifiedCommands";
+import { toolchainState, loadToolchainCommands, runToolchainCommand } from "@/stores/toolchain";
 
 useKeyboard();
 
@@ -46,6 +52,8 @@ const isEditorRoute = computed(() => route.path === "/editor");
 const paletteVisible = ref(false);
 // Plan 55: Quick Open (Ctrl+P) fuzzy file finder.
 const quickOpenVisible = ref(false);
+// G-FEAT-01: New Project wizard visibility.
+const newProjectVisible = ref(false);
 
 const commands = computed<Command[]>(() => {
   // N-42: Reference paletteVisible so this computed re-evaluates when the
@@ -54,6 +62,85 @@ const commands = computed<Command[]>(() => {
   void paletteVisible.value;
   const builtin: Command[] = [
     { id: "save", label: t("mainLayout.commandSaveFile"), shortcut: "Ctrl+S", action: () => saveFile() },
+    {
+      id: "save-all",
+      label: t("mainLayout.commandSaveAll"),
+      shortcut: "Ctrl+K S",
+      action: () => {
+        void import("@/stores/editor").then(({ saveAllFiles }) => {
+          void saveAllFiles().then((n) => {
+            if (n > 0) {
+              void import("@/lib/notifications").then(({ notifySuccess }) =>
+                notifySuccess(`Saved ${n} file(s)`),
+              );
+            }
+          });
+        });
+      },
+    },
+    {
+      id: "organize-imports",
+      label: t("mainLayout.commandOrganizeImports"),
+      shortcut: "Shift+Alt+O",
+      action: () => {
+        void import("@/stores/editor").then(async ({ activeFile, updateContent }) => {
+          const f = activeFile.value;
+          if (!f) return;
+          const lang =
+            f.path.endsWith(".go") ? "go" : f.path.endsWith(".ts") || f.path.endsWith(".tsx") ? "typescript" : f.path.endsWith(".js") ? "javascript" : "";
+          if (!lang) return;
+          const { organizeLSPImports } = await import("@/stores/lsp");
+          const { applyTextEditsToContent } = await import("@/lib/lspCompletion");
+          const edits = await organizeLSPImports(lang, f.path, f.content);
+          if (!edits.length) return;
+          updateContent(f.path, applyTextEditsToContent(f.content, edits));
+        });
+      },
+    },
+    {
+      id: "debug-package",
+      label: t("mainLayout.commandDebugPackage"),
+      action: () => {
+        void import("@/stores/debug").then(({ launchDebugPackage, refreshDebugStatus }) => {
+          void refreshDebugStatus().then(() => launchDebugPackage());
+        });
+      },
+    },
+    {
+      id: "coverage-package",
+      label: t("mainLayout.commandCoverage"),
+      action: () => {
+        void import("@/stores/coverage").then(({ runPackageCoverage }) => {
+          void runPackageCoverage();
+        });
+      },
+    },
+    {
+      id: "test-at-cursor",
+      label: t("mainLayout.commandTestAtCursor"),
+      shortcut: "Ctrl+Shift+T",
+      action: () => {
+        const path = appState.currentFilePath;
+        if (!path) return;
+        void import("@/stores/editor").then(({ activeFile }) => {
+          const f = activeFile.value;
+          if (!f) return;
+          const lang =
+            f.language === "go" || path.endsWith(".go")
+              ? "go"
+              : path.endsWith(".ts") || path.endsWith(".tsx")
+                ? "typescript"
+                : path.endsWith(".js") || path.endsWith(".jsx")
+                  ? "javascript"
+                  : "";
+          if (!lang) return;
+          const line = Math.max(0, (appState.cursorLine || 1) - 1);
+          void import("@/stores/toolchain").then(({ runTestAtCursor }) => {
+            void runTestAtCursor(lang, path, line, f.content);
+          });
+        });
+      },
+    },
     { id: "toggle-ai", label: t("mainLayout.commandToggleAiChat"), action: () => setPanelTab("ai") },
     { id: "toggle-terminal", label: t("mainLayout.commandToggleTerminal"), action: () => toggleTerminal() },
     { id: "clear-chat", label: t("mainLayout.commandClearChat"), action: () => clearMessages() },
@@ -63,30 +150,52 @@ const commands = computed<Command[]>(() => {
     // N-20: layout toggles
     { id: "toggle-activity-bar", label: t("mainLayout.commandToggleActivityBar"), action: () => { toggleActivityBar(); saveSettings(); } },
     { id: "toggle-status-bar", label: t("mainLayout.commandToggleStatusBar"), action: () => { toggleStatusBar(); saveSettings(); } },
-  ];
-  // N-42: Merge plugin commands. Built-in IDs take priority — if a plugin
-  // registers a command with the same ID as a built-in, the built-in wins
-  // and the plugin command is filtered out to avoid confusion.
-  const builtinIds = new Set(builtin.map((c) => c.id));
-  const pluginCommands: Command[] = listPluginCommands()
-    .filter((rc) => !builtinIds.has(rc.id))
-    .map((rc) => ({
-      id: rc.id,
-      // Prefix the label with category (if any) so users can find plugin
-      // commands by typing the category name. This also makes the source
-      // visible in the palette without needing UI changes.
-      label: rc.category ? `${rc.category}: ${rc.title}` : rc.title,
-      shortcut: rc.keybinding,
-      // Fire-and-forget the async handler. Errors are surfaced to the
-      // console (and the Output panel via executePluginCommand's path).
+    // G-FEAT-01: New Project scaffolding wizard.
+    { id: "new-project", label: t("mainLayout.commandNewProject"), action: () => { newProjectVisible.value = true; } },
+    // G-VSC-01: open the VS Code extension marketplace (Open VSX) in the
+    // extensions tab. Ensures the sidebar is visible so the panel shows.
+    {
+      id: "browse-marketplace",
+      label: t("mainLayout.commandBrowseMarketplace"),
       action: () => {
-        executePluginCommand(rc.id).catch((e: unknown) => {
-          console.error(`Plugin command "${rc.id}" failed:`, e);
-        });
+        setPanelTab("extensions");
+        setExtensionsSubview("marketplace");
+        if (appState.sidebarCollapsed) appState.sidebarCollapsed = false;
       },
-    }));
-  return [...builtin, ...pluginCommands];
+    },
+  ];
+  // G-FEAT-03: surface toolchain commands (go build / eslint / ...) grouped
+  // by language. toolchainState.commands is refreshed when a project opens.
+  const toolchainCommands: Command[] = toolchainState.commands.map((tc) => ({
+    id: `toolchain-${tc.id}`,
+    label: tc.label,
+    action: () => {
+      void runToolchainCommand(tc.id, appState.currentFilePath ?? undefined);
+    },
+  }));
+  // G-VSC-04: Merge extension-contributed commands via the unified
+  // aggregator. Native plugin commands come first (higher priority), then
+  // VS Code extension commands (supplementary). Each carries a `source`
+  // field so CommandPalette.vue can render a source badge.
+  // Built-in IDs take absolute priority — if an extension registers a
+  // command with the same ID as a built-in, the built-in wins and the
+  // extension command is filtered out to avoid confusion.
+  const builtinIds = new Set(builtin.map((c) => c.id));
+  const extensionCommands: Command[] = getUnifiedPaletteCommands().filter(
+    (c) => !builtinIds.has(c.id),
+  );
+  return [...builtin, ...toolchainCommands, ...extensionCommands];
 });
+
+// G-FEAT-03: refresh the toolchain command list when a project is opened so
+// the palette only offers commands relevant to the workspace (Go vs TS/JS).
+watch(
+  () => appState.currentProject,
+  (root) => {
+    if (root) void loadToolchainCommands();
+  },
+  { immediate: true },
+);
 
 registerShortcut({
   key: "p",
@@ -152,6 +261,17 @@ function handleRunCommand(cmd: Command) {
   paletteVisible.value = false;
 }
 
+// G-FEAT-01: When the wizard successfully creates a project, add it to the
+// recent list and open the new workspace.
+async function handleProjectCreated(path: string) {
+  try {
+    const project = await projectService.addProject(path);
+    openProject(project.name, project.path);
+  } catch (e) {
+    console.error("Failed to open created project:", e);
+  }
+}
+
 // N-30: Layout tree activation handler. When a leaf is clicked, set it
 // active and persist the layout (best-effort).
 function handleLeafActivate(leafId: string) {
@@ -177,6 +297,8 @@ function handleResetLayout() {
     );
   });
 }
+// Used by command palette / future UI; keep referenced for tree-shake safety.
+void handleResetLayout;
 </script>
 
 <template>
@@ -255,10 +377,20 @@ function handleResetLayout() {
       @run="handleRunCommand"
     />
 
+    <!-- prompt-5 Task A: Diff confirm for AI apply-to-editor -->
+    <ApplyDiffModal />
+
     <!-- Plan 55: Quick Open (Ctrl+P) fuzzy file finder -->
     <QuickOpen
       :visible="quickOpenVisible"
       @close="quickOpenVisible = false"
+    />
+
+    <!-- G-FEAT-01: New Project scaffolding wizard -->
+    <NewProjectWizard
+      :visible="newProjectVisible"
+      @close="newProjectVisible = false"
+      @created="handleProjectCreated"
     />
   </div>
 </template>

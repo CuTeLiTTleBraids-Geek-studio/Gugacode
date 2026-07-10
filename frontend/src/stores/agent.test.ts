@@ -70,6 +70,9 @@ import {
   shouldAutoApprove,
   applyApprovalPolicy,
   __resetAgentPromptCacheForTests,
+  parseNativeToolCalls,
+  buildNativeToolDefs,
+  onNativeToolCalls,
   type ToolCall,
 } from "./agent";
 import { fileService, searchService, agentService, aiService } from "@/api/services";
@@ -1008,7 +1011,7 @@ describe("agent store", () => {
         expect(shouldAutoApprove(tc)).toBe(false);
       });
 
-      it("returns true for 'auto-approve' run tool without blockReason", () => {
+      it("G-SEC-02: returns false for 'auto-approve' run tool without blockReason (never auto-approve commands)", () => {
         appState.toolApprovalConfig = { run: "auto-approve" };
         const tc: ToolCall = {
           id: "1",
@@ -1016,10 +1019,24 @@ describe("agent store", () => {
           target: "ls",
           status: "pending",
         };
-        expect(shouldAutoApprove(tc)).toBe(true);
+        // G-SEC-02: run tools are never auto-approved, even with auto-approve
+        // policy and no blockReason. All commands require manual approval.
+        expect(shouldAutoApprove(tc)).toBe(false);
       });
 
-      it("returns false for 'auto-approve' run tool with blockReason (denylist)", () => {
+      it("prompt-5 Task E: returns false for 'auto-approve' write tool (never auto-approve writes)", () => {
+        appState.toolApprovalConfig = { write: "auto-approve" };
+        const tc: ToolCall = {
+          id: "1",
+          kind: "write",
+          target: "out.ts",
+          content: "x",
+          status: "pending",
+        };
+        expect(shouldAutoApprove(tc)).toBe(false);
+      });
+
+      it("G-SEC-02: returns false for 'auto-approve' run tool with blockReason (denylist)", () => {
         appState.toolApprovalConfig = { run: "auto-approve" };
         const tc: ToolCall = {
           id: "1",
@@ -1029,6 +1046,41 @@ describe("agent store", () => {
           blockReason: "rm -rf (recursive force delete)",
         };
         expect(shouldAutoApprove(tc)).toBe(false);
+      });
+    });
+
+    describe("native tool protocol (prompt-5 Task H)", () => {
+      it("buildNativeToolDefs includes builtin tools with schemas", () => {
+        const defs = buildNativeToolDefs();
+        const names = defs.map((d) => d.function.name);
+        expect(names).toContain("read");
+        expect(names).toContain("write");
+        expect(names).toContain("run");
+        expect(names).toContain("search");
+        expect(defs.every((d) => d.type === "function")).toBe(true);
+      });
+
+      it("parseNativeToolCalls maps OpenAI-style payloads to ToolCall", () => {
+        const calls = parseNativeToolCalls([
+          { id: "c1", name: "read", arguments: JSON.stringify({ path: "main.go" }) },
+          { id: "c2", name: "write", arguments: JSON.stringify({ path: "a.ts", content: "x" }) },
+          { id: "c3", name: "run", arguments: JSON.stringify({ command: "go test" }) },
+        ]);
+        expect(calls).toHaveLength(3);
+        expect(calls[0]).toMatchObject({ kind: "read", target: "main.go", status: "pending" });
+        expect(calls[1]).toMatchObject({ kind: "write", target: "a.ts", content: "x" });
+        expect(calls[2]).toMatchObject({ kind: "run", target: "go test" });
+      });
+
+      it("onNativeToolCalls enqueues pending tools", () => {
+        agentState.mode = "agent";
+        const n = onNativeToolCalls([
+          { name: "search", arguments: JSON.stringify({ query: "TODO" }) },
+        ]);
+        expect(n).toBe(1);
+        expect(agentState.pendingToolCalls).toHaveLength(1);
+        expect(agentState.pendingToolCalls[0].kind).toBe("search");
+        expect(agentState.toolCallCount).toBe(1);
       });
     });
 
@@ -1087,7 +1139,7 @@ describe("agent store", () => {
         expect(sendMessage).not.toHaveBeenCalled();
       });
 
-      it("does not auto-approve blocked run commands (respects denylist)", async () => {
+      it("G-SEC-02: does not auto-approve blocked run commands (respects denylist)", async () => {
         appState.toolApprovalConfig = { run: "auto-approve" };
         const tc: ToolCall = {
           id: "1",
@@ -1103,7 +1155,25 @@ describe("agent store", () => {
         expect(sendMessage).not.toHaveBeenCalled();
       });
 
-      it("awaits _riskCheckPromise for run tools before deciding", async () => {
+      it("G-SEC-02: does not auto-approve non-blocked run commands (always manual approval)", async () => {
+        // G-SEC-02: even non-blocked run commands with auto-approve policy
+        // must stay pending for manual approval. The denylist is not a
+        // security boundary, so no command bypasses approval.
+        appState.toolApprovalConfig = { run: "auto-approve" };
+        const tc: ToolCall = {
+          id: "1",
+          kind: "run",
+          target: "ls -la",
+          status: "pending",
+          // No blockReason — command is not on the denylist.
+        };
+        const { sendMessage } = await import("@/stores/ai");
+        await applyApprovalPolicy(tc);
+        expect(tc.status).toBe("pending");
+        expect(sendMessage).not.toHaveBeenCalled();
+      });
+
+      it("G-SEC-02: awaits _riskCheckPromise for run tools but never auto-approves", async () => {
         appState.toolApprovalConfig = { run: "auto-approve" };
         (agentService.execCommand as any).mockResolvedValue({
           command: "ls",
@@ -1134,11 +1204,12 @@ describe("agent store", () => {
         await Promise.resolve();
         expect(completed).toBe(false);
         expect(tc.status).toBe("pending");
-        // Now resolve the risk check — the policy should apply.
+        // Now resolve the risk check — G-SEC-02: the policy must NOT
+        // auto-approve. The call stays pending for manual approval.
         resolveRisk();
         await promise;
-        expect(tc.status).toBe("executed");
-        expect(sendMessage).toHaveBeenCalledTimes(1);
+        expect(tc.status).toBe("pending");
+        expect(sendMessage).not.toHaveBeenCalled();
       });
 
       it("is a no-op when status is not pending (already handled)", async () => {

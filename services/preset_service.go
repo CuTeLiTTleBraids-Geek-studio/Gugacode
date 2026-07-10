@@ -275,14 +275,8 @@ func writePresetFile(dir string, preset PresetFile) error {
 	if err != nil {
 		return fmt.Errorf("invalid preset name: %w", err)
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("create preset directory: %w", err)
-	}
-	data, err := json.MarshalIndent(preset, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal preset: %w", err)
-	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	// G-SEC-09: atomic write (temp file + rename).
+	if err := atomicWriteJSON(path, preset, 0644); err != nil {
 		return fmt.Errorf("write preset file: %w", err)
 	}
 	return nil

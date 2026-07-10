@@ -31,11 +31,11 @@
 **Files:**
 - Modify: `services/settings_service.go`
 
-- [ ] **Step 1: Read current Settings struct**
+- [x] **Step 1: Read current Settings struct**
 
 Read `services/settings_service.go` to find the `Settings` struct definition.
 
-- [ ] **Step 2: Add 14 new fields to Settings struct**
+- [x] **Step 2: Add 14 new fields to Settings struct**
 
 Add these fields to the `Settings` struct:
 
@@ -71,7 +71,7 @@ type Settings struct {
 }
 ```
 
-- [ ] **Step 3: Update defaultSettings to include new fields**
+- [x] **Step 3: Update defaultSettings to include new fields**
 
 Find the `defaultSettings` variable and add:
 
@@ -105,12 +105,12 @@ var defaultSettings = Settings{
 }
 ```
 
-- [ ] **Step 4: Verify build**
+- [x] **Step 4: Verify build**
 
 Run: `go build ./services/...`
 Expected: success
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/settings_service.go
@@ -125,7 +125,7 @@ git commit -m "feat: extend Settings struct with 14 new persisted fields (B-4)"
 - Modify: `frontend/src/types/index.ts`
 - Modify: `frontend/src/stores/app.ts`
 
-- [ ] **Step 1: Extend Settings interface in types**
+- [x] **Step 1: Extend Settings interface in types**
 
 In `frontend/src/types/index.ts`, find the `Settings` interface and add:
 
@@ -161,7 +161,7 @@ export interface Settings {
 }
 ```
 
-- [ ] **Step 2: Extend AppState interface in app.ts**
+- [x] **Step 2: Extend AppState interface in app.ts**
 
 In `frontend/src/stores/app.ts`, add the new fields to `AppState`:
 
@@ -186,7 +186,7 @@ In `frontend/src/stores/app.ts`, add the new fields to `AppState`:
   fontSizeScaling: number;
 ```
 
-- [ ] **Step 3: Add defaults to appState reactive**
+- [x] **Step 3: Add defaults to appState reactive**
 
 In the `reactive<AppState>()` call, add:
 
@@ -207,7 +207,7 @@ In the `reactive<AppState>()` call, add:
   fontSizeScaling: 100,
 ```
 
-- [ ] **Step 4: Update loadSettings to load new fields**
+- [x] **Step 4: Update loadSettings to load new fields**
 
 In `loadSettings()`, add:
 
@@ -228,7 +228,7 @@ In `loadSettings()`, add:
     appState.fontSizeScaling = settings.fontSizeScaling;
 ```
 
-- [ ] **Step 5: Update saveSettings to save new fields**
+- [x] **Step 5: Update saveSettings to save new fields**
 
 In `saveSettings()`, add to the `settings: Settings` object:
 
@@ -249,12 +249,12 @@ In `saveSettings()`, add to the `settings: Settings` object:
       fontSizeScaling: appState.fontSizeScaling,
 ```
 
-- [ ] **Step 6: Verify build**
+- [x] **Step 6: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/types/index.ts frontend/src/stores/app.ts
@@ -268,7 +268,7 @@ git commit -m "feat: extend frontend Settings type and appState with 14 fields (
 **Files:**
 - Modify: `frontend/src/views/SettingsView.vue`
 
-- [ ] **Step 1: Remove all local refs for persisted settings**
+- [x] **Step 1: Remove all local refs for persisted settings**
 
 Remove these local ref declarations:
 ```typescript
@@ -291,7 +291,7 @@ const uiDensity = ref("comfortable");
 const fontSizeScaling = ref(100);
 ```
 
-- [ ] **Step 2: Update all template v-model bindings**
+- [x] **Step 2: Update all template v-model bindings**
 
 Replace every `v-model="cursorBlinking"` with `v-model="appState.cursorBlinking"`, and add `@change="saveSettings"`.
 
@@ -314,17 +314,17 @@ Do the same for all 14+ settings:
 - `autoUpdate` → `appState.autoUpdate` + `@change="saveSettings"`
 - `dataFolderPath` → `appState.dataFolderPath` + `@input="saveSettings"`
 
-- [ ] **Step 3: Verify build**
+- [x] **Step 3: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/views/SettingsView.vue
@@ -341,7 +341,7 @@ git commit -m "fix: bind all SettingsView fields to appState with saveSettings (
 - Modify: `frontend/src/stores/ai.test.ts`
 - Modify: `frontend/src/views/SettingsView.vue`
 
-- [ ] **Step 1: Merge setConfig into aiService with optional systemPrompt**
+- [x] **Step 1: Merge setConfig into aiService with optional systemPrompt**
 
 In `frontend/src/api/services.ts`, update the `aiService.setConfig` to accept `systemPrompt`:
 
@@ -379,7 +379,7 @@ export const aiService = {
 
 Remove the entire `aiServiceV2` export.
 
-- [ ] **Step 2: Update ai.ts to use aiService.setConfig**
+- [x] **Step 2: Update ai.ts to use aiService.setConfig**
 
 In `frontend/src/stores/ai.ts`, replace:
 ```typescript
@@ -409,7 +409,7 @@ with:
     });
 ```
 
-- [ ] **Step 3: Update SettingsView.vue imports**
+- [x] **Step 3: Update SettingsView.vue imports**
 
 In `frontend/src/views/SettingsView.vue`, replace:
 ```typescript
@@ -422,7 +422,7 @@ import { fileService, aiService } from "@/api/services";
 
 Replace `aiServiceV2.setConfig` with `aiService.setConfig` in `handleTestConnection`.
 
-- [ ] **Step 4: Update ai.test.ts mocks**
+- [x] **Step 4: Update ai.test.ts mocks**
 
 In `frontend/src/stores/ai.test.ts`, remove the `aiServiceV2` mock and update the `aiService` mock to include `setConfig`:
 
@@ -446,17 +446,17 @@ vi.mock("@/api/services", () => ({
 }));
 ```
 
-- [ ] **Step 5: Verify build**
+- [x] **Step 5: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 6: Run tests**
+- [x] **Step 6: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/api/services.ts frontend/src/stores/ai.ts frontend/src/stores/ai.test.ts frontend/src/views/SettingsView.vue
@@ -471,7 +471,7 @@ git commit -m "refactor: merge aiServiceV2 into aiService with optional systemPr
 - Modify: `services/ai_service.go`
 - Test: `services/ai_service_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `services/ai_service_test.go`:
 
@@ -502,12 +502,12 @@ func TestParseSSEStream_EmptyInput(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `go test ./services/ -run TestParseSSEStream -v`
 Expected: FAIL (function not defined)
 
-- [ ] **Step 3: Implement parseSSEStream**
+- [x] **Step 3: Implement parseSSEStream**
 
 Add this function to `services/ai_service.go`:
 
@@ -544,12 +544,12 @@ func parseSSEStream(r io.Reader, onChunk func(string)) error {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./services/ -run TestParseSSEStream -v`
 Expected: PASS
 
-- [ ] **Step 5: Refactor SendStreamWithContext to use parseSSEStream**
+- [x] **Step 5: Refactor SendStreamWithContext to use parseSSEStream**
 
 Replace the SSE parsing loop in `SendStreamWithContext` with:
 
@@ -565,12 +565,12 @@ Replace the SSE parsing loop in `streamWithEvents` with:
 	})
 ```
 
-- [ ] **Step 6: Run full test suite**
+- [x] **Step 6: Run full test suite**
 
 Run: `go test ./services/ -count=1`
 Expected: all PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add services/ai_service.go services/ai_service_test.go
@@ -584,7 +584,7 @@ git commit -m "refactor: extract parseSSEStream helper to eliminate SSE duplicat
 **Files:**
 - Modify: `frontend/src/components/editor/CodeEditor.vue`
 
-- [ ] **Step 1: Create icon name-to-component mapping**
+- [x] **Step 1: Create icon name-to-component mapping**
 
 In `frontend/src/components/editor/CodeEditor.vue`, add an import and mapping in the `<script setup>`:
 
@@ -614,7 +614,7 @@ const presetIconMap: Record<string, any> = {
 };
 ```
 
-- [ ] **Step 2: Update the AI action menu to use component icons**
+- [x] **Step 2: Update the AI action menu to use component icons**
 
 Where the AI actions are rendered in the context menu, use:
 
@@ -622,17 +622,17 @@ Where the AI actions are rendered in the context menu, use:
 <el-icon><component :is="presetIconMap[action.icon] || Info" /></el-icon>
 ```
 
-- [ ] **Step 3: Verify build**
+- [x] **Step 3: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/editor/CodeEditor.vue
@@ -643,27 +643,27 @@ git commit -m "fix: map PresetMeta icon strings to Element Plus components (Q-6)
 
 ### Task 7: Full verification
 
-- [ ] **Step 1: Run Go tests**
+- [x] **Step 1: Run Go tests**
 
 Run: `go test ./services/... -count=1 -timeout 60s`
 Expected: all PASS
 
-- [ ] **Step 2: Run Go build**
+- [x] **Step 2: Run Go build**
 
 Run: `go build .`
 Expected: success
 
-- [ ] **Step 3: Run frontend type check**
+- [x] **Step 3: Run frontend type check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 4: Run frontend tests**
+- [x] **Step 4: Run frontend tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 5: Commit if any fixup needed**
+- [x] **Step 5: Commit if any fixup needed**
 
 ```bash
 git add -A

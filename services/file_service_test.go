@@ -48,6 +48,9 @@ func TestFileService_WriteFile(t *testing.T) {
 	path := filepath.Join(dir, "out.txt")
 
 	svc := &FileService{}
+	if err := svc.SetWorkspaceRoot(dir); err != nil {
+		t.Fatalf("SetWorkspaceRoot: %v", err)
+	}
 	err := svc.WriteFile(path, "written content")
 	if err != nil {
 		t.Fatalf("WriteFile failed: %v", err)
@@ -64,6 +67,9 @@ func TestFileService_CreateFile(t *testing.T) {
 	path := filepath.Join(dir, "new.txt")
 
 	svc := &FileService{}
+	if err := svc.SetWorkspaceRoot(dir); err != nil {
+		t.Fatalf("SetWorkspaceRoot: %v", err)
+	}
 	err := svc.CreateFile(path)
 	if err != nil {
 		t.Fatalf("CreateFile failed: %v", err)
@@ -79,6 +85,9 @@ func TestFileService_CreateDirectory(t *testing.T) {
 	path := filepath.Join(dir, "a", "b", "c")
 
 	svc := &FileService{}
+	if err := svc.SetWorkspaceRoot(dir); err != nil {
+		t.Fatalf("SetWorkspaceRoot: %v", err)
+	}
 	err := svc.CreateDirectory(path)
 	if err != nil {
 		t.Fatalf("CreateDirectory failed: %v", err)
@@ -95,6 +104,9 @@ func TestFileService_DeletePath(t *testing.T) {
 	os.WriteFile(path, []byte("x"), 0644)
 
 	svc := &FileService{}
+	if err := svc.SetWorkspaceRoot(dir); err != nil {
+		t.Fatalf("SetWorkspaceRoot: %v", err)
+	}
 	err := svc.DeletePath(path)
 	if err != nil {
 		t.Fatalf("DeletePath failed: %v", err)
@@ -111,6 +123,9 @@ func TestFileService_RenamePath(t *testing.T) {
 	os.WriteFile(oldPath, []byte("x"), 0644)
 
 	svc := &FileService{}
+	if err := svc.SetWorkspaceRoot(dir); err != nil {
+		t.Fatalf("SetWorkspaceRoot: %v", err)
+	}
 	err := svc.RenamePath(oldPath, newPath)
 	if err != nil {
 		t.Fatalf("RenamePath failed: %v", err)
@@ -122,13 +137,27 @@ func TestFileService_RenamePath(t *testing.T) {
 
 // --- Path sandboxing tests ---
 
-func TestFileService_NoWorkspace_AllowsAnyPath(t *testing.T) {
+func TestFileService_NoWorkspace_RejectsWrite(t *testing.T) {
+	// prompt-6 Task 4 / BUG-M5: empty root must refuse mutations.
 	dir := t.TempDir()
 	path := filepath.Join(dir, "free.txt")
 	svc := &FileService{}
-	// No workspace root set — should allow any path
-	if err := svc.WriteFile(path, "data"); err != nil {
-		t.Fatalf("WriteFile should succeed without workspace: %v", err)
+	if err := svc.WriteFile(path, "data"); err == nil {
+		t.Fatal("WriteFile should fail without workspace root")
+	}
+	if err := svc.CreateFile(path); err == nil {
+		t.Fatal("CreateFile should fail without workspace root")
+	}
+	if err := svc.DeletePath(path); err == nil {
+		t.Fatal("DeletePath should fail without workspace root")
+	}
+	// Read remains allowed (no sandbox when root empty) for open-file UX
+	// outside a project; create a real file via os then read.
+	if werr := os.WriteFile(path, []byte("x"), 0644); werr != nil {
+		t.Fatalf("seed file: %v", werr)
+	}
+	if _, err := svc.ReadFile(path); err != nil {
+		t.Fatalf("ReadFile should still work without workspace: %v", err)
 	}
 }
 
@@ -190,17 +219,17 @@ func TestFileService_SetWorkspaceRootInvalidPath(t *testing.T) {
 	}
 }
 
-func TestFileService_SetWorkspaceRootEmptyDisables(t *testing.T) {
+func TestFileService_SetWorkspaceRootEmptyRejectsWrite(t *testing.T) {
+	// prompt-6 Task 4: clearing workspace root re-enables the empty-root write ban.
 	workspace := t.TempDir()
 	outside := t.TempDir()
 	outsideFile := filepath.Join(outside, "free.txt")
 
 	svc := &FileService{}
 	svc.SetWorkspaceRoot(workspace)
-	// Disable sandboxing
 	svc.SetWorkspaceRoot("")
-	if err := svc.WriteFile(outsideFile, "data"); err != nil {
-		t.Errorf("WriteFile should succeed after disabling workspace: %v", err)
+	if err := svc.WriteFile(outsideFile, "data"); err == nil {
+		t.Error("WriteFile should fail after clearing workspace root")
 	}
 }
 

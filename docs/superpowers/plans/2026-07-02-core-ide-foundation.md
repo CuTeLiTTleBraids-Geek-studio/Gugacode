@@ -82,7 +82,7 @@ frontend/
 - Create: `services/file_service.go`
 - Create: `services/file_service_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `services/file_service_test.go`:
 
@@ -209,12 +209,12 @@ func TestFileService_RenamePath(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./services/ -v`
 Expected: FAIL — package not found / `FileService` undefined (compilation error, no `file_service.go` yet)
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `services/file_service.go`:
 
@@ -317,12 +317,12 @@ func (f *FileService) PickDirectory() (string, error) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./services/ -v`
 Expected: PASS — all 7 tests pass (PickDirectory is not unit-tested; it requires a running GUI and is verified manually later)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/file_service.go services/file_service_test.go
@@ -337,7 +337,7 @@ git commit -m "feat: add FileService backend with file-system operations"
 - Create: `services/project_service.go`
 - Create: `services/project_service_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `services/project_service_test.go`:
 
@@ -429,12 +429,12 @@ func TestProjectService_persistsAcrossInstances(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./services/ -run ProjectService -v`
 Expected: FAIL — `ProjectService` undefined
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `services/project_service.go`:
 
@@ -567,12 +567,12 @@ func sortProjectsByRecency(projects []Project) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./services/ -run ProjectService -v`
 Expected: PASS — all 5 tests pass
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/project_service.go services/project_service_test.go
@@ -587,7 +587,7 @@ git commit -m "feat: add ProjectService backend with recent-projects persistence
 - Create: `services/settings_service.go`
 - Create: `services/settings_service_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `services/settings_service_test.go`:
 
@@ -664,7 +664,7 @@ func TestSettingsService_LoadSettings_corruptFileReturnsDefaults(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Add the test helper**
+- [x] **Step 2: Add the test helper**
 
 Append to `services/settings_service_test.go` (after the test functions above):
 
@@ -697,12 +697,12 @@ func writeCorruptSettings(t *testing.T, path string) {
 
 (Merge the `os` import into the existing import block at the top of the test file.)
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run: `go test ./services/ -run SettingsService -v`
 Expected: FAIL — `SettingsService` and `defaultSettings` undefined
 
-- [ ] **Step 4: Write minimal implementation**
+- [x] **Step 4: Write minimal implementation**
 
 Create `services/settings_service.go`:
 
@@ -785,12 +785,12 @@ func defaultSettings() Settings {
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test ./services/ -run SettingsService -v`
 Expected: PASS — all 3 tests pass
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add services/settings_service.go services/settings_service_test.go
@@ -806,7 +806,7 @@ git commit -m "feat: add SettingsService backend with JSON persistence"
 
 > **Note:** WindowService methods require a live Wails window and cannot be unit-tested in isolation. Verification is done in Task 6 when the service is wired into `main.go` and tested manually.
 
-- [ ] **Step 1: Write the implementation**
+- [x] **Step 1: Write the implementation**
 
 Create `services/window_service.go`:
 
@@ -862,12 +862,12 @@ func (w *WindowService) SetTitle(title string) {
 }
 ```
 
-- [ ] **Step 2: Verify it compiles**
+- [x] **Step 2: Verify it compiles**
 
 Run: `go build ./services/`
 Expected: builds with no errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add services/window_service.go
@@ -881,7 +881,7 @@ git commit -m "feat: add WindowService backend for native window controls"
 **Files:**
 - Modify: `main.go`
 
-- [ ] **Step 1: Update main.go to register all services and wire the window**
+- [x] **Step 1: Update main.go to register all services and wire the window**
 
 Replace the entire contents of `main.go` with:
 
@@ -959,12 +959,12 @@ func main() {
 }
 ```
 
-- [ ] **Step 2: Verify it compiles**
+- [x] **Step 2: Verify it compiles**
 
 Run: `go build ./...`
 Expected: builds with no errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add main.go
@@ -979,7 +979,7 @@ git commit -m "feat: register FileService, ProjectService, SettingsService, Wind
 - Modify: `frontend/package.json`
 - Create: `frontend/vitest.config.ts`
 
-- [ ] **Step 1: Install packages**
+- [x] **Step 1: Install packages**
 
 Run from `frontend/`:
 
@@ -988,7 +988,7 @@ npm install monaco-editor @guolao/vue-monaco-editor
 npm install -D vitest @vue/test-utils jsdom
 ```
 
-- [ ] **Step 2: Add test script to package.json**
+- [x] **Step 2: Add test script to package.json**
 
 In `frontend/package.json`, add to the `"scripts"` block:
 
@@ -997,7 +997,7 @@ In `frontend/package.json`, add to the `"scripts"` block:
 "test:watch": "vitest"
 ```
 
-- [ ] **Step 3: Create vitest config**
+- [x] **Step 3: Create vitest config**
 
 Create `frontend/vitest.config.ts`:
 
@@ -1020,12 +1020,12 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 4: Verify vitest runs (no tests yet)**
+- [x] **Step 4: Verify vitest runs (no tests yet)**
 
 Run from `frontend/`: `npx vitest run`
 Expected: "No test files found" — vitest is configured and working
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/package.json frontend/package-lock.json frontend/vitest.config.ts
@@ -1040,7 +1040,7 @@ git commit -m "chore: add Monaco editor and Vitest to frontend dependencies"
 - Create: `frontend/src/types/index.ts`
 - Create: `frontend/src/api/services.ts`
 
-- [ ] **Step 1: Create shared types**
+- [x] **Step 1: Create shared types**
 
 Create `frontend/src/types/index.ts`:
 
@@ -1073,7 +1073,7 @@ export interface Settings {
 }
 ```
 
-- [ ] **Step 2: Create API layer**
+- [x] **Step 2: Create API layer**
 
 Create `frontend/src/api/services.ts`:
 
@@ -1133,12 +1133,12 @@ export const windowService = {
 
 > **Note:** The binding files (`file_service.js`, etc.) are auto-generated. Run `wails3 dev` once (or build) after Task 5 to generate them. If the exact import path differs, adjust the `../../bindings/changeme/` prefix to match the generated structure.
 
-- [ ] **Step 3: Verify TypeScript compiles**
+- [x] **Step 3: Verify TypeScript compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors (binding files must exist — run `wails3 dev` first if they don't)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/types/index.ts frontend/src/api/services.ts
@@ -1153,7 +1153,7 @@ git commit -m "feat: add typed API layer wrapping Wails service bindings"
 - Create: `frontend/src/lib/language.ts`
 - Create: `frontend/src/lib/language.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `frontend/src/lib/language.test.ts`:
 
@@ -1206,12 +1206,12 @@ describe("detectLanguage", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run from `frontend/`: `npx vitest run src/lib/language.test.ts`
 Expected: FAIL — `detectLanguage` is not exported (module not found)
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `frontend/src/lib/language.ts`:
 
@@ -1265,12 +1265,12 @@ export function detectLanguage(filePath: string): string {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run from `frontend/`: `npx vitest run src/lib/language.test.ts`
 Expected: PASS — all 10 tests pass
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/lib/language.ts frontend/src/lib/language.test.ts
@@ -1285,7 +1285,7 @@ git commit -m "feat: add file-extension language detection utility"
 - Create: `frontend/src/stores/editor.ts`
 - Create: `frontend/src/stores/editor.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `frontend/src/stores/editor.test.ts`:
 
@@ -1372,12 +1372,12 @@ describe("editor store", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run from `frontend/`: `npx vitest run src/stores/editor.test.ts`
 Expected: FAIL — module not found
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `frontend/src/stores/editor.ts`:
 
@@ -1457,12 +1457,12 @@ export function getDirtyFiles(): OpenFile[] {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run from `frontend/`: `npx vitest run src/stores/editor.test.ts`
 Expected: PASS — all 10 tests pass
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/stores/editor.ts frontend/src/stores/editor.test.ts
@@ -1476,7 +1476,7 @@ git commit -m "feat: add editor store for open files, tabs, and dirty state"
 **Files:**
 - Modify: `frontend/src/stores/app.ts`
 
-- [ ] **Step 1: Add settings load/save to the app store**
+- [x] **Step 1: Add settings load/save to the app store**
 
 Open `frontend/src/stores/app.ts`. Add these imports at the top (after the existing `import` line):
 
@@ -1533,7 +1533,7 @@ export function openProject(name: string, path: string): void {
 }
 ```
 
-- [ ] **Step 2: Call loadSettings on app startup**
+- [x] **Step 2: Call loadSettings on app startup**
 
 Open `frontend/src/main.ts`. Add the import and call after `app.use(router)`:
 
@@ -1573,12 +1573,12 @@ loadSettings();
 app.mount("#app");
 ```
 
-- [ ] **Step 3: Verify it compiles**
+- [x] **Step 3: Verify it compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/stores/app.ts frontend/src/main.ts
@@ -1592,7 +1592,7 @@ git commit -m "feat: wire app store to SettingsService with debounced auto-save"
 **Files:**
 - Modify: `frontend/src/components/layout/TitleBar.vue`
 
-- [ ] **Step 1: Add window service calls to TitleBar**
+- [x] **Step 1: Add window service calls to TitleBar**
 
 Open `frontend/src/components/layout/TitleBar.vue`. Replace the `<script setup>` block with:
 
@@ -1639,7 +1639,7 @@ function handleClose() {
 </script>
 ```
 
-- [ ] **Step 2: Wire the template handlers**
+- [x] **Step 2: Wire the template handlers**
 
 In the same file, update the `<template>` — replace the menu buttons and window control buttons:
 
@@ -1687,12 +1687,12 @@ In the same file, update the `<template>` — replace the menu buttons and windo
     </div>
 ```
 
-- [ ] **Step 3: Verify it compiles**
+- [x] **Step 3: Verify it compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/layout/TitleBar.vue
@@ -1706,7 +1706,7 @@ git commit -m "feat: wire TitleBar window controls and menu navigation"
 **Files:**
 - Modify: `frontend/src/views/WelcomeView.vue`
 
-- [ ] **Step 1: Replace the script block**
+- [x] **Step 1: Replace the script block**
 
 Open `frontend/src/views/WelcomeView.vue`. Replace the entire `<script setup lang="ts">` block with:
 
@@ -1754,12 +1754,12 @@ function handleQuickAction(action: string) {
 </script>
 ```
 
-- [ ] **Step 2: Verify it compiles**
+- [x] **Step 2: Verify it compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/views/WelcomeView.vue
@@ -1773,7 +1773,7 @@ git commit -m "feat: wire WelcomeView Open Project to folder picker and project 
 **Files:**
 - Modify: `frontend/src/views/ProjectsView.vue`
 
-- [ ] **Step 1: Replace the script and template**
+- [x] **Step 1: Replace the script and template**
 
 Open `frontend/src/views/ProjectsView.vue`. Replace the entire `<script setup lang="ts">` block with:
 
@@ -1890,7 +1890,7 @@ Replace the `<template>` block with:
 </template>
 ```
 
-- [ ] **Step 2: Add styles for the project list**
+- [x] **Step 2: Add styles for the project list**
 
 In the same file's `<style scoped>`, replace the `.projects-grid-placeholder` and `.grid-slot` rules with:
 
@@ -1973,12 +1973,12 @@ In the same file's `<style scoped>`, replace the `.projects-grid-placeholder` an
 }
 ```
 
-- [ ] **Step 3: Verify it compiles**
+- [x] **Step 3: Verify it compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/views/ProjectsView.vue
@@ -1992,7 +1992,7 @@ git commit -m "feat: wire ProjectsView to list, open, and remove recent projects
 **Files:**
 - Create: `frontend/src/components/explorer/FileTree.vue`
 
-- [ ] **Step 1: Create the recursive file tree component**
+- [x] **Step 1: Create the recursive file tree component**
 
 Create `frontend/src/components/explorer/FileTree.vue`:
 
@@ -2147,12 +2147,12 @@ const indent = { paddingLeft: `${props.depth * 12 + 8}px` };
 </style>
 ```
 
-- [ ] **Step 2: Verify it compiles**
+- [x] **Step 2: Verify it compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/explorer/FileTree.vue
@@ -2166,7 +2166,7 @@ git commit -m "feat: add recursive FileTree component for project explorer"
 **Files:**
 - Modify: `frontend/src/components/layout/SidePanel.vue`
 
-- [ ] **Step 1: Integrate FileTree into the explorer tab**
+- [x] **Step 1: Integrate FileTree into the explorer tab**
 
 Open `frontend/src/components/layout/SidePanel.vue`. Replace the `<script setup>` block with:
 
@@ -2257,12 +2257,12 @@ Add this style inside `<style scoped>`:
 }
 ```
 
-- [ ] **Step 2: Verify it compiles**
+- [x] **Step 2: Verify it compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/layout/SidePanel.vue
@@ -2276,7 +2276,7 @@ git commit -m "feat: wire SidePanel explorer tab to FileTree component"
 **Files:**
 - Create: `frontend/src/components/editor/CodeEditor.vue`
 
-- [ ] **Step 1: Create the Monaco wrapper component**
+- [x] **Step 1: Create the Monaco wrapper component**
 
 Create `frontend/src/components/editor/CodeEditor.vue`:
 
@@ -2363,12 +2363,12 @@ watch(() => props.language, (lang) => {
 </style>
 ```
 
-- [ ] **Step 2: Verify it compiles**
+- [x] **Step 2: Verify it compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/editor/CodeEditor.vue
@@ -2382,7 +2382,7 @@ git commit -m "feat: add CodeEditor Monaco wrapper component"
 **Files:**
 - Create: `frontend/src/components/editor/TabBar.vue`
 
-- [ ] **Step 1: Create the tab bar component**
+- [x] **Step 1: Create the tab bar component**
 
 Create `frontend/src/components/editor/TabBar.vue`:
 
@@ -2501,12 +2501,12 @@ function handleClose(path: string) {
 </style>
 ```
 
-- [ ] **Step 2: Verify it compiles**
+- [x] **Step 2: Verify it compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/editor/TabBar.vue
@@ -2520,7 +2520,7 @@ git commit -m "feat: add TabBar component with dirty indicators and close button
 **Files:**
 - Modify: `frontend/src/views/EditorView.vue`
 
-- [ ] **Step 1: Replace EditorView with integrated editor**
+- [x] **Step 1: Replace EditorView with integrated editor**
 
 Open `frontend/src/views/EditorView.vue`. Replace the entire file with:
 
@@ -2675,7 +2675,7 @@ watch(
 </style>
 ```
 
-- [ ] **Step 2: Wire file selection from SidePanel to EditorView**
+- [x] **Step 2: Wire file selection from SidePanel to EditorView**
 
 Open `frontend/src/components/layout/MainLayout.vue`. Update the `<script setup>` and the center area to pass the `file-select` event through:
 
@@ -2748,12 +2748,12 @@ function handleFileSelect(path: string) {
 
 And in `EditorView.vue`, remove the now-unused `handleFileSelect` function (the store handles it). The `TabBar` `@select` and `@close` handlers stay.
 
-- [ ] **Step 3: Verify it compiles**
+- [x] **Step 3: Verify it compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/views/EditorView.vue frontend/src/components/layout/MainLayout.vue frontend/src/components/layout/SidePanel.vue frontend/src/stores/editor.ts
@@ -2767,7 +2767,7 @@ git commit -m "feat: integrate Monaco editor with tab bar and file explorer"
 **Files:**
 - Modify: `frontend/src/components/layout/StatusBar.vue`
 
-- [ ] **Step 1: Update StatusBar to reflect real editor state**
+- [x] **Step 1: Update StatusBar to reflect real editor state**
 
 Open `frontend/src/components/layout/StatusBar.vue`. Replace the `<script setup>` block with:
 
@@ -2820,12 +2820,12 @@ Update the template's right side to hide cursor info when no file is open:
     </div>
 ```
 
-- [ ] **Step 2: Verify it compiles**
+- [x] **Step 2: Verify it compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/layout/StatusBar.vue
@@ -2838,22 +2838,22 @@ git commit -m "feat: wire StatusBar to real editor cursor position and language"
 
 **Files:** None (verification only)
 
-- [ ] **Step 1: Run all Go tests**
+- [x] **Step 1: Run all Go tests**
 
 Run from project root: `go test ./services/ -v`
 Expected: all FileService, ProjectService, SettingsService tests PASS
 
-- [ ] **Step 2: Run all frontend tests**
+- [x] **Step 2: Run all frontend tests**
 
 Run from `frontend/`: `npx vitest run`
 Expected: all language detection and editor store tests PASS
 
-- [ ] **Step 3: Verify TypeScript compiles**
+- [x] **Step 3: Verify TypeScript compiles**
 
 Run from `frontend/`: `npx vue-tsc --noEmit`
 Expected: no errors
 
-- [ ] **Step 4: Start dev mode and manually verify**
+- [x] **Step 4: Start dev mode and manually verify**
 
 Run from project root: `wails3 dev`
 
@@ -2875,7 +2875,7 @@ Manual test checklist:
 15. Navigate to Projects → recent project appears in the list
 16. Remove a project from the list → it disappears
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git add -A

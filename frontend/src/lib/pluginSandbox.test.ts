@@ -4,7 +4,6 @@ import {
   hasPermissionForMethod,
   type WorkerLike,
   type RpcHandler,
-  type RpcMethod,
   type WorkerToHostMessage,
   type HostToWorkerMessage,
 } from "./pluginSandbox";

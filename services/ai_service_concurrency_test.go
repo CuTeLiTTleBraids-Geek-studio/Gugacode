@@ -26,13 +26,16 @@ func TestAIService_N93_SetConfig_ConcurrentReaders_NoRace(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; atomic.LoadInt32(&stop) == 0; i++ {
-			svc.SetConfig(AIConfig{
-				APIKey:        "key-" + string(rune('a'+(i%26))),
-				Model:         "model-" + string(rune('a'+(i%26))),
-				SystemPrompt:  "prompt variant",
-				MaxTokens:     100 + (i % 50),
-				ContextWindow: 8000 + (i % 100),
-			})
+			if err := svc.SetConfig(AIConfig{
+			APIKey:        "key-" + string(rune('a'+(i%26))),
+			Model:         "model-" + string(rune('a'+(i%26))),
+			SystemPrompt:  "prompt variant",
+			MaxTokens:     100 + (i % 50),
+			ContextWindow: 8000 + (i % 100),
+		}); err != nil {
+			t.Errorf("SetConfig failed: %v", err)
+			return
+		}
 		}
 	}()
 
@@ -69,10 +72,12 @@ func TestAIService_N93_SetConfig_ConcurrentReaders_NoRace(t *testing.T) {
 // cannot affect the in-flight request.
 func TestAIService_N93_Snapshot_IsStableAfterSetConfig(t *testing.T) {
 	svc := NewAIService()
-	svc.SetConfig(AIConfig{
+	if err := svc.SetConfig(AIConfig{
 		APIKey: "original-key",
 		Model:  "original-model",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	// Take a snapshot.
 	snap := svc.snapshot()
@@ -81,10 +86,12 @@ func TestAIService_N93_Snapshot_IsStableAfterSetConfig(t *testing.T) {
 	}
 
 	// Mutate the service's config.
-	svc.SetConfig(AIConfig{
+	if err := svc.SetConfig(AIConfig{
 		APIKey: "new-key",
 		Model:  "new-model",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	// The previously-taken snapshot must be unchanged.
 	if snap.config.APIKey != "original-key" {
@@ -160,24 +167,28 @@ func TestAIService_N93_StartStream_UsesSnapshotNotLiveConfig(t *testing.T) {
 
 	svc := NewAIService()
 	svc.SetApp(app)
-	svc.SetConfig(AIConfig{
+	if err := svc.SetConfig(AIConfig{
 		APIKey:  "snapshot-key",
 		BaseURL: srv.URL,
 		Model:   "test-model",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	// Start the stream (uses snapshot with snapshot-key).
-	if err := svc.StartStream([]ChatMessage{{Role: "user", Content: "hello"}}); err != nil {
+	if _, err := svc.StartStream([]ChatMessage{{Role: "user", Content: "hello"}}); err != nil {
 		t.Fatalf("StartStream failed: %v", err)
 	}
 
 	// Immediately mutate the API key. The in-flight stream should still
 	// use the snapshot's key ("snapshot-key"), not "mutated-key".
-	svc.SetConfig(AIConfig{
+	if err := svc.SetConfig(AIConfig{
 		APIKey:  "mutated-key",
 		BaseURL: srv.URL,
 		Model:   "test-model",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	// Wait for the server to receive the request.
 	deadline := time.Now().Add(2 * time.Second)
@@ -211,11 +222,13 @@ func TestAIService_N93_StopStream_ConcurrentStartStop_NoRace(t *testing.T) {
 
 	svc := NewAIService()
 	svc.SetApp(app)
-	svc.SetConfig(AIConfig{
+	if err := svc.SetConfig(AIConfig{
 		APIKey:  "test-key",
 		BaseURL: srv.URL,
 		Model:   "test-model",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	var stop int32
 	var wg sync.WaitGroup
@@ -225,7 +238,7 @@ func TestAIService_N93_StopStream_ConcurrentStartStop_NoRace(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for atomic.LoadInt32(&stop) == 0 {
-			_ = svc.StartStream([]ChatMessage{{Role: "user", Content: "x"}})
+			_, _ = svc.StartStream([]ChatMessage{{Role: "user", Content: "x"}})
 			time.Sleep(2 * time.Millisecond)
 		}
 	}()

@@ -23,12 +23,18 @@
 //     { type: "nknk:log", level, message }
 //
 // Security:
-//   - iframe has `sandbox="allow-scripts allow-same-origin"` (no forms,
-//     no top navigation, no popup, no pointer lock).
-//   - Origin check on every message: only same-origin messages are accepted.
+//   - iframe has `sandbox="allow-scripts"` (no allow-same-origin, no forms,
+//     no top navigation, no popup, no pointer lock). Without allow-same-origin
+//     the iframe gets an opaque origin and cannot remove its own sandbox or
+//     reach parent.window.go bindings directly.
+//   - Source check on every message: only messages whose `event.source`
+//     matches the iframe's `contentWindow` are accepted. Origin-string checks
+//     are unsafe here because sandboxed iframes without allow-same-origin
+//     emit `origin: "null"`, which can be spoofed.
 //   - Permission check on every RPC: METHOD_PERMISSIONS gate.
-//   - The iframe cannot access the parent's DOM, localStorage, or
-//     cookies directly — only via the postMessage RPC bridge.
+//   - With only `allow-scripts`, the iframe cannot access the parent's DOM,
+//     localStorage, cookies, or parent.window bindings — only via the
+//     postMessage RPC bridge.
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import type { PluginManifest } from "@/types";
 import { errorMessage } from "@/lib/errors";
@@ -62,12 +68,12 @@ interface PendingCall {
 const pendingCalls = new Map<number, PendingCall>();
 let nextCallId = 1;
 
-// Validate message origin — only same-origin (or null for sandboxed iframes
-// with allow-same-origin) messages are accepted.
-function isAllowedOrigin(origin: string): boolean {
-  // Same-origin check. For sandboxed iframes with allow-same-origin,
-  // origin matches window.location.origin.
-  return origin === window.location.origin || origin === "null";
+// Validate message source — only messages from the iframe's own
+// contentWindow are accepted. Using `event.source` is safer than
+// checking `event.origin`, because a sandboxed iframe without
+// allow-same-origin emits `origin: "null"` which any document can spoof.
+function isAllowedOrigin(event: MessageEvent): boolean {
+  return event.source === iframeEl.value?.contentWindow;
 }
 
 async function handleRpcRequest(id: number, method: RpcMethod, args: unknown[]): Promise<void> {
@@ -94,7 +100,7 @@ function sendToIframe(msg: unknown): void {
 }
 
 function onMessage(event: MessageEvent): void {
-  if (!isAllowedOrigin(event.origin)) return;
+  if (!isAllowedOrigin(event)) return;
   const data = event.data;
   if (!data || typeof data !== "object") return;
   const msg = data as { type?: string };
@@ -176,7 +182,7 @@ defineExpose({ callIframeMethod, isReady, lastError });
       ref="iframeEl"
       :src="iframeSrc"
       :title="title"
-      sandbox="allow-scripts allow-same-origin"
+      sandbox="allow-scripts"
       class="plugin-view-iframe__el"
     />
   </div>

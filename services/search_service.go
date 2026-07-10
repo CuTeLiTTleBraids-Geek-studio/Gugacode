@@ -232,7 +232,7 @@ func (s *SearchService) Replace(filePath string, pattern string, replacement str
 	})
 
 	if count > 0 {
-		if err := os.WriteFile(filePath, []byte(newContent), 0644); err != nil {
+		if err := atomicWriteFile(filePath, []byte(newContent), 0644); err != nil {
 			return nil, err
 		}
 	}

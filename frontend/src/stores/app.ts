@@ -1,7 +1,7 @@
 import { reactive, computed, watch } from "vue";
 import { Events } from "@wailsio/runtime";
 import { settingsService, windowService } from "@/api/services";
-import type { Settings, ShortcutKeys, ToolApprovalConfig, CustomAccentTheme, AIProviderConfig } from "@/types";
+import type { Settings, ShortcutKeys, ToolApprovalConfig, CustomAccentTheme, AIProviderConfig, PersonalizationConfig } from "@/types";
 import type { AccentTheme } from "@/lib/monaco-themes";
 import { accentThemes, applyMonacoTheme, applyMonacoThemeForMode, registerAllThemes, registerCustomTheme } from "@/lib/monaco-themes";
 import { PROVIDER_PRESETS } from "@/lib/aiProviders";
@@ -14,12 +14,16 @@ import {
 } from "@/composables/useKeyboard";
 // Plan 57 / N-23: theme editor functions extracted to a dedicated module.
 import {
-  deriveAccentTokens,
   applyCustomAccentTokens,
   clearCustomAccentTokens,
-  serializeCustomAccent,
-  deserializeCustomAccent,
 } from "@/stores/themeEditor";
+// prompt-6 Task 1: dual-window settings sync origin.
+import {
+  getWindowOriginId,
+  unwrapEventData,
+  parseSyncOrigin,
+} from "@/lib/windowOrigin";
+// Re-export theme editor helpers for settings/UI consumers.
 export {
   deriveAccentTokens,
   serializeCustomAccent,
@@ -28,12 +32,17 @@ export {
 
 export type PanelTab = "explorer" | "search" | "git" | "extensions" | "ai";
 export type ThemeMode = "dark" | "light" | "system";
+// G-VSC-01: sub-view of the "extensions" activity tab. "installed" shows the
+// unified plugin/extension management panel (G-VSC-04); "marketplace" shows
+// the Open VSX search/browse/install panel (G-VSC-01).
+export type ExtensionsSubview = "installed" | "marketplace";
 
 export interface AppState {
   sidebarCollapsed: boolean;
   sidebarWidth: number;
   activityBarWidth: number;
   panelTab: PanelTab;
+  extensionsSubview: ExtensionsSubview;
   terminalVisible: boolean;
   terminalHeight: number;
   aiChatVisible: boolean;
@@ -63,10 +72,18 @@ export interface AppState {
   warnings: number;
   cursorLine: number;
   cursorColumn: number;
+  /** prompt-10 10-D: bump to force Monaco jump (Problems / search). */
+  editorJumpSeq: number;
   encoding: string;
   languageMode: string;
   // AI config
   aiApiKey: string;
+  // G-SEC-07: aiApiKey is no longer populated from LoadSettings (the backend
+  // clears it). aiApiKeyConfigured signals whether a key is stored on disk;
+  // aiApiKeyStorageMethod labels how it is stored. The plaintext key is kept
+  // out of the JS heap where feasible.
+  aiApiKeyConfigured: boolean;
+  aiApiKeyStorageMethod: string;
   aiBaseUrl: string;
   aiModel: string;
   aiSystemPrompt: string;
@@ -112,6 +129,21 @@ export interface AppState {
   // N-152: 窗口是否已最大化。标题栏据此切换放大 ↔ 还原图标。
   // 由 main.go 的 window:maximised 事件驱动，初始化时从后端查询。
   isWindowMaximised: boolean;
+  // G-FEAT-03: which bottom-panel tab to focus after a toolchain run.
+  // Empty string means "don't change". TerminalPanel watches this and
+  // switches its activeView when it changes to a known value.
+  bottomPanelView: "terminal" | "output" | "problems" | "tasks" | "workflows" | "";
+  // G-FEAT-03: toolchain binary path overrides, mirrored from settings so
+  // they round-trip through save and are pushed to the backend on load.
+  toolPaths: Record<string, string>;
+  // Plan 11 Task 15: personalization config (background images, avatars, fonts, bubble styles).
+  personalization: PersonalizationConfig;
+  // prompt-5 Task C / BUG-L6: open AI companion window on app startup.
+  openAIWindowOnStartup: boolean;
+  /** prompt-9 9-A: format via LSP before save. */
+  formatOnSave: boolean;
+  /** prompt-7 Task F: last known settings.json version for CAS. */
+  settingsVersion: number;
 }
 
 export const appState = reactive<AppState>({
@@ -119,6 +151,7 @@ export const appState = reactive<AppState>({
   sidebarWidth: 260,
   activityBarWidth: 48,
   panelTab: "explorer",
+  extensionsSubview: "installed",
   terminalVisible: true,
   terminalHeight: 220,
   aiChatVisible: false,
@@ -146,9 +179,13 @@ export const appState = reactive<AppState>({
   warnings: 0,
   cursorLine: 1,
   cursorColumn: 1,
+  editorJumpSeq: 0,
   encoding: "UTF-8",
   languageMode: "TypeScript",
   aiApiKey: "",
+  // G-SEC-07: presence flag + storage method replace holding the plaintext key.
+  aiApiKeyConfigured: false,
+  aiApiKeyStorageMethod: "none",
   aiBaseUrl: "https://api.openai.com",
   aiModel: "gpt-4o",
   aiSystemPrompt: "",
@@ -181,6 +218,24 @@ export const appState = reactive<AppState>({
   activeAIConfigId: "",
   // N-152: 初始假设未最大化，initWindowMaximiseListener 会从后端同步真实状态。
   isWindowMaximised: false,
+  // G-FEAT-03: no panel-view override until a toolchain run sets one.
+  bottomPanelView: "",
+  // G-FEAT-03: empty until LoadSettings populates it.
+  toolPaths: {},
+  // prompt-5 Task C: default off — user opens AI window on demand.
+  openAIWindowOnStartup: false,
+  formatOnSave: true,
+  settingsVersion: 0,
+  // Plan 11 Task 15: personalization defaults (empty = no background/avatar override).
+  personalization: {
+    codeEditorBgOpacity: 0,
+    codeEditorBgBlur: 0,
+    chatBgOpacity: 0,
+    chatBgBlur: 0,
+    bubbleStyle: "rounded",
+    bubbleOpacity: 1,
+    messageSpacing: 12,
+  } as PersonalizationConfig,
 });
 
 export const isEditorReady = computed(() => appState.currentProject !== null);
@@ -428,11 +483,19 @@ export function setPanelTab(tab: PanelTab) {
   appState.panelTab = tab;
 }
 
+// G-VSC-01: switch the extensions tab between "installed" management and
+// "marketplace" browse/install. Used by the SidePanel sub-tab toggle and the
+// "Browse Marketplace" command palette entry.
+export function setExtensionsSubview(view: ExtensionsSubview) {
+  appState.extensionsSubview = view;
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 export async function loadSettings(): Promise<void> {
   try {
     const settings = await settingsService.loadSettings();
+    appState.settingsVersion = settings.version ?? 0;
     appState.language = settings.language;
     appState.theme = settings.theme;
     appState.fontSize = settings.fontSize;
@@ -441,7 +504,13 @@ export async function loadSettings(): Promise<void> {
     appState.wordWrap = settings.wordWrap;
     appState.lineNumbers = settings.lineNumbers;
     appState.minimap = settings.minimap;
-    appState.aiApiKey = settings.aiApiKey;
+    // G-SEC-07: the backend no longer returns the decrypted key, neither in
+    // the legacy field nor in aiProviderConfigs (apiKey is stripped to "").
+    // Track presence via the boolean + storage method. appState.aiApiKey
+    // stays empty - AI calls use useStoredKey=true instead.
+    appState.aiApiKey = "";
+    appState.aiApiKeyConfigured = settings.aiApiKeyConfigured ?? false;
+    appState.aiApiKeyStorageMethod = settings.aiApiKeyStorageMethod ?? "none";
     appState.aiBaseUrl = settings.aiBaseUrl;
     appState.aiModel = settings.aiModel;
     appState.aiSystemPrompt = settings.aiSystemPrompt;
@@ -464,6 +533,8 @@ export async function loadSettings(): Promise<void> {
     appState.uiDensity = settings.uiDensity;
     appState.fontSizeScaling = settings.fontSizeScaling;
     appState.inlineCompletionEnabled = settings.inlineCompletionEnabled;
+    // prompt-9 9-A: default true when field missing (legacy settings.json).
+    appState.formatOnSave = settings.formatOnSave !== false;
     // N-8: hydrate custom shortcut overrides into useKeyboard and mirror in
     // appState for reactivity.
     const custom = settings.customShortcuts ?? {};
@@ -499,6 +570,25 @@ export async function loadSettings(): Promise<void> {
       appState.aiProviderConfigs = [migrated];
       appState.activeAIConfigId = migrated.id;
     }
+    // G-SEC-07: the backend no longer returns plaintext keys in aiProviderConfigs
+    // (apiKey is stripped to "", apiKeyConfigured signals presence). The legacy
+    // appState.aiApiKey stays empty - AI calls use useStoredKey=true instead.
+    appState.aiApiKey = "";
+    // G-FEAT-03: mirror tool path overrides into appState (for round-trip
+    // save) and push them to the backend ToolchainService.
+    appState.toolPaths = { ...(settings.toolPaths ?? {}) };
+    // Plan 11 Task 15: mirror personalization config into appState.
+    if (settings.personalization) {
+      appState.personalization = { ...appState.personalization, ...settings.personalization };
+    }
+    // prompt-5 Task C: AI companion window on startup (default false).
+    appState.openAIWindowOnStartup = settings.openAIWindowOnStartup === true;
+    try {
+      const { toolchainService } = await import("@/api/services");
+      void toolchainService.setToolPaths(appState.toolPaths);
+    } catch {
+      // Backend may be unavailable in test/jsdom; ignore.
+    }
   } catch (e) {
     console.error("Failed to load settings:", e);
     notifyError(translate("settings.loadFailed", { error: e instanceof Error ? e.message : String(e) }));
@@ -509,6 +599,9 @@ export function saveSettings(): void {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     const settings: Settings = {
+      // prompt-7 Task F: CAS token + version round-trip.
+      expectedVersion: appState.settingsVersion > 0 ? appState.settingsVersion : undefined,
+      version: appState.settingsVersion,
       language: appState.language,
       theme: appState.theme,
       fontSize: appState.fontSize,
@@ -518,6 +611,10 @@ export function saveSettings(): void {
       lineNumbers: appState.lineNumbers,
       minimap: appState.minimap,
       aiApiKey: appState.aiApiKey,
+      // G-SEC-07: signal whether a key is stored so the backend preserves it
+      // when aiApiKey is empty (unrelated saves no longer wipe the key).
+      aiApiKeyConfigured: appState.aiApiKeyConfigured,
+      aiApiKeyStorageMethod: appState.aiApiKeyStorageMethod,
       aiBaseUrl: appState.aiBaseUrl,
       aiModel: appState.aiModel,
       aiSystemPrompt: appState.aiSystemPrompt,
@@ -540,6 +637,7 @@ export function saveSettings(): void {
       uiDensity: appState.uiDensity,
       fontSizeScaling: appState.fontSizeScaling,
       inlineCompletionEnabled: appState.inlineCompletionEnabled,
+      formatOnSave: appState.formatOnSave,
       // N-8: pull the live customizations from useKeyboard so the persisted
       // snapshot reflects the current bindings even if appState.customShortcuts
       // hasn't been re-synced.
@@ -559,15 +657,87 @@ export function saveSettings(): void {
       // Multi-provider AI configs (CC Switch-style).
       aiProviderConfigs: appState.aiProviderConfigs,
       activeAIConfigId: appState.activeAIConfigId,
+      // G-FEAT-03: toolchain binary path overrides.
+      toolPaths: { ...appState.toolPaths },
+      // Plan 11 Task 15: personalization config.
+      personalization: { ...appState.personalization },
+      // prompt-5 Task C: AI companion window on startup.
+      openAIWindowOnStartup: appState.openAIWindowOnStartup,
     };
     try {
       await settingsService.saveSettings(settings);
+      // Optimistic version bump; peer reload is SSOT.
+      appState.settingsVersion =
+        appState.settingsVersion > 0 ? appState.settingsVersion + 1 : 1;
+      // prompt-6 Task 1: notify peer webviews (AI window / main) to reload.
+      try {
+        void Events.Emit("settings:changed", {
+          origin: getWindowOriginId(),
+          version: appState.settingsVersion,
+          at: Date.now(),
+        });
+      } catch {
+        // Events may be unavailable in unit tests.
+      }
     } catch (e) {
       console.error("Failed to save settings:", e);
-      notifyError(translate("settings.saveFailed", { error: e instanceof Error ? e.message : String(e) }));
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/settings version conflict|version conflict/i.test(msg)) {
+        notifyError(
+          translate("settings.versionConflict"),
+          translate("settings.versionConflictTitle"),
+        );
+        void loadSettings();
+      } else {
+        notifyError(translate("settings.saveFailed", { error: msg }));
+      }
     }
   }, 500);
 }
+
+// prompt-6 Task 1: listen for peer settings saves and re-hydrate appState.
+let settingsSyncListenerRegistered = false;
+let settingsSyncCancel: (() => void) | null = null;
+/** Prevent re-entrancy when loadSettings triggers another save path. */
+let applyingRemoteSettings = false;
+
+export function initSettingsSyncListener(): void {
+  if (settingsSyncListenerRegistered) return;
+  settingsSyncListenerRegistered = true;
+  try {
+    settingsSyncCancel = Events.On("settings:changed", (event: unknown) => {
+      const payload = unwrapEventData(event);
+      const origin = parseSyncOrigin(payload);
+      if (origin && origin === getWindowOriginId()) return;
+      if (applyingRemoteSettings) return;
+      applyingRemoteSettings = true;
+      void loadSettings()
+        .catch(() => {
+          /* best-effort */
+        })
+        .finally(() => {
+          applyingRemoteSettings = false;
+        });
+    });
+  } catch {
+    settingsSyncListenerRegistered = false;
+  }
+}
+
+export function cleanupSettingsSyncListener(): void {
+  if (settingsSyncCancel) {
+    try {
+      settingsSyncCancel();
+    } catch {
+      /* ignore */
+    }
+    settingsSyncCancel = null;
+  }
+  settingsSyncListenerRegistered = false;
+}
+
+// Register at module load so both main and AI windows pick up peer changes.
+initSettingsSyncListener();
 
 /**
  * Migrate legacy single-config AI settings into a CC Switch-style config entry.
@@ -607,8 +777,11 @@ export function activateAIConfig(id: string): void {
   const cfg = appState.aiProviderConfigs.find((c) => c.id === id);
   if (!cfg) return;
   appState.activeAIConfigId = id;
-  // Mirror into legacy fields so sendMessage / aiService.setConfig pick them up.
-  appState.aiApiKey = cfg.apiKey;
+  // G-SEC-07: the backend strips apiKey from configs. Keep aiApiKey empty
+  // (plaintext never lives in the JS heap). apiKeyConfigured signals whether
+  // a key is stored on disk for this config.
+  appState.aiApiKey = "";
+  appState.aiApiKeyConfigured = !!cfg.apiKeyConfigured;
   appState.aiBaseUrl = cfg.baseUrl;
   appState.aiModel = cfg.model;
   appState.aiProvider = cfg.provider;
@@ -683,4 +856,12 @@ export function activeAIConfig(): AIProviderConfig | undefined {
 export function openProject(name: string, path: string): void {
   appState.currentProject = path;
   appState.projectName = name;
+  // prompt-4 Task 10: 打开项目时同步快照工作区根，激活智能回滚。
+  void import("@/stores/snapshot").then(({ setSnapshotWorkspaceRoot }) => {
+    setSnapshotWorkspaceRoot(path);
+  });
+  // 同步加载工作流（若 store 已就绪）
+  void import("@/stores/workflows").then(({ loadWorkflows }) => {
+    void loadWorkflows(path);
+  });
 }

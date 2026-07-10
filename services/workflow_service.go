@@ -15,6 +15,9 @@ import (
 // Steps can depend on other steps via dependsOn, enabling build → test →
 // deploy pipelines. The condition field (optional) is a shell command that
 // must exit 0 for the step to run; a non-zero exit skips the step.
+//
+// Plan 11 Task 11 Step 1: extended with Type (command/ai/git/file/mcp/skill),
+// OnFailure (abort/continue/skip/retry), and Timeout.
 type WorkflowStep struct {
 	Name      string   `json:"name" yaml:"name"`
 	Command   string   `json:"command" yaml:"command"`
@@ -27,15 +30,50 @@ type WorkflowStep struct {
 	// treats it as true — failures are fatal. Set to false to allow a
 	// step to fail without blocking subsequent steps (Plan 61 / N-24).
 	ExpectSuccess *bool `json:"expectSuccess,omitempty" yaml:"expectSuccess,omitempty"`
+	// Plan 11 Task 11 Step 1: Type specifies the step kind.
+	// Supported: "command" (default), "ai", "git", "file", "mcp", "skill".
+	Type     WorkflowStepType `json:"type,omitempty" yaml:"type,omitempty"`
+	// Plan 11 Task 11 Step 1: OnFailure controls behavior when the step fails.
+	// Supported: "abort" (default), "continue", "skip", "retry".
+	OnFailure OnFailureAction `json:"onFailure,omitempty" yaml:"onFailure,omitempty"`
+	// Plan 11 Task 11 Step 1: Timeout is the maximum execution time in seconds.
+	// 0 means no timeout.
+	Timeout int `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 }
+
+// WorkflowStepType specifies the kind of a workflow step (Step 1).
+type WorkflowStepType string
+
+const (
+	WorkflowStepCommand WorkflowStepType = "command" // shell command (default)
+	WorkflowStepAI      WorkflowStepType = "ai"       // AI generate/review/commit-msg (Step 4)
+	WorkflowStepGit     WorkflowStepType = "git"       // git operation
+	WorkflowStepFile    WorkflowStepType = "file"      // file read/write
+	WorkflowStepMCP     WorkflowStepType = "mcp"        // MCP tool call
+	WorkflowStepSkill   WorkflowStepType = "skill"     // Skills system
+)
+
+// OnFailureAction controls step failure behavior (Step 1).
+type OnFailureAction string
+
+const (
+	OnFailureAbort    OnFailureAction = "abort"    // abort entire workflow (default)
+	OnFailureContinue OnFailureAction = "continue" // continue to next step
+	OnFailureSkip     OnFailureAction = "skip"     // skip dependent steps
+	OnFailureRetry    OnFailureAction = "retry"    // retry the step
+)
 
 // WorkflowTrigger describes an event that auto-runs a workflow (Proposal B).
 // When the event fires and the changed file matches Glob, the workflow is
 // triggered automatically. Supported events: "file-saved", "startup",
 // "workflow-completed" (Proposal R / N-58).
+//
+// Plan 11 Task 11 Step 2: extended with Condition (branch/language/glob)
+// and additional runOn events (fileChange/manual/schedule/shortcut).
 type WorkflowTrigger struct {
 	// Event is the trigger event name. Supported: "file-saved",
 	// "startup", "workflow-completed".
+	// Plan 11 Task 11 Step 2: also "fileChange", "manual", "schedule", "shortcut".
 	Event string `json:"event,omitempty" yaml:"event,omitempty"`
 	// Glob is a glob pattern matched against the file path relative to
 	// the project root (forward slashes). Supports "*" within a segment
@@ -47,6 +85,22 @@ type WorkflowTrigger struct {
 	// Empty means any workflow completion triggers this workflow.
 	// Proposal R / N-58.
 	WorkflowName string `json:"workflowName,omitempty" yaml:"workflowName,omitempty"`
+	// Plan 11 Task 11 Step 2: Condition restricts when the trigger fires.
+	// Branch matches git branch name; Language matches file language.
+	Condition *WorkflowTriggerCondition `json:"condition,omitempty" yaml:"condition,omitempty"`
+}
+
+// WorkflowTriggerCondition restricts when a trigger fires (Step 2).
+type WorkflowTriggerCondition struct {
+	// Branch is a glob pattern matched against the current git branch.
+	// Empty matches all branches.
+	Branch string `json:"branch,omitempty" yaml:"branch,omitempty"`
+	// Language is a language ID (e.g. "go", "typescript") matched against
+	// the changed file's language. Empty matches all languages.
+	Language string `json:"language,omitempty" yaml:"language,omitempty"`
+	// FileGlob is an additional glob pattern for file matching (alias
+	// for Glob on the trigger, allowing more complex conditions).
+	FileGlob string `json:"fileGlob,omitempty" yaml:"fileGlob,omitempty"`
 }
 
 // WorkflowDef describes a multi-step workflow loaded from
@@ -62,8 +116,15 @@ type WorkflowDef struct {
 	// RunOn, when set, auto-triggers the workflow on an IDE event
 	// (e.g. file-saved). The frontend listens for the event and matches
 	// the changed file path against RunOn.Glob (Proposal B).
-	RunOn       *WorkflowTrigger `json:"runOn,omitempty" yaml:"runOn,omitempty"`
-	Source      string          `json:"source" yaml:"-"` // relative file path
+	RunOn *WorkflowTrigger `json:"runOn,omitempty" yaml:"runOn,omitempty"`
+	// G-SEC-03: RequiresConfirmation indicates the workflow needs explicit
+	// user approval before execution. Project-level workflows (.nknk/) default
+	// to true so that untrusted startup workflows in cloned repositories cannot
+	// auto-run shell commands. The flag is forced true for project sources
+	// regardless of the file's explicit setting so a malicious repo cannot
+	// bypass the confirmation gate.
+	RequiresConfirmation bool `json:"requiresConfirmation,omitempty" yaml:"requiresConfirmation,omitempty"`
+	Source               string `json:"source" yaml:"-"` // relative file path
 }
 
 // WorkflowService loads workflow definitions from the project's
@@ -76,10 +137,15 @@ type WorkflowService struct{}
 // "file-saved" triggers when a matching file is saved (Proposal B).
 // "startup" triggers once at IDE startup (Proposal J).
 // "workflow-completed" triggers when another workflow finishes (Proposal R).
+// Plan 11 Task 11 Step 2: added fileChange/manual/schedule/shortcut.
 var allowedRunOnEvents = map[string]bool{
 	"file-saved":         true,
 	"startup":            true,
 	"workflow-completed": true,
+	"fileChange":         true,
+	"manual":             true,
+	"schedule":           true,
+	"shortcut":           true,
 }
 
 // WorkflowValidationError describes a single validation problem found in
@@ -154,7 +220,7 @@ func (s *WorkflowService) ValidateWorkflow(wf *WorkflowDef) WorkflowValidationRe
 		if !allowedRunOnEvents[wf.RunOn.Event] {
 			errs = append(errs, WorkflowValidationError{
 				Field:   "runOn.event",
-				Message: fmt.Sprintf("unknown runOn event %q (allowed: file-saved, startup, workflow-completed)", wf.RunOn.Event),
+				Message: fmt.Sprintf("unknown runOn event %q (allowed: file-saved, startup, workflow-completed, fileChange, manual, schedule, shortcut)", wf.RunOn.Event),
 			})
 		}
 	}
@@ -165,11 +231,31 @@ func (s *WorkflowService) ValidateWorkflow(wf *WorkflowDef) WorkflowValidationRe
 			Message: depErr.Error(),
 		})
 	}
+	// G-SEC-03: Project-level workflows (.nknk/) require explicit user
+	// confirmation before execution. This is forced on regardless of the
+	// file's explicit setting so a malicious cloned repo cannot bypass the
+	// confirmation gate by setting requiresConfirmation: false. Startup
+	// workflows in particular must never auto-execute.
+	if isProjectSource(wf.Source) {
+		wf.RequiresConfirmation = true
+	}
 	return WorkflowValidationResult{
 		WorkflowName: wf.Name,
 		Valid:        len(errs) == 0,
 		Errors:       errs,
 	}
+}
+
+// isProjectSource returns true if the workflow was loaded from the project's
+// .nknk/workflows directory. Such workflows are untrusted (G-SEC-03) because
+// they ship with the repository and may be malicious. The check normalizes
+// path separators so it works on all platforms.
+func isProjectSource(source string) bool {
+	if source == "" {
+		return false
+	}
+	norm := strings.ReplaceAll(source, "\\", "/")
+	return strings.HasPrefix(norm, ".nknk/workflows")
 }
 
 // ValidateAllWorkflows validates a slice of workflows and returns a result
@@ -179,6 +265,21 @@ func (s *WorkflowService) ValidateAllWorkflows(wfs []WorkflowDef) []WorkflowVali
 	out := make([]WorkflowValidationResult, len(wfs))
 	for i := range wfs {
 		out[i] = s.ValidateWorkflow(&wfs[i])
+	}
+	return out
+}
+
+// PendingStartupWorkflows returns workflows with runOn.event == "startup"
+// that require explicit user confirmation before execution (G-SEC-03). These
+// workflows must NOT be auto-executed on project load; the UI should list
+// them as "Pending Confirmation" and require the user to click "Run".
+func (s *WorkflowService) PendingStartupWorkflows(wfs []WorkflowDef) []WorkflowDef {
+	var out []WorkflowDef
+	for i := range wfs {
+		wf := wfs[i]
+		if wf.RunOn != nil && wf.RunOn.Event == "startup" {
+			out = append(out, wf)
+		}
 	}
 	return out
 }
@@ -244,6 +345,11 @@ func (s *WorkflowService) LoadWorkflows(projectRoot string) ([]WorkflowDef, erro
 			continue
 		}
 		wf.Source = filepath.Join(".nknk", "workflows", entry.Name())
+		// G-SEC-03: all workflows loaded from .nknk/workflows are
+		// project-level and therefore untrusted. Mark them as requiring
+		// explicit user confirmation so the frontend does not auto-run
+		// startup triggers without the user's consent.
+		wf.RequiresConfirmation = true
 		out = append(out, *wf)
 	}
 	return out, nil
@@ -389,4 +495,237 @@ func (s WorkflowStep) ComposeStepCommandLine() string {
 		out += " " + shellQuote(a)
 	}
 	return out
+}
+
+// ---- prompt-4 Task 12: 软件内创建 / 保存 / 删除 / 重命名工作流 ----
+
+// sanitizeWorkflowName validates and cleans a workflow name for use as a
+// flat filename stem under .nknk/workflows/. Rejects path traversal and
+// empty names (G-SEC-06 / IsRelativePathSafe).
+func sanitizeWorkflowName(name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", fmt.Errorf("workflow name is required")
+	}
+	// Strip extension if the UI passed one.
+	ext := strings.ToLower(filepath.Ext(name))
+	if hasWorkflowExt(ext) {
+		name = strings.TrimSuffix(name, ext)
+	}
+	if err := ValidateNameForFlatDir(name); err != nil {
+		return "", fmt.Errorf("invalid workflow name: %w", err)
+	}
+	return name, nil
+}
+
+// workflowPath returns the absolute path for a workflow YAML file, validated
+// to stay within projectRoot/.nknk/workflows/.
+func workflowPath(projectRoot, name string) (string, error) {
+	safe, err := sanitizeWorkflowName(name)
+	if err != nil {
+		return "", err
+	}
+	if projectRoot == "" {
+		return "", fmt.Errorf("projectRoot is required")
+	}
+	dir := filepath.Join(projectRoot, ".nknk", "workflows")
+	full := filepath.Join(dir, safe+".yml")
+	// Ensure the resolved path stays under the workflows directory.
+	if _, err := ValidatePathWithinRoot(dir, full); err != nil {
+		return "", fmt.Errorf("workflow path outside workflows dir: %w", err)
+	}
+	return full, nil
+}
+
+// atomicWriteYAML marshals data to YAML and writes it atomically (G-SEC-09).
+func atomicWriteYAML(path string, data interface{}, perm os.FileMode) error {
+	if perm == 0 {
+		perm = 0600
+	}
+	raw, err := yaml.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("marshal yaml: %w", err)
+	}
+	return atomicWriteFile(path, raw, perm)
+}
+
+// workflowFileDTO is the on-disk YAML shape. Source is omitted (yaml:"-").
+// We re-encode from WorkflowDef while forcing RequiresConfirmation for
+// project-level files (G-SEC-03).
+type workflowFileDTO struct {
+	Name                 string           `yaml:"name"`
+	Description          string           `yaml:"description,omitempty"`
+	Steps                []WorkflowStep   `yaml:"steps"`
+	Watch                []string         `yaml:"watch,omitempty"`
+	RunOn                *WorkflowTrigger `yaml:"runOn,omitempty"`
+	RequiresConfirmation bool             `yaml:"requiresConfirmation,omitempty"`
+}
+
+func toWorkflowFileDTO(wf *WorkflowDef) workflowFileDTO {
+	return workflowFileDTO{
+		Name:                 wf.Name,
+		Description:          wf.Description,
+		Steps:                wf.Steps,
+		Watch:                wf.Watch,
+		RunOn:                wf.RunOn,
+		RequiresConfirmation: true, // G-SEC-03: always true for project workflows
+	}
+}
+
+// CreateWorkflow writes a new workflow file at .nknk/workflows/<name>.yml.
+// Fails if a file with the same name already exists. New workflows default
+// to RequiresConfirmation = true (G-SEC-03).
+func (s *WorkflowService) CreateWorkflow(projectRoot, name string, def *WorkflowDef) error {
+	if def == nil {
+		return fmt.Errorf("workflow definition is required")
+	}
+	safe, err := sanitizeWorkflowName(name)
+	if err != nil {
+		return err
+	}
+	// Prefer the name argument; fall back to def.Name.
+	if def.Name == "" {
+		def.Name = safe
+	} else {
+		// Keep def.Name sanitized as well.
+		if n, nerr := sanitizeWorkflowName(def.Name); nerr == nil {
+			def.Name = n
+		}
+	}
+	def.RequiresConfirmation = true
+	// Validate before write.
+	result := s.ValidateWorkflow(def)
+	if !result.Valid {
+		msgs := make([]string, 0, len(result.Errors))
+		for _, e := range result.Errors {
+			msgs = append(msgs, e.Field+": "+e.Message)
+		}
+		return fmt.Errorf("invalid workflow: %s", strings.Join(msgs, "; "))
+	}
+	path, err := workflowPath(projectRoot, safe)
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(path); err == nil {
+		return fmt.Errorf("workflow %q already exists", safe)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("stat workflow: %w", err)
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create workflows dir: %w", err)
+	}
+	dto := toWorkflowFileDTO(def)
+	dto.Name = safe
+	if err := atomicWriteYAML(path, dto, 0600); err != nil {
+		return fmt.Errorf("write workflow: %w", err)
+	}
+	return nil
+}
+
+// SaveWorkflow overwrites an existing workflow (or creates it if missing).
+// Always forces RequiresConfirmation = true for project sources.
+func (s *WorkflowService) SaveWorkflow(projectRoot, name string, def *WorkflowDef) error {
+	if def == nil {
+		return fmt.Errorf("workflow definition is required")
+	}
+	safe, err := sanitizeWorkflowName(name)
+	if err != nil {
+		return err
+	}
+	if def.Name == "" {
+		def.Name = safe
+	}
+	def.RequiresConfirmation = true
+	result := s.ValidateWorkflow(def)
+	if !result.Valid {
+		msgs := make([]string, 0, len(result.Errors))
+		for _, e := range result.Errors {
+			msgs = append(msgs, e.Field+": "+e.Message)
+		}
+		return fmt.Errorf("invalid workflow: %s", strings.Join(msgs, "; "))
+	}
+	path, err := workflowPath(projectRoot, safe)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create workflows dir: %w", err)
+	}
+	dto := toWorkflowFileDTO(def)
+	dto.Name = safe
+	if err := atomicWriteYAML(path, dto, 0600); err != nil {
+		return fmt.Errorf("write workflow: %w", err)
+	}
+	return nil
+}
+
+// DeleteWorkflow removes .nknk/workflows/<name>.yml (and .yaml/.json variants).
+func (s *WorkflowService) DeleteWorkflow(projectRoot, name string) error {
+	safe, err := sanitizeWorkflowName(name)
+	if err != nil {
+		return err
+	}
+	if projectRoot == "" {
+		return fmt.Errorf("projectRoot is required")
+	}
+	dir := filepath.Join(projectRoot, ".nknk", "workflows")
+	var lastErr error
+	found := false
+	for _, ext := range workflowFileExtensions {
+		full := filepath.Join(dir, safe+ext)
+		if _, err := ValidatePathWithinRoot(dir, full); err != nil {
+			return fmt.Errorf("workflow path outside workflows dir: %w", err)
+		}
+		if _, err := os.Stat(full); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			lastErr = err
+			continue
+		}
+		if err := os.Remove(full); err != nil {
+			return fmt.Errorf("delete workflow: %w", err)
+		}
+		found = true
+	}
+	if !found {
+		if lastErr != nil {
+			return lastErr
+		}
+		return fmt.Errorf("workflow %q not found", safe)
+	}
+	return nil
+}
+
+// RenameWorkflow renames a workflow file from oldName to newName.
+// Fails if newName already exists or oldName is missing.
+func (s *WorkflowService) RenameWorkflow(projectRoot, oldName, newName string) error {
+	oldSafe, err := sanitizeWorkflowName(oldName)
+	if err != nil {
+		return fmt.Errorf("old name: %w", err)
+	}
+	newSafe, err := sanitizeWorkflowName(newName)
+	if err != nil {
+		return fmt.Errorf("new name: %w", err)
+	}
+	if oldSafe == newSafe {
+		return nil
+	}
+	// Load existing definition so we can rewrite Name field.
+	wf, err := s.LoadWorkflow(projectRoot, oldSafe)
+	if err != nil {
+		return err
+	}
+	wf.Name = newSafe
+	if err := s.CreateWorkflow(projectRoot, newSafe, wf); err != nil {
+		return err
+	}
+	if err := s.DeleteWorkflow(projectRoot, oldSafe); err != nil {
+		// Best-effort rollback of the new file if delete fails.
+		_ = s.DeleteWorkflow(projectRoot, newSafe)
+		return fmt.Errorf("delete old workflow after rename: %w", err)
+	}
+	return nil
 }

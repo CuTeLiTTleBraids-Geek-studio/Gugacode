@@ -182,7 +182,9 @@ func TestFormatRulesForPrompt_N71(t *testing.T) {
 func TestAIService_N71_SetConfig_TruncatesOverlongSystemPrompt(t *testing.T) {
 	svc := NewAIService()
 	long := strings.Repeat("a", MaxSystemPromptOverrideLen+100)
-	svc.SetConfig(AIConfig{SystemPrompt: long})
+	if err := svc.SetConfig(AIConfig{SystemPrompt: long}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 	if len(svc.config.SystemPrompt) != MaxSystemPromptOverrideLen {
 		t.Errorf("expected SystemPrompt truncated to %d, got %d", MaxSystemPromptOverrideLen, len(svc.config.SystemPrompt))
 	}
@@ -191,7 +193,9 @@ func TestAIService_N71_SetConfig_TruncatesOverlongSystemPrompt(t *testing.T) {
 func TestAIService_N71_SetConfig_AllowsMaxSystemPrompt(t *testing.T) {
 	svc := NewAIService()
 	exact := strings.Repeat("a", MaxSystemPromptOverrideLen)
-	svc.SetConfig(AIConfig{SystemPrompt: exact})
+	if err := svc.SetConfig(AIConfig{SystemPrompt: exact}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 	if len(svc.config.SystemPrompt) != MaxSystemPromptOverrideLen {
 		t.Errorf("expected SystemPrompt unchanged at max, got %d", len(svc.config.SystemPrompt))
 	}

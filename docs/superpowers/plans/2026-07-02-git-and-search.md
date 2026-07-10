@@ -69,7 +69,7 @@ frontend/
 - Create: `services/git_service.go`
 - Create: `services/git_service_test.go`
 
-- [ ] **Step 1: Add go-git dependency**
+- [x] **Step 1: Add go-git dependency**
 
 Run from project root:
 
@@ -79,7 +79,7 @@ go get github.com/go-git/go-git/v5@latest
 
 Expected: `go.mod` gains `github.com/go-git/go-git/v5` in the require block. `go.sum` is updated.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `services/git_service_test.go`:
 
@@ -235,12 +235,12 @@ func TestGitService_BranchInfo_notARepo(t *testing.T) {
 }
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run: `go test ./services/ -run TestGitService -v`
 Expected: FAIL — `services.GitService` undefined (no `git_service.go` yet).
 
-- [ ] **Step 4: Write minimal implementation**
+- [x] **Step 4: Write minimal implementation**
 
 Create `services/git_service.go`:
 
@@ -376,12 +376,12 @@ func openWorktree(path string) (*git.Repository, *git.Worktree, error) {
 var errNotARepo = errors.New("not a git repository")
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `go test ./services/ -run TestGitService -v`
 Expected: PASS — all 6 GitService tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add services/git_service.go services/git_service_test.go go.mod go.sum
@@ -396,7 +396,7 @@ git commit -m "feat: add GitService with status and branch info"
 - Modify: `services/git_service.go` (append methods)
 - Modify: `services/git_service_test.go` (append tests)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `services/git_service_test.go`:
 
@@ -462,12 +462,12 @@ func TestGitService_Commit_nothingStaged(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./services/ -run TestGitService_Stage -v; go test ./services/ -run TestGitService_Unstage -v; go test ./services/ -run TestGitService_Commit -v`
 Expected: FAIL — `svc.Stage` / `svc.Unstage` / `svc.Commit` undefined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Append to `services/git_service.go`:
 
@@ -549,12 +549,12 @@ import (
 )
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./services/ -run TestGitService -v`
 Expected: PASS — all 10 GitService tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/git_service.go services/git_service_test.go
@@ -569,7 +569,7 @@ git commit -m "feat: add GitService stage, unstage, commit operations"
 - Create: `services/search_service.go`
 - Create: `services/search_service_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `services/search_service_test.go`:
 
@@ -712,12 +712,12 @@ func TestSearchService_Search_invalidRegex(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./services/ -run TestSearchService -v`
 Expected: FAIL — `services.SearchService` undefined.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `services/search_service.go`:
 
@@ -869,12 +869,12 @@ func searchFile(path string, re *regexp.Regexp) []SearchMatch {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./services/ -run TestSearchService -v`
 Expected: PASS — all 7 SearchService tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/search_service.go services/search_service_test.go
@@ -888,7 +888,7 @@ git commit -m "feat: add SearchService with regex content search"
 **Files:**
 - Modify: `main.go`
 
-- [ ] **Step 1: Edit main.go to register GitService and SearchService**
+- [x] **Step 1: Edit main.go to register GitService and SearchService**
 
 In `main.go`, locate the service instantiation block (currently lines 29-34):
 
@@ -944,7 +944,7 @@ Replace with:
 		},
 ```
 
-- [ ] **Step 2: Verify build and vet**
+- [x] **Step 2: Verify build and vet**
 
 Run:
 ```bash
@@ -954,12 +954,12 @@ go vet ./...
 
 Expected: both succeed with no output.
 
-- [ ] **Step 3: Run all Go tests**
+- [x] **Step 3: Run all Go tests**
 
 Run: `go test ./services/ -v`
 Expected: all tests pass (24 prior + 6 Git status + 4 Git stage/commit + 7 Search = 41 tests).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add main.go
@@ -976,7 +976,7 @@ git commit -m "feat: register GitService and SearchService in main.go"
 - Generated: `frontend/bindings/changeme/services/gitservice.js`
 - Generated: `frontend/bindings/changeme/services/searchservice.js`
 
-- [ ] **Step 1: Regenerate Wails bindings**
+- [x] **Step 1: Regenerate Wails bindings**
 
 Run from project root:
 
@@ -992,7 +992,7 @@ ls frontend/bindings/changeme/services/
 
 Expected: `gitservice.js` and `searchservice.js` are present alongside the existing 6 service files.
 
-- [ ] **Step 2: Extend types**
+- [x] **Step 2: Extend types**
 
 Open `frontend/src/types/index.ts`. Append after the `ChatMessage` interface (currently the last type in the file):
 
@@ -1020,7 +1020,7 @@ export interface SearchResult {
 }
 ```
 
-- [ ] **Step 3: Extend API service wrappers**
+- [x] **Step 3: Extend API service wrappers**
 
 Open `frontend/src/api/services.ts`. Add two new imports after the existing `AIServiceBindings` import (line 9):
 
@@ -1057,7 +1057,7 @@ export const searchService = {
 };
 ```
 
-- [ ] **Step 4: Verify type check**
+- [x] **Step 4: Verify type check**
 
 Run:
 ```bash
@@ -1067,7 +1067,7 @@ npx vue-tsc --noEmit
 
 Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/types/index.ts frontend/src/api/services.ts frontend/bindings/
@@ -1082,7 +1082,7 @@ git commit -m "feat: add Git and Search bindings and TypeScript wrappers"
 - Create: `frontend/src/stores/git.ts`
 - Create: `frontend/src/stores/git.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `frontend/src/stores/git.test.ts`:
 
@@ -1168,7 +1168,7 @@ describe("git store", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 ```bash
@@ -1178,7 +1178,7 @@ npx vitest run src/stores/git.test.ts
 
 Expected: FAIL — cannot resolve `./git`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `frontend/src/stores/git.ts`:
 
@@ -1261,7 +1261,7 @@ export function clearGitState(): void {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run:
 ```bash
@@ -1271,7 +1271,7 @@ npx vitest run src/stores/git.test.ts
 
 Expected: PASS — all 6 git store tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/stores/git.ts frontend/src/stores/git.test.ts
@@ -1286,7 +1286,7 @@ git commit -m "feat: add git store with refresh, stage, unstage, commit"
 - Create: `frontend/src/stores/search.ts`
 - Create: `frontend/src/stores/search.test.ts`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `frontend/src/stores/search.test.ts`:
 
@@ -1368,7 +1368,7 @@ describe("search store", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run:
 ```bash
@@ -1378,7 +1378,7 @@ npx vitest run src/stores/search.test.ts
 
 Expected: FAIL — cannot resolve `./search`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Create `frontend/src/stores/search.ts`:
 
@@ -1440,7 +1440,7 @@ export function clearSearch(): void {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run:
 ```bash
@@ -1450,7 +1450,7 @@ npx vitest run src/stores/search.test.ts
 
 Expected: PASS — all 6 search store tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/stores/search.ts frontend/src/stores/search.test.ts
@@ -1464,7 +1464,7 @@ git commit -m "feat: add search store with debounced content search"
 **Files:**
 - Create: `frontend/src/components/layout/GitPanel.vue`
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 Create `frontend/src/components/layout/GitPanel.vue`:
 
@@ -1826,7 +1826,7 @@ watch(repoPath, (newPath) => {
 </style>
 ```
 
-- [ ] **Step 2: Verify type check**
+- [x] **Step 2: Verify type check**
 
 Run:
 ```bash
@@ -1836,7 +1836,7 @@ npx vue-tsc --noEmit
 
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/layout/GitPanel.vue
@@ -1850,7 +1850,7 @@ git commit -m "feat: add GitPanel component with stage/unstage/commit UI"
 **Files:**
 - Create: `frontend/src/components/layout/SearchPanel.vue`
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 Create `frontend/src/components/layout/SearchPanel.vue`:
 
@@ -2153,7 +2153,7 @@ watch(() => appState.currentProject, () => {
 </style>
 ```
 
-- [ ] **Step 2: Verify type check**
+- [x] **Step 2: Verify type check**
 
 Run:
 ```bash
@@ -2163,7 +2163,7 @@ npx vue-tsc --noEmit
 
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/layout/SearchPanel.vue
@@ -2178,7 +2178,7 @@ git commit -m "feat: add SearchPanel component with debounced search UI"
 - Modify: `frontend/src/components/layout/SidePanel.vue`
 - Modify: `frontend/src/stores/app.ts` (extend loadSettings to read git branch)
 
-- [ ] **Step 1: Edit SidePanel.vue script section**
+- [x] **Step 1: Edit SidePanel.vue script section**
 
 Open `frontend/src/components/layout/SidePanel.vue`. Replace the existing `<script setup>` block (lines 1-33) with:
 
@@ -2242,7 +2242,7 @@ watch(
 </script>
 ```
 
-- [ ] **Step 2: Edit SidePanel.vue template section**
+- [x] **Step 2: Edit SidePanel.vue template section**
 
 Replace the entire `<template>` block (the part between `<template>` and `</template>`) with:
 
@@ -2297,7 +2297,7 @@ Replace the entire `<template>` block (the part between `<template>` and `</temp
 </template>
 ```
 
-- [ ] **Step 3: Remove the now-unused search input CSS**
+- [x] **Step 3: Remove the now-unused search input CSS**
 
 In the `<style scoped>` block of `SidePanel.vue`, remove these two rules (they are no longer used since the search input moved into `SearchPanel.vue`):
 
@@ -2337,7 +2337,7 @@ In the `<style scoped>` block of `SidePanel.vue`, remove these two rules (they a
 
 Leave the rest of the CSS unchanged.
 
-- [ ] **Step 4: Verify type check and run tests**
+- [x] **Step 4: Verify type check and run tests**
 
 Run:
 ```bash
@@ -2348,7 +2348,7 @@ npx vitest run
 
 Expected: no type errors. All existing tests still pass (48 prior + 6 git + 6 search = 60 tests).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/layout/SidePanel.vue
@@ -2361,7 +2361,7 @@ git commit -m "feat: wire GitPanel and SearchPanel into SidePanel"
 
 **Files:** none (manual testing only)
 
-- [ ] **Step 1: Run full backend test suite**
+- [x] **Step 1: Run full backend test suite**
 
 Run:
 ```bash
@@ -2370,7 +2370,7 @@ go test ./services/ -v
 
 Expected: all tests pass. Count: 24 prior (File, Project, Settings, Terminal, AI) + 10 GitService + 7 SearchService = 41 tests.
 
-- [ ] **Step 2: Run full frontend test suite**
+- [x] **Step 2: Run full frontend test suite**
 
 Run:
 ```bash
@@ -2380,7 +2380,7 @@ npx vitest run
 
 Expected: all tests pass. Count: 48 prior + 6 git store + 6 search store = 60 tests.
 
-- [ ] **Step 3: Build verification**
+- [x] **Step 3: Build verification**
 
 Run:
 ```bash
@@ -2391,7 +2391,7 @@ npx vue-tsc --noEmit
 
 Expected: both succeed with no output.
 
-- [ ] **Step 4: Manual GUI verification**
+- [x] **Step 4: Manual GUI verification**
 
 Run `wails3 dev` from the project root. When the app launches, verify each of the following:
 
@@ -2413,7 +2413,7 @@ Run `wails3 dev` from the project root. When the app launches, verify each of th
 16. **Search ignores node_modules**: Search for a term that appears in `node_modules/`. The results should NOT include files under `node_modules/`.
 17. **Tab switching**: Switch between Explorer, Search, and Source Control tabs. Each should render its content correctly without errors in the console.
 
-- [ ] **Step 5: Final commit (if any fixes were needed during manual testing)**
+- [x] **Step 5: Final commit (if any fixes were needed during manual testing)**
 
 If manual testing revealed bugs that required fixes, commit them with descriptive messages. Otherwise, no commit needed.
 

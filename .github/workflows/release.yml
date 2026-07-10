@@ -18,8 +18,17 @@ name: Release
 #            gugacode-<version>-darwin-arm64.zip
 #
 # Each artifact is hashed with SHA256; a single SHA256SUMS file is
-# published alongside the artifacts and signed with the release GPG key
-# if configured (via the RELEASE_GPG_KEY_ID secret — optional).
+# published alongside the artifacts.
+#
+# Code signing (MED-07 / G-SEC-08):
+#   - Windows: Authenticode via signtool (requires WINDOWS_CERT_PFX +
+#     WINDOWS_CERT_PASSWORD secrets). Missing secrets FAIL the release.
+#   - macOS:   Developer ID codesign + notarytool notarization (requires
+#     MACOS_CERT_P12 + MACOS_CERT_PASSWORD + APPLE_ID +
+#     APPLE_APP_SPECIFIC_PASSWORD + APPLE_TEAM_ID secrets). Missing
+#     secrets FAIL the release.
+# A tag release must never publish unsigned artifacts — signing is
+# mandatory, not opt-in.
 
 on:
   push:
@@ -53,8 +62,43 @@ jobs:
             artifact_name: gugacode-${{ github.ref_name }}-darwin-arm64.zip
             build_cmd: wails3 build -tags desktop,production
     runs-on: ${{ matrix.os }}
+    env:
+      # MED-07 / G-SEC-08: code-signing secrets. Required for tag releases —
+      # missing secrets fail the build (see the verify step below).
+      WINDOWS_CERT_PFX: ${{ secrets.WINDOWS_CERT_PFX }}
+      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
+
+      # MED-07: a tag release must never publish unsigned artifacts.
+      # Fail fast when the signing secrets required for this platform are
+      # missing, instead of silently producing an unsigned build.
+      - name: Verify code-signing secrets (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          if [ -z "$WINDOWS_CERT_PFX" ] || [ -z "$WINDOWS_CERT_PASSWORD" ]; then
+            echo "::error::Windows code-signing secrets (WINDOWS_CERT_PFX / WINDOWS_CERT_PASSWORD) are not configured. Tag releases must be signed."
+            exit 1
+          fi
+          echo "Windows signing secrets present."
+
+      - name: Verify code-signing secrets (macOS)
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          if [ -z "$MACOS_CERT_P12" ] || [ -z "$MACOS_CERT_PASSWORD" ] || \
+             [ -z "$APPLE_ID" ] || [ -z "$APPLE_APP_SPECIFIC_PASSWORD" ] || \
+             [ -z "$APPLE_TEAM_ID" ]; then
+            echo "::error::macOS code-signing secrets (MACOS_CERT_P12 / MACOS_CERT_PASSWORD / APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID) are not configured. Tag releases must be signed."
+            exit 1
+          fi
+          echo "macOS signing secrets present."
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -83,6 +127,67 @@ jobs:
 
       - name: Build
         run: ${{ matrix.build_cmd }}
+
+      # MED-07 / G-SEC-08: Windows Authenticode signing. The verify step
+      # above already ensures the certificate secret is present; this step
+      # always runs on Windows tag releases. The certificate is stored
+      # base64-encoded in the secret and decoded to a temp file here.
+      - name: Code sign (Windows Authenticode)
+        if: matrix.os == 'windows-latest' && env.WINDOWS_CERT_PFX != ''
+        shell: pwsh
+        run: |
+          $pfxPath = "$env:RUNNER_TEMP\codesign.pfx"
+          [System.Convert]::FromBase64String($env:WINDOWS_CERT_PFX) | Set-Content -Path $pfxPath -AsByteStream
+          # Locate signtool.exe from the installed Windows SDK.
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue | Sort-Object -Descending | Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe not found in Windows SDK" }
+          $exes = Get-ChildItem -Path bin -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue
+          foreach ($e in $exes) {
+            & $signtool.FullName sign /f $pfxPath /p $env:WINDOWS_CERT_PASSWORD /fd sha256 /td sha256 /tr http://timestamp.digicert.com $e.FullName
+          }
+          Remove-Item $pfxPath -Force
+
+      # MED-07 / G-SEC-08: macOS Developer ID signing + notarization. The
+      # verify step above already ensures all Apple signing secrets are
+      # present; this step always runs on macOS tag releases. Imports the
+      # certificate into a temporary keychain, signs the .app bundle with
+      # a hardened runtime, submits to Apple for notarization, then staples
+      # the notarization ticket.
+      - name: Code sign & notarize (macOS)
+        if: matrix.os == 'macos-latest' && env.MACOS_CERT_P12 != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          p12_path="$RUNNER_TEMP/developer_id.p12"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$p12_path"
+          keychain="build-$RANDOM.keychain"
+          keychain_pw="$(openssl rand -hex 32)"
+          security create-keychain -p "$keychain_pw" "$keychain"
+          security default-keychain -s "$keychain"
+          security unlock-keychain -p "$keychain_pw" "$keychain"
+          security import "$p12_path" -k "$keychain" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_pw" "$keychain"
+          rm -f "$p12_path"
+          APP_PATH="bin/gugacode.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "gugacode.app not found; skipping macOS signing"; exit 0
+          fi
+          # Sign with hardened runtime (required for notarization).
+          codesign --force --deep --options runtime --sign "Developer ID Application" "$APP_PATH"
+          # Verify the signature.
+          codesign --verify --strict --verbose=2 "$APP_PATH"
+          # Submit for notarization and wait for Apple's verdict.
+          zip_path="$RUNNER_TEMP/gugacode-notarize.zip"
+          ditto -c -k --keepParent "$APP_PATH" "$zip_path"
+          xcrun notarytool submit "$zip_path" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          # Staple the notarization ticket to the app bundle.
+          xcrun stapler staple "$APP_PATH"
+          # Clean up the temporary keychain.
+          security delete-keychain "$keychain"
 
       - name: Package (Windows)
         if: matrix.os == 'windows-latest'

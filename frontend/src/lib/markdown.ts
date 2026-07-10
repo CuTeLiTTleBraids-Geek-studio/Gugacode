@@ -180,7 +180,14 @@ function highlightCodeBlocks(html: string): string {
  * Sanitizes HTML to prevent XSS using DOMPurify.
  */
 export function sanitizeHtml(html: string): string {
-  return DOMPurify.sanitize(html, {
+  // G-SEC-11: Force external links to open in a new tab with noopener/noreferrer
+  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (node.tagName === 'A' && node.getAttribute('href')) {
+      node.setAttribute('target', '_blank')
+      node.setAttribute('rel', 'noopener noreferrer')
+    }
+  })
+  const result = DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [
       "h1", "h2", "h3", "h4", "h5", "h6",
       "p", "br", "hr", "blockquote", "pre", "code",
@@ -191,7 +198,9 @@ export function sanitizeHtml(html: string): string {
     ],
     ALLOWED_ATTR: ["href", "title", "class", "id", "src", "alt", "target", "rel"],
     ALLOW_DATA_ATTR: false,
-  });
+  })
+  DOMPurify.removeHook('afterSanitizeAttributes')
+  return result
 }
 
 /**

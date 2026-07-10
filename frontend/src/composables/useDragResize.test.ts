@@ -164,7 +164,7 @@ describe("useDragResize (N-20)", () => {
     });
 
     it("does not call onCommit if drag never started", () => {
-      const drag = makeHorizontal();
+      makeHorizontal();
       // pointerup without a prior pointerdown should be a no-op.
       window.dispatchEvent(makePointerEvent("pointerup"));
       expect(commits).toEqual([]);

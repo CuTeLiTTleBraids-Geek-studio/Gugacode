@@ -4,7 +4,7 @@ package services
 
 import (
 	"io"
-	"strings"
+	"syscall"
 
 	"github.com/UserExistsError/conpty"
 )
@@ -29,7 +29,10 @@ func (w *windowsPty) Close() error {
 }
 
 func startPty(shell []string, workingDir string) (io.ReadWriteCloser, error) {
-	commandLine := strings.Join(shell, " ")
+	// M-3/HIGH-02: use syscall.EscapeArg to properly quote each argument.
+	// The previous strings.Join(shell, " ") did not escape spaces or special
+	// characters, allowing argument injection when a path contained spaces.
+	commandLine := buildWindowsCommandLine(shell)
 	opts := []conpty.ConPtyOption{}
 	if workingDir != "" {
 		opts = append(opts, conpty.ConPtyWorkDir(workingDir))
@@ -39,4 +42,20 @@ func startPty(shell []string, workingDir string) (io.ReadWriteCloser, error) {
 		return nil, err
 	}
 	return &windowsPty{cpty: cpty}, nil
+}
+
+// buildWindowsCommandLine builds a properly escaped Windows command-line
+// string from a shell argv slice using syscall.EscapeArg. Extracted from
+// startPty for testability (HIGH-02): ConPTY tests are skipped in CI
+// (skipIfNoConsole), so this function lets us verify the escaping logic
+// directly without a real console.
+func buildWindowsCommandLine(shell []string) string {
+	var commandLine string
+	for i, arg := range shell {
+		if i > 0 {
+			commandLine += " "
+		}
+		commandLine += syscall.EscapeArg(arg)
+	}
+	return commandLine
 }

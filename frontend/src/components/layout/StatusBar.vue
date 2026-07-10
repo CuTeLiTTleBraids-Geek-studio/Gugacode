@@ -2,7 +2,10 @@
 import { appState, toggleTerminal } from "@/stores/app";
 import { editorState, activeFile } from "@/stores/editor";
 import { toggleInlineCompletion } from "@/stores/inlineCompletion";
-import { computed } from "vue";
+import { connectivityState } from "@/lib/connectivity";
+import { lspStatusLabel, lspStatusDetail } from "@/stores/lsp";
+import { runtimeVersions, refreshRuntimeVersions } from "@/stores/toolchain";
+import { computed, onMounted } from "vue";
 import { useI18n } from "@/lib/i18n";
 
 const { t } = useI18n();
@@ -19,6 +22,21 @@ const hasOpenFile = computed(() => editorState.openFiles.length > 0);
 const inlineCompletionLabel = computed(() =>
   appState.inlineCompletionEnabled ? t("statusBar.aiCompletionOn") : t("statusBar.aiCompletionOff"),
 );
+// G-FEAT-02: when the network is offline, AI completion is unavailable but
+// LSP-based offline completion keeps working. Show a badge to make this
+// state visible so the user understands why AI is disabled.
+const isOffline = computed(() => !connectivityState.online);
+// prompt-8 Task 8-D: LSP status for gopls / typescript-language-server.
+const lspLabel = computed(() => lspStatusLabel.value);
+const lspDetail = computed(() => lspStatusDetail.value);
+// prompt-9 9-I: Go / Node versions
+const goVer = computed(() => runtimeVersions.goVersion || "");
+const nodeVer = computed(() => runtimeVersions.nodeVersion || "");
+const goWork = computed(() => runtimeVersions.hasGoWork);
+
+onMounted(() => {
+  void refreshRuntimeVersions();
+});
 </script>
 
 <template>
@@ -55,6 +73,20 @@ const inlineCompletionLabel = computed(() =>
           {{ warnings }}
         </span>
       </span>
+
+      <!-- G-FEAT-02: offline badge — shown when the network is offline.
+           LSP-based offline completion still works in this state, but AI
+           completion is unavailable, so we surface the state explicitly. -->
+      <span
+        v-if="isOffline"
+        class="statusbar__item statusbar__item--offline"
+        role="status"
+        :aria-label="t('statusBar.offlineBadgeAria')"
+        :title="t('statusBar.offlineBadgeHint')"
+      >
+        <span class="statusbar__dot statusbar__dot--warning" aria-hidden="true" />
+        {{ t("statusBar.offlineBadge") }}
+      </span>
     </div>
 
     <!-- Right side -->
@@ -82,6 +114,30 @@ const inlineCompletionLabel = computed(() =>
       >
         {{ languageMode }}
       </button>
+      <span
+        v-if="goVer"
+        class="statusbar__item"
+        role="status"
+        :title="goWork ? `${goVer} (go.work)` : goVer"
+      >
+        {{ goVer }}{{ goWork ? " · work" : "" }}
+      </span>
+      <span
+        v-if="nodeVer"
+        class="statusbar__item"
+        role="status"
+        :title="nodeVer"
+      >
+        {{ nodeVer }}
+      </span>
+      <span
+        class="statusbar__item"
+        role="status"
+        :aria-label="lspDetail || lspLabel"
+        :title="lspDetail || t('statusBar.lspHint')"
+      >
+        {{ lspLabel }}
+      </span>
       <button
         type="button"
         class="statusbar__item"
@@ -231,6 +287,12 @@ const inlineCompletionLabel = computed(() =>
 
 .statusbar__item--active:active {
   transform: scale(0.95);
+}
+
+/* G-FEAT-02: offline badge — warning-tinted to draw attention. */
+.statusbar__item--offline {
+  color: var(--color-warning);
+  cursor: default;
 }
 
 button.statusbar__item:focus-visible {

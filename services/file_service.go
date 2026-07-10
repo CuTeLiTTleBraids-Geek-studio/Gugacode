@@ -79,43 +79,30 @@ func (f *FileService) SetWorkspaceRoot(root string) error {
 }
 
 // validatePath returns the absolute path if it's within the workspace root,
-// or an error if it's outside. If no workspace root is set, any path is allowed.
+// or an error if it's outside. If no workspace root is set, any path is allowed
+// for *read* operations. Mutating operations use validateMutatingPath.
 //
-// N-56: filepath.Abs only performs lexical cleaning — it does NOT resolve
-// symlinks. A symlink placed inside the workspace that points outside
-// (e.g., ./link -> ../../../etc/passwd) would pass the lexical prefix
-// check. We therefore call filepath.EvalSymlinks on both the target and
-// the root before the prefix comparison. For paths that don't yet exist
-// (e.g., CreateFile targets), we resolve the parent directory's symlinks
-// and rejoin with the basename.
+// G-QUAL-02: path traversal defense is centralized in pathsec.go — see
+// ValidatePathWithinRoot for the symlink-resolving implementation (N-56).
 func (f *FileService) validatePath(path string) (string, error) {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return "", err
-	}
+	f.mu.Lock()
+	root := f.rootDir
+	f.mu.Unlock()
+	return ValidatePathWithinRoot(root, path)
+}
+
+// validateMutatingPath is like validatePath but refuses writes when no
+// workspace root is set (prompt-6 Task 4 / BUG-M5). Without a project root
+// the FileService sandbox is effectively off — rejecting mutations closes
+// that compliance gap for Write/Delete/Rename/Create.
+func (f *FileService) validateMutatingPath(path string) (string, error) {
 	f.mu.Lock()
 	root := f.rootDir
 	f.mu.Unlock()
 	if root == "" {
-		return abs, nil
+		return "", fmt.Errorf("no workspace root: open a project before writing files")
 	}
-	absResolved, err := evalSymlinksAllowMissing(abs)
-	if err != nil {
-		return "", err
-	}
-	rootResolved, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		// If the root itself can't be resolved, fall back to lexical.
-		rootResolved = root
-	}
-	rel, err := filepath.Rel(rootResolved, absResolved)
-	if err != nil {
-		return "", err
-	}
-	if strings.HasPrefix(rel, "..") || rel == ".." {
-		return "", fmt.Errorf("path %s is outside the workspace", path)
-	}
-	return abs, nil
+	return ValidatePathWithinRoot(root, path)
 }
 
 // ListDirectory returns the immediate children of path, directories first.
@@ -167,8 +154,9 @@ func (f *FileService) ReadFile(path string) (string, error) {
 // WriteFile writes text content to a file, creating or truncating it.
 // After a successful write, emits a "file:saved" event with the absolute
 // file path so workflow triggers (Proposal B) can match it.
+// prompt-6 Task 4: requires a workspace root (empty root → error).
 func (f *FileService) WriteFile(path string, content string) error {
-	abs, err := f.validatePath(path)
+	abs, err := f.validateMutatingPath(path)
 	if err != nil {
 		return err
 	}
@@ -184,8 +172,9 @@ func (f *FileService) WriteFile(path string, content string) error {
 }
 
 // CreateFile creates an empty file.
+// prompt-6 Task 4: requires a workspace root.
 func (f *FileService) CreateFile(path string) error {
-	abs, err := f.validatePath(path)
+	abs, err := f.validateMutatingPath(path)
 	if err != nil {
 		return err
 	}
@@ -197,8 +186,9 @@ func (f *FileService) CreateFile(path string) error {
 }
 
 // CreateDirectory creates a directory and any necessary parents.
+// prompt-6 Task 4: requires a workspace root.
 func (f *FileService) CreateDirectory(path string) error {
-	abs, err := f.validatePath(path)
+	abs, err := f.validateMutatingPath(path)
 	if err != nil {
 		return err
 	}
@@ -206,8 +196,9 @@ func (f *FileService) CreateDirectory(path string) error {
 }
 
 // DeletePath removes a file or directory recursively.
+// prompt-6 Task 4: requires a workspace root.
 func (f *FileService) DeletePath(path string) error {
-	abs, err := f.validatePath(path)
+	abs, err := f.validateMutatingPath(path)
 	if err != nil {
 		return err
 	}
@@ -215,12 +206,13 @@ func (f *FileService) DeletePath(path string) error {
 }
 
 // RenamePath moves or renames a file or directory.
+// prompt-6 Task 4: requires a workspace root.
 func (f *FileService) RenamePath(oldPath, newPath string) error {
-	oldAbs, err := f.validatePath(oldPath)
+	oldAbs, err := f.validateMutatingPath(oldPath)
 	if err != nil {
 		return err
 	}
-	newAbs, err := f.validatePath(newPath)
+	newAbs, err := f.validateMutatingPath(newPath)
 	if err != nil {
 		return err
 	}

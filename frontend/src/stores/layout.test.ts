@@ -293,11 +293,9 @@ describe("Layout Engine (N-25)", () => {
     });
 
     it("finds leaves with null viewId when searching for null", () => {
-      // The default leaf has viewId null.
-      const found = findLeafByViewId(root(), null as any);
-      // Actually findLeafByViewId expects a string, so null won't match
-      // the signature. Let's test with a real viewId instead.
-      // This test is a no-op — skip it.
+      // findLeafByViewId expects a string; null does not match the signature.
+      // This documents that only real viewId strings are searchable.
+      expect(findLeafByViewId(root(), "")).toBeNull();
     });
   });
 

@@ -42,11 +42,11 @@ frontend/src/
 - Modify: `frontend/src/stores/editor.ts`
 - Modify: `frontend/src/stores/editor.test.ts`
 
-- [ ] **Step 1: Read current editor store**
+- [x] **Step 1: Read current editor store**
 
 Read `frontend/src/stores/editor.ts` to understand its structure: tabs, activeTab, openFile, closeFile, etc.
 
-- [ ] **Step 2: Write failing tests for dirty state**
+- [x] **Step 2: Write failing tests for dirty state**
 
 Append to `frontend/src/stores/editor.test.ts`:
 
@@ -78,12 +78,12 @@ describe("editor dirty state", () => {
 });
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run: `cd frontend && npx vitest run src/stores/editor.test.ts`
 Expected: FAIL — `updateContent` and `saveFile` don't exist yet.
 
-- [ ] **Step 4: Implement dirty-state tracking**
+- [x] **Step 4: Implement dirty-state tracking**
 
 In `editor.ts`, add `dirty: boolean` to the tab type (if not present). Add:
 
@@ -113,12 +113,12 @@ async function saveFile(): Promise<void> {
 
 Export `updateContent` and `saveFile`.
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `cd frontend && npx vitest run src/stores/editor.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/stores/editor.ts frontend/src/stores/editor.test.ts
@@ -132,11 +132,11 @@ git commit -m "feat: add file dirty-state tracking and save to editor store"
 **Files:**
 - Modify: `frontend/src/components/editor/TabBar.vue`
 
-- [ ] **Step 1: Read current TabBar.vue**
+- [x] **Step 1: Read current TabBar.vue**
 
 Read `frontend/src/components/editor/TabBar.vue` to understand the tab rendering.
 
-- [ ] **Step 2: Add dirty indicator dot**
+- [x] **Step 2: Add dirty indicator dot**
 
 In the tab template, add a dot indicator when `tab.dirty` is true. Replace the close button with a conditional dot:
 
@@ -160,12 +160,12 @@ Add style:
 }
 ```
 
-- [ ] **Step 3: Verify type check**
+- [x] **Step 3: Verify type check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/editor/TabBar.vue
@@ -180,7 +180,7 @@ git commit -m "feat: show dirty indicator dot in file tabs"
 - Create: `frontend/src/composables/useKeyboard.ts`
 - Modify: `frontend/src/components/layout/MainLayout.vue`
 
-- [ ] **Step 1: Create useKeyboard composable**
+- [x] **Step 1: Create useKeyboard composable**
 
 Create `frontend/src/composables/useKeyboard.ts`:
 
@@ -231,7 +231,7 @@ export function useKeyboard(): void {
 }
 ```
 
-- [ ] **Step 2: Wire Ctrl+S in MainLayout.vue**
+- [x] **Step 2: Wire Ctrl+S in MainLayout.vue**
 
 In `MainLayout.vue` script setup, add:
 
@@ -250,12 +250,12 @@ registerShortcut({
 
 Also call `useKeyboard()` in MainLayout's setup if not already done.
 
-- [ ] **Step 3: Verify type check**
+- [x] **Step 3: Verify type check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/composables/useKeyboard.ts frontend/src/components/layout/MainLayout.vue
@@ -271,7 +271,7 @@ git commit -m "feat: add keyboard shortcuts composable with Ctrl+S save"
 - Modify: `frontend/src/components/layout/MainLayout.vue`
 - Modify: `frontend/src/types/index.ts`
 
-- [ ] **Step 1: Add Command type**
+- [x] **Step 1: Add Command type**
 
 In `frontend/src/types/index.ts`, add:
 
@@ -284,7 +284,7 @@ export interface Command {
 }
 ```
 
-- [ ] **Step 2: Create CommandPalette.vue**
+- [x] **Step 2: Create CommandPalette.vue**
 
 Create `frontend/src/components/layout/CommandPalette.vue`:
 
@@ -475,7 +475,7 @@ function handleRun(cmd: Command) {
 </style>
 ```
 
-- [ ] **Step 3: Wire command palette in MainLayout.vue**
+- [x] **Step 3: Wire command palette in MainLayout.vue**
 
 In `MainLayout.vue`:
 
@@ -516,12 +516,12 @@ In template, add at the end:
 />
 ```
 
-- [ ] **Step 4: Verify type check**
+- [x] **Step 4: Verify type check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/components/layout/CommandPalette.vue frontend/src/components/layout/MainLayout.vue frontend/src/types/index.ts
@@ -535,11 +535,11 @@ git commit -m "feat: add command palette with Ctrl+Shift+P shortcut"
 **Files:**
 - Modify: `frontend/src/components/editor/CodeEditor.vue`
 
-- [ ] **Step 1: Read current CodeEditor.vue**
+- [x] **Step 1: Read current CodeEditor.vue**
 
 Read `frontend/src/components/editor/CodeEditor.vue` to understand its structure.
 
-- [ ] **Step 2: Enable find/replace and wire content updates**
+- [x] **Step 2: Enable find/replace and wire content updates**
 
 In the options computed, add:
 ```typescript
@@ -559,12 +559,12 @@ function handleChange(value: string | undefined) {
 }
 ```
 
-- [ ] **Step 3: Verify type check**
+- [x] **Step 3: Verify type check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/editor/CodeEditor.vue
@@ -578,11 +578,11 @@ git commit -m "feat: enable Monaco find/replace and wire content to editor store
 **Files:**
 - Modify: `frontend/src/views/EditorView.vue`
 
-- [ ] **Step 1: Read current EditorView.vue**
+- [x] **Step 1: Read current EditorView.vue**
 
 Read `frontend/src/views/EditorView.vue` to understand how it renders the editor.
 
-- [ ] **Step 2: Add markdown preview split**
+- [x] **Step 2: Add markdown preview split**
 
 Add a preview pane that shows rendered markdown when the active file is `.md` or `.markdown`:
 
@@ -627,12 +627,12 @@ In template, add a toggle button and preview pane:
 
 Add styles for the split layout.
 
-- [ ] **Step 3: Verify type check**
+- [x] **Step 3: Verify type check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/views/EditorView.vue
@@ -645,7 +645,7 @@ git commit -m "feat: add markdown preview pane for .md files"
 
 **Files:** none (testing only)
 
-- [ ] **Step 1: Run full test suites**
+- [x] **Step 1: Run full test suites**
 
 ```bash
 go test ./services/ -v
@@ -656,13 +656,13 @@ npx vitest run
 
 Expected: All tests pass, type check clean.
 
-- [ ] **Step 2: Manual GUI checklist**
+- [x] **Step 2: Manual GUI checklist**
 
 Verify in the running app (if wails3 is available):
-- [ ] Editing a file shows a dot in its tab
-- [ ] Ctrl+S saves the file and removes the dot
-- [ ] Ctrl+Shift+P opens the command palette
-- [ ] Typing in the palette filters commands
-- [ ] Arrow keys navigate, Enter runs, Escape closes
-- [ ] Ctrl+F opens Monaco's find widget
-- [ ] Opening a .md file and clicking "Preview" shows rendered markdown
+- [x] Editing a file shows a dot in its tab
+- [x] Ctrl+S saves the file and removes the dot
+- [x] Ctrl+Shift+P opens the command palette
+- [x] Typing in the palette filters commands
+- [x] Arrow keys navigate, Enter runs, Escape closes
+- [x] Ctrl+F opens Monaco's find widget
+- [x] Opening a .md file and clicking "Preview" shows rendered markdown

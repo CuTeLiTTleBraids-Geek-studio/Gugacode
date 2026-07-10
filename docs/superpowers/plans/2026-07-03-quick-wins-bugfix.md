@@ -35,15 +35,15 @@
 - Delete: `frontend/bindings/changeme/greetservice.js`
 - Modify: `main.go` (remove registration line)
 
-- [ ] **Step 1: Delete greetservice.go**
+- [x] **Step 1: Delete greetservice.go**
 
 Delete the file `greetservice.go` at project root.
 
-- [ ] **Step 2: Delete the binding file**
+- [x] **Step 2: Delete the binding file**
 
 Delete `frontend/bindings/changeme/greetservice.js`.
 
-- [ ] **Step 3: Remove GreetService registration from main.go**
+- [x] **Step 3: Remove GreetService registration from main.go**
 
 In `main.go`, find the line that registers GreetService:
 
@@ -53,7 +53,7 @@ application.NewService(&GreetService{}),
 
 Remove that line from the services slice.
 
-- [ ] **Step 4: Verify build**
+- [x] **Step 4: Verify build**
 
 Run: `go build .`
 Expected: success (no errors)
@@ -61,7 +61,7 @@ Expected: success (no errors)
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success (no errors)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add greetservice.go frontend/bindings/changeme/greetservice.js main.go
@@ -76,7 +76,7 @@ git commit -m "chore: remove legacy GreetService (Q-10)"
 - Modify: `services/project_service.go:127-135`
 - Test: `services/project_service_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `services/project_service_test.go`:
 
@@ -105,12 +105,12 @@ func TestSortProjectsByRecency_EmptyAndSingle(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it passes (bubble sort already works)**
+- [x] **Step 2: Run test to verify it passes (bubble sort already works)**
 
 Run: `go test ./services/ -run TestSortProjectsByRecency -v`
 Expected: PASS (current bubble sort already produces correct order; this test locks behavior before refactor)
 
-- [ ] **Step 3: Replace bubble sort with sort.Slice**
+- [x] **Step 3: Replace bubble sort with sort.Slice**
 
 In `services/project_service.go`, replace the `sortProjectsByRecency` function:
 
@@ -124,12 +124,12 @@ func sortProjectsByRecency(projects []Project) {
 
 Add `"sort"` to the import block.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./services/ -run TestSortProjectsByRecency -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/project_service.go services/project_service_test.go
@@ -144,7 +144,7 @@ git commit -m "refactor: replace bubble sort with sort.Slice (Q-2)"
 - Modify: `services/project_service.go:88-104` (AddProject method)
 - Test: `services/project_service_test.go`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `services/project_service_test.go`:
 
@@ -174,12 +174,12 @@ func TestProjectService_AddProjectGeneratesUniqueIDs(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails or is flaky**
+- [x] **Step 2: Run test to verify it fails or is flaky**
 
 Run: `go test ./services/ -run TestProjectService_AddProjectGeneratesUniqueIDs -v`
 Expected: may PASS or FAIL depending on timing (millisecond timestamp IDs can collide)
 
-- [ ] **Step 3: Replace timestamp ID with crypto/rand hex**
+- [x] **Step 3: Replace timestamp ID with crypto/rand hex**
 
 In `services/project_service.go`, add a helper function after the imports:
 
@@ -204,17 +204,17 @@ proj := Project{
 	ID:         generateProjectID(),
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `go test ./services/ -run TestProjectService_AddProjectGeneratesUniqueIDs -v`
 Expected: PASS (crypto/rand guarantees uniqueness)
 
-- [ ] **Step 5: Run full test suite**
+- [x] **Step 5: Run full test suite**
 
 Run: `go test ./services/ -count=1`
 Expected: all PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add services/project_service.go services/project_service_test.go
@@ -228,7 +228,7 @@ git commit -m "fix: use crypto/rand for Project.ID instead of timestamp (Q-3)"
 **Files:**
 - Modify: `frontend/src/components/explorer/FileTree.vue:27`
 
-- [ ] **Step 1: Change isFolder from plain assignment to computed**
+- [x] **Step 1: Change isFolder from plain assignment to computed**
 
 In `frontend/src/components/explorer/FileTree.vue`, update the import:
 
@@ -246,17 +246,17 @@ with:
 const isFolder = computed(() => props.depth === 0 || props.isDir);
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/explorer/FileTree.vue
@@ -270,7 +270,7 @@ git commit -m "fix: make FileTree isFolder reactive with computed (Q-7)"
 **Files:**
 - Modify: `frontend/src/components/layout/TerminalPanel.vue:43`
 
-- [ ] **Step 1: Replace CSS variable with literal font name**
+- [x] **Step 1: Replace CSS variable with literal font name**
 
 In `frontend/src/components/layout/TerminalPanel.vue`, find line 43:
 ```typescript
@@ -282,12 +282,12 @@ Replace with:
 fontFamily: "JetBrains Mono, Consolas, 'Courier New', monospace",
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/layout/TerminalPanel.vue
@@ -301,7 +301,7 @@ git commit -m "fix: use literal font name for xterm fontFamily (B-9)"
 **Files:**
 - Modify: `frontend/src/components/layout/TerminalPanel.vue:29,112-118`
 
-- [ ] **Step 1: Change activeTab from const string to ref**
+- [x] **Step 1: Change activeTab from const string to ref**
 
 In `frontend/src/components/layout/TerminalPanel.vue`, find line 29:
 ```typescript
@@ -313,7 +313,7 @@ Replace with:
 const activeTab = ref("terminal");
 ```
 
-- [ ] **Step 2: Add click handler to tab buttons**
+- [x] **Step 2: Add click handler to tab buttons**
 
 Find the tab button template (around line 108-118):
 ```html
@@ -346,12 +346,12 @@ Replace with:
 </button>
 ```
 
-- [ ] **Step 3: Verify build**
+- [x] **Step 3: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/layout/TerminalPanel.vue
@@ -365,7 +365,7 @@ git commit -m "fix: make TerminalPanel activeTab reactive ref (B-8)"
 **Files:**
 - Modify: `frontend/src/components/layout/TitleBar.vue:17-29`
 
-- [ ] **Step 1: Add Edit and View menu handlers**
+- [x] **Step 1: Add Edit and View menu handlers**
 
 In `frontend/src/components/layout/TitleBar.vue`, replace the `handleMenu` function:
 
@@ -400,17 +400,17 @@ Add `toggleSidebar` and `toggleTerminal` to the import from `@/stores/app`:
 import { appState, toggleSidebar, toggleTerminal } from "@/stores/app";
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/layout/TitleBar.vue
@@ -424,7 +424,7 @@ git commit -m "fix: wire TitleBar Edit/View menu handlers (B-6)"
 **Files:**
 - Modify: `frontend/src/views/ProjectsView.vue` (lines 114, 141, 211-212, 262-263)
 
-- [ ] **Step 1: Replace --color-background with --color-bg-base**
+- [x] **Step 1: Replace --color-background with --color-bg-base**
 
 In `frontend/src/views/ProjectsView.vue`, replace all occurrences of `var(--color-background, #111111)` with `var(--color-bg-base)`:
 
@@ -438,7 +438,7 @@ Line 141:
 color: var(--color-bg-base) !important;
 ```
 
-- [ ] **Step 2: Replace --duration-fast and --ease-out-expo with --transition-fast**
+- [x] **Step 2: Replace --duration-fast and --ease-out-expo with --transition-fast**
 
 Lines 211-212:
 ```css
@@ -452,12 +452,12 @@ transition: color var(--transition-fast),
             background-color var(--transition-fast);
 ```
 
-- [ ] **Step 3: Verify build**
+- [x] **Step 3: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/views/ProjectsView.vue
@@ -471,7 +471,7 @@ git commit -m "fix: use correct CSS design tokens in ProjectsView (B-5)"
 **Files:**
 - Modify: `frontend/src/views/PluginsView.vue` (lines 115, 255, 279)
 
-- [ ] **Step 1: Replace --color-background with --color-bg-base**
+- [x] **Step 1: Replace --color-background with --color-bg-base**
 
 In `frontend/src/views/PluginsView.vue`, replace all occurrences of `var(--color-background, #111111)` with `var(--color-bg-base)`:
 
@@ -490,12 +490,12 @@ Line 279:
 color: var(--color-bg-base) !important;
 ```
 
-- [ ] **Step 2: Verify build**
+- [x] **Step 2: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/views/PluginsView.vue
@@ -509,7 +509,7 @@ git commit -m "fix: use correct CSS design tokens in PluginsView (B-5)"
 **Files:**
 - Modify: `frontend/src/views/SettingsView.vue`
 
-- [ ] **Step 1: Import accentThemes and applyAccentTheme**
+- [x] **Step 1: Import accentThemes and applyAccentTheme**
 
 In `frontend/src/views/SettingsView.vue`, update the script imports:
 
@@ -522,7 +522,7 @@ import { fileService, aiService, aiServiceV2 } from "@/api/services";
 import { Folder, Hide, View, Pointer } from "@element-plus/icons-vue";
 ```
 
-- [ ] **Step 2: Replace accentColors array with accentThemes-derived list**
+- [x] **Step 2: Replace accentColors array with accentThemes-derived list**
 
 Remove the `accentColors` array (lines ~39-48):
 ```typescript
@@ -547,7 +547,7 @@ const accentColorList = Object.entries(accentThemes).map(([key, meta]) => ({
 }));
 ```
 
-- [ ] **Step 3: Add selectAccent function**
+- [x] **Step 3: Add selectAccent function**
 
 Add this function after `handleThemeChange`:
 
@@ -558,7 +558,7 @@ function selectAccent(key: AccentTheme) {
 }
 ```
 
-- [ ] **Step 4: Update the color swatch template**
+- [x] **Step 4: Update the color swatch template**
 
 Find the color swatches template (around line 585-596) and replace:
 
@@ -577,24 +577,24 @@ Find the color swatches template (around line 585-596) and replace:
 </div>
 ```
 
-- [ ] **Step 5: Remove the old accentColor ref**
+- [x] **Step 5: Remove the old accentColor ref**
 
 Remove this line from the script:
 ```typescript
 const accentColor = ref("#a0c4ff");
 ```
 
-- [ ] **Step 6: Verify build**
+- [x] **Step 6: Verify build**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 7: Run tests**
+- [x] **Step 7: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add frontend/src/views/SettingsView.vue
@@ -605,27 +605,27 @@ git commit -m "fix: wire Color Accent selector to accentThemes + applyAccentThem
 
 ### Task 11: Full verification
 
-- [ ] **Step 1: Run Go tests**
+- [x] **Step 1: Run Go tests**
 
 Run: `go test ./services/... -count=1 -timeout 60s`
 Expected: all PASS
 
-- [ ] **Step 2: Run Go build**
+- [x] **Step 2: Run Go build**
 
 Run: `go build .`
 Expected: success
 
-- [ ] **Step 3: Run frontend type check**
+- [x] **Step 3: Run frontend type check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: success
 
-- [ ] **Step 4: Run frontend tests**
+- [x] **Step 4: Run frontend tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: all PASS
 
-- [ ] **Step 5: Commit if any fixup needed**
+- [x] **Step 5: Commit if any fixup needed**
 
 ```bash
 git add -A

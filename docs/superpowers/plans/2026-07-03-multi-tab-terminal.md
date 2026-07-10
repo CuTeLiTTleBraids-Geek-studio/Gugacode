@@ -31,7 +31,7 @@
 
 Refactor from single-session to multi-session. Add `TerminalSession` struct, session map, and `SetApp` for direct event emission.
 
-- [ ] **Step 1: Rewrite terminal_service.go**
+- [x] **Step 1: Rewrite terminal_service.go**
 
 Overwrite `e:\gugacode\gugacode\gugacode\services\terminal_service.go` with:
 
@@ -323,7 +323,7 @@ type errTerminalNotRunning struct{}
 func (errTerminalNotRunning) Error() string { return "terminal not running" }
 ```
 
-- [ ] **Step 2: Build**
+- [x] **Step 2: Build**
 
 Run: `cd e:\gugacode\gugacode\gugacode && go build .`
 Expected: exit 0
@@ -337,7 +337,7 @@ Expected: exit 0
 
 Update existing tests to use the new multi-session API.
 
-- [ ] **Step 1: Rewrite test file**
+- [x] **Step 1: Rewrite test file**
 
 Overwrite `e:\gugacode\gugacode\gugacode\services\terminal_service_test.go` with:
 
@@ -459,7 +459,7 @@ func TestTerminalService_WorkspaceRoot(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run: `cd e:\gugacode\gugacode\gugacode && go test ./services/ -run TestTerminalService -v -count=1`
 Expected: All tests pass
@@ -473,14 +473,14 @@ Expected: All tests pass
 
 Give TerminalService the app reference for direct event emission, and remove the old poll loop.
 
-- [ ] **Step 1: Add SetApp call**
+- [x] **Step 1: Add SetApp call**
 
 In `main.go`, after `aiService.SetApp(app)` (line 77), add:
 ```go
 	terminalService.SetApp(app)
 ```
 
-- [ ] **Step 2: Remove the terminal poll loop**
+- [x] **Step 2: Remove the terminal poll loop**
 
 Remove the entire poll loop goroutine (lines 80-87):
 ```go
@@ -495,7 +495,7 @@ Remove the entire poll loop goroutine (lines 80-87):
 	}()
 ```
 
-- [ ] **Step 3: Remove TerminalOutputEvent struct**
+- [x] **Step 3: Remove TerminalOutputEvent struct**
 
 Remove the struct definition (lines 24-26):
 ```go
@@ -514,11 +514,11 @@ Replace with:
 	application.RegisterEvent[map[string]string]("terminal:output")
 ```
 
-- [ ] **Step 4: Remove unused time import if needed**
+- [x] **Step 4: Remove unused time import if needed**
 
 Check if `time` is still used. If not, remove `"time"` from imports.
 
-- [ ] **Step 5: Build**
+- [x] **Step 5: Build**
 
 Run: `cd e:\gugacode\gugacode\gugacode && go build .`
 Expected: exit 0
@@ -532,7 +532,7 @@ Expected: exit 0
 
 Add 5 new methods with FNV-1a binding IDs computed from `gugacode/services.TerminalService.{MethodName}`.
 
-- [ ] **Step 1: Compute binding IDs**
+- [x] **Step 1: Compute binding IDs**
 
 The FNV-1a 32-bit hash of `gugacode/services.TerminalService.{MethodName}`:
 - StartSession → need to compute
@@ -560,7 +560,7 @@ func main() {
 }
 ```
 
-- [ ] **Step 2: Add new methods to terminalservice.js**
+- [x] **Step 2: Add new methods to terminalservice.js**
 
 Add these export functions to `frontend/bindings/gugacode/services/terminalservice.js` (before the existing functions or after — order doesn't matter):
 
@@ -634,7 +634,7 @@ Replace `NEW_ID_1` through `NEW_ID_6` with the computed values from Step 1.
 - Modify: `frontend/src/api/services.ts`
 - Modify: `frontend/src/types/index.ts`
 
-- [ ] **Step 1: Add terminal session methods to services.ts**
+- [x] **Step 1: Add terminal session methods to services.ts**
 
 In `frontend/src/api/services.ts`, find the `terminalService` export and add these methods:
 
@@ -657,7 +657,7 @@ export const terminalService = {
 };
 ```
 
-- [ ] **Step 2: Add TerminalSessionInfo type**
+- [x] **Step 2: Add TerminalSessionInfo type**
 
 In `frontend/src/types/index.ts`, add:
 
@@ -676,7 +676,7 @@ export interface TerminalSessionInfo {
 **Files:**
 - Modify: `frontend/src/stores/terminal.ts` (complete rewrite)
 
-- [ ] **Step 1: Rewrite terminal.ts**
+- [x] **Step 1: Rewrite terminal.ts**
 
 Overwrite `e:\gugacode\gugacode\gugacode\frontend\src\stores\terminal.ts` with:
 
@@ -839,7 +839,7 @@ export function clearOutput(): void {
 }
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
@@ -851,7 +851,7 @@ Expected: exit 0
 **Files:**
 - Modify: `frontend/src/stores/terminal.test.ts`
 
-- [ ] **Step 1: Rewrite test file**
+- [x] **Step 1: Rewrite test file**
 
 Overwrite `e:\gugacode\gugacode\gugacode\frontend\src\stores\terminal.test.ts` with:
 
@@ -972,7 +972,7 @@ describe("terminal store (multi-session)", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests**
+- [x] **Step 2: Run tests**
 
 Run: `cd frontend && npx vitest run src/stores/terminal.test.ts`
 Expected: All tests pass
@@ -989,7 +989,7 @@ The panel needs:
 - Multiple xterm.js instances (one per session, lazily initialized)
 - Switching between tabs shows the correct terminal
 
-- [ ] **Step 1: Rewrite TerminalPanel.vue**
+- [x] **Step 1: Rewrite TerminalPanel.vue**
 
 Overwrite `e:\gugacode\gugacode\gugacode\frontend\src\components\layout\TerminalPanel.vue` with:
 
@@ -1378,7 +1378,7 @@ onBeforeUnmount(() => {
 </style>
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
@@ -1387,32 +1387,32 @@ Expected: exit 0
 
 ### Task 9: Full Verification
 
-- [ ] **Step 1: Go tests**
+- [x] **Step 1: Go tests**
 
 Run: `cd e:\gugacode\gugacode\gugacode && go test ./services/... -count=1`
 Expected: ok gugacode/services
 
-- [ ] **Step 2: Go build**
+- [x] **Step 2: Go build**
 
 Run: `cd e:\gugacode\gugacode\gugacode && go build .`
 Expected: exit 0
 
-- [ ] **Step 3: Frontend type-check**
+- [x] **Step 3: Frontend type-check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 4: Frontend tests**
+- [x] **Step 4: Frontend tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: All tests pass (existing 87 + updated terminal tests)
 
-- [ ] **Step 5: Verify multi-session methods exist in bindings**
+- [x] **Step 5: Verify multi-session methods exist in bindings**
 
 Run: `grep "StartSession\|KillSession\|WriteSession\|ResizeSession\|IsSessionRunning\|ListSessions" frontend/bindings/gugacode/services/terminalservice.js`
 Expected: 6 matches
 
-- [ ] **Step 6: Verify poll loop removed from main.go**
+- [x] **Step 6: Verify poll loop removed from main.go**
 
 Run: `grep "ReadOutput" main.go`
 Expected: No matches (poll loop removed)

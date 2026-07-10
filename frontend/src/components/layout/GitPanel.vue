@@ -14,9 +14,23 @@ import {
   commitChanges,
   pushChanges,
   pullChanges,
+  conflictState,
+  rebaseState,
+  loadConflicts,
+  resolveConflictAsOurs,
+  resolveConflictAsTheirs,
+  markConflictResolved,
+  startRebase,
+  abortRebase,
+  continueRebase,
+  checkRebaseStatus,
+  generateGitignore,
+  clearConflictState,
 } from "@/stores/git";
+import { openFileFromPath } from "@/stores/editor";
 import { ArrowDown, Plus, Minus, Check, Top, Bottom, Aim, Close } from "@element-plus/icons-vue";
 import DiffView from "@/components/editor/DiffView.vue";
+import MarkdownContent from "@/components/common/MarkdownContent.vue";
 import {
   reviewState,
   hasReview,
@@ -26,6 +40,7 @@ import {
 import { renderMarkdownWithApplyButtons } from "@/lib/markdown";
 import { errorMessage } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
+import type { MergeConflict } from "@/types";
 
 const { t } = useI18n();
 
@@ -46,10 +61,16 @@ function viewDiff(filePath: string) {
 }
 
 const hasChanges = computed(() => gitState.changes.length > 0);
+const hasConflicts = computed(() => conflictState.conflicts.length > 0);
+const isRebaseInProgress = computed(() => rebaseState.inProgress);
 
 async function handleRefresh() {
   if (!repoPath.value) return;
   await refreshGit(repoPath.value);
+  await checkRebaseStatus();
+  if (isRebaseInProgress.value) {
+    await loadConflicts();
+  }
 }
 
 async function handleStage(path: string) {
@@ -103,7 +124,7 @@ async function handleBranchCommand(name: string) {
         await checkoutBranch(repoPath.value, value);
         ElMessage.success(t("git.createdAndSwitched", { name: value }));
       }
-    } catch (e) {
+    } catch {
       // user cancelled
     }
   } else {
@@ -112,6 +133,126 @@ async function handleBranchCommand(name: string) {
       ElMessage.success(t("git.switched", { name }));
     } catch (e: unknown) {
       ElMessage.error(t("git.switchFailed", { error: errorMessage(e) }));
+    }
+  }
+}
+
+// --- G-FEAT-04: Rebase controls ---
+
+async function handleRebaseCommand(cmd: string) {
+  if (cmd === "__start__") {
+    await handleStartRebase();
+  }
+}
+
+async function handleStartRebase() {
+  if (!repoPath.value) return;
+  try {
+    const { value } = await ElMessageBox.prompt(t("git.rebaseBranchPrompt"), t("git.rebaseTitle"), {
+      confirmButtonText: t("git.startRebase"),
+      cancelButtonText: t("common.cancel"),
+      inputPattern: /^[A-Za-z0-9._\-/]+$/,
+      inputErrorMessage: t("git.invalidBranchName"),
+    });
+    if (value) {
+      await startRebase(value);
+      if (isRebaseInProgress.value) {
+        ElMessage.warning(t("git.rebaseInProgress"));
+      } else {
+        ElMessage.success(t("git.rebaseStarted", { branch: value }));
+      }
+      await refreshGit(repoPath.value);
+    }
+  } catch {
+    // user cancelled or rebase failed
+    if (rebaseState.error) {
+      ElMessage.error(t("git.rebaseFailed", { error: rebaseState.error }));
+    }
+  }
+}
+
+async function handleAbortRebase() {
+  try {
+    await abortRebase();
+    ElMessage.success(t("git.rebaseAborted"));
+    if (repoPath.value) await refreshGit(repoPath.value);
+  } catch (e: unknown) {
+    ElMessage.error(t("git.rebaseFailed", { error: errorMessage(e) }));
+  }
+}
+
+async function handleContinueRebase() {
+  try {
+    await continueRebase();
+    ElMessage.success(t("git.rebaseContinued"));
+    if (repoPath.value) await refreshGit(repoPath.value);
+  } catch (e: unknown) {
+    ElMessage.error(t("git.rebaseFailed", { error: errorMessage(e) }));
+  }
+}
+
+// --- G-FEAT-04: Conflict resolution ---
+
+const resolvingFile = ref<string | null>(null);
+
+async function handleAcceptOurs(conflict: MergeConflict) {
+  if (!repoPath.value) return;
+  resolvingFile.value = conflict.file;
+  try {
+    await resolveConflictAsOurs(repoPath.value, conflict);
+    ElMessage.success(t("git.conflictResolved", { file: conflict.file }));
+  } catch (e: unknown) {
+    ElMessage.error(t("git.conflictResolveFailed", { error: errorMessage(e) }));
+  } finally {
+    resolvingFile.value = null;
+  }
+}
+
+async function handleAcceptTheirs(conflict: MergeConflict) {
+  if (!repoPath.value) return;
+  resolvingFile.value = conflict.file;
+  try {
+    await resolveConflictAsTheirs(repoPath.value, conflict);
+    ElMessage.success(t("git.conflictResolved", { file: conflict.file }));
+  } catch (e: unknown) {
+    ElMessage.error(t("git.conflictResolveFailed", { error: errorMessage(e) }));
+  } finally {
+    resolvingFile.value = null;
+  }
+}
+
+async function handleOpenEditor(conflict: MergeConflict) {
+  if (!repoPath.value) return;
+  const fullPath = repoPath.value + "/" + conflict.file;
+  await openFileFromPath(fullPath);
+}
+
+async function handleMarkResolved(file: string) {
+  if (!repoPath.value) return;
+  resolvingFile.value = file;
+  try {
+    await markConflictResolved(repoPath.value, file);
+    ElMessage.success(t("git.conflictResolved", { file }));
+  } catch (e: unknown) {
+    ElMessage.error(t("git.conflictResolveFailed", { error: errorMessage(e) }));
+  } finally {
+    resolvingFile.value = null;
+  }
+}
+
+// --- G-FEAT-04: .gitignore generation ---
+
+async function handleGitignoreCommand(projectType: string) {
+  try {
+    await generateGitignore(projectType);
+    ElMessage.success(t("git.gitignoreCreated"));
+    if (repoPath.value) await refreshGit(repoPath.value);
+  } catch (e: unknown) {
+    const msg = errorMessage(e);
+    if (msg.includes("already exists")) {
+      ElMessage.warning(t("git.gitignoreExists"));
+    } else {
+      ElMessage.error(t("git.gitignoreFailed", { error: msg }));
     }
   }
 }
@@ -182,6 +323,11 @@ onMounted(() => {
   if (repoPath.value) {
     refreshGit(repoPath.value);
     loadBranches(repoPath.value);
+    checkRebaseStatus().then(() => {
+      if (isRebaseInProgress.value) {
+        loadConflicts();
+      }
+    });
   }
 });
 
@@ -189,6 +335,14 @@ watch(repoPath, (newPath) => {
   if (newPath) {
     refreshGit(newPath);
     loadBranches(newPath);
+    clearConflictState();
+    checkRebaseStatus().then(() => {
+      if (isRebaseInProgress.value) {
+        loadConflicts();
+      }
+    });
+  } else {
+    clearConflictState();
   }
 });
 </script>
@@ -251,6 +405,61 @@ watch(repoPath, (newPath) => {
       >
         ↻
       </button>
+      <!-- G-FEAT-04: Rebase controls -->
+      <el-dropdown trigger="click" @command="handleRebaseCommand" v-if="!isRebaseInProgress">
+        <button
+          type="button"
+          class="git-panel__action-btn"
+          :title="t('git.rebaseTitle')"
+          @click.stop
+        >
+          <el-icon :size="13"><ArrowDown /></el-icon>
+        </button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="__start__">{{ t('git.startRebase') }}</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      <template v-else>
+        <button
+          type="button"
+          class="git-panel__action-btn git-panel__action-btn--warning"
+          :title="t('git.abortRebase')"
+          :disabled="rebaseState.loading"
+          @click="handleAbortRebase"
+        >
+          ✕
+        </button>
+        <button
+          type="button"
+          class="git-panel__action-btn git-panel__action-btn--success"
+          :title="t('git.continueRebase')"
+          :disabled="rebaseState.loading"
+          @click="handleContinueRebase"
+        >
+          ✓
+        </button>
+      </template>
+      <!-- G-FEAT-04: .gitignore generation -->
+      <el-dropdown trigger="click" @command="handleGitignoreCommand">
+        <button
+          type="button"
+          class="git-panel__action-btn"
+          :title="t('git.gitignoreTitle')"
+          @click.stop
+        >
+          .gitignore
+        </button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="go">{{ t('git.gitignoreTypeGo') }}</el-dropdown-item>
+            <el-dropdown-item command="typescript">{{ t('git.gitignoreTypeTypeScript') }}</el-dropdown-item>
+            <el-dropdown-item command="javascript">{{ t('git.gitignoreTypeJavaScript') }}</el-dropdown-item>
+            <el-dropdown-item command="general">{{ t('git.gitignoreTypeGeneral') }}</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <button
         type="button"
         class="git-panel__review-btn"
@@ -261,6 +470,60 @@ watch(repoPath, (newPath) => {
         <el-icon :size="13"><Aim /></el-icon>
         <span>{{ t('git.review') }}</span>
       </button>
+    </div>
+
+    <!-- G-FEAT-04: Rebase in progress banner -->
+    <div v-if="isRebaseInProgress" class="git-panel__rebase-banner">
+      <span class="git-panel__rebase-indicator" />
+      <span class="git-panel__rebase-text">{{ t('git.rebaseInProgress') }}</span>
+    </div>
+
+    <!-- G-FEAT-04: Merge conflict resolver -->
+    <div v-if="hasConflicts" class="git-panel__conflicts">
+      <div class="git-panel__section-header git-panel__conflicts-header">
+        {{ t('git.conflicts', { count: conflictState.conflicts.length }) }}
+      </div>
+      <div
+        v-for="conflict in conflictState.conflicts"
+        :key="conflict.file"
+        class="git-panel__conflict-row"
+      >
+        <span class="git-panel__conflict-path" :title="conflict.file">{{ conflict.file }}</span>
+        <span class="git-panel__conflict-actions">
+          <button
+            type="button"
+            class="git-panel__conflict-btn git-panel__conflict-btn--ours"
+            :disabled="resolvingFile === conflict.file"
+            @click="handleAcceptOurs(conflict)"
+          >
+            {{ t('git.acceptOurs') }}
+          </button>
+          <button
+            type="button"
+            class="git-panel__conflict-btn git-panel__conflict-btn--theirs"
+            :disabled="resolvingFile === conflict.file"
+            @click="handleAcceptTheirs(conflict)"
+          >
+            {{ t('git.acceptTheirs') }}
+          </button>
+          <button
+            type="button"
+            class="git-panel__conflict-btn"
+            :disabled="resolvingFile === conflict.file"
+            @click="handleOpenEditor(conflict)"
+          >
+            {{ t('git.openEditor') }}
+          </button>
+          <button
+            type="button"
+            class="git-panel__conflict-btn git-panel__conflict-btn--resolved"
+            :disabled="resolvingFile === conflict.file"
+            @click="handleMarkResolved(conflict.file)"
+          >
+            {{ t('git.markResolved') }}
+          </button>
+        </span>
+      </div>
     </div>
 
     <!-- Commit message + button -->
@@ -417,9 +680,9 @@ watch(repoPath, (newPath) => {
                   :title="f"
                 >{{ f.split('/').pop() }}</span>
               </div>
-              <div
+              <MarkdownContent
                 class="review-modal__content markdown-body"
-                v-html="renderReviewContent(reviewState.result!)"
+                :html="renderReviewContent(reviewState.result!)"
               />
               <div v-if="reviewState.reviewedAt" class="review-modal__timestamp">
                 {{ t('git.reviewedAt', { time: formatReviewTime(reviewState.reviewedAt) }) }}
@@ -664,6 +927,130 @@ watch(repoPath, (newPath) => {
 .git-panel__status--deleted { color: var(--color-error); }
 .git-panel__status--untracked { color: var(--color-text-disabled); }
 .git-panel__status--default { color: var(--color-text-tertiary); }
+
+/* G-FEAT-04: Rebase button variants */
+.git-panel__action-btn--warning {
+  color: var(--color-error, #ef4444);
+}
+.git-panel__action-btn--warning:hover {
+  background-color: color-mix(in srgb, var(--color-error, #ef4444) 12%, transparent);
+}
+.git-panel__action-btn--success {
+  color: var(--color-success, #22c55e);
+}
+.git-panel__action-btn--success:hover {
+  background-color: color-mix(in srgb, var(--color-success, #22c55e) 12%, transparent);
+}
+
+/* G-FEAT-04: Rebase in progress banner */
+.git-panel__rebase-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px;
+  background-color: color-mix(in srgb, var(--color-warning, #f59e0b) 10%, transparent);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.git-panel__rebase-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-warning, #f59e0b);
+  animation: git-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes git-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .git-panel__rebase-indicator { animation: none; }
+}
+
+.git-panel__rebase-text {
+  font-size: 11px;
+  color: var(--color-warning, #f59e0b);
+  font-weight: 500;
+}
+
+/* G-FEAT-04: Merge conflict resolver */
+.git-panel__conflicts {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.git-panel__conflicts-header {
+  color: var(--color-error, #ef4444);
+}
+
+.git-panel__conflict-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 16px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--color-border-subtle, transparent);
+}
+
+.git-panel__conflict-row:last-child {
+  border-bottom: none;
+}
+
+.git-panel__conflict-path {
+  flex: 1;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.git-panel__conflict-actions {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.git-panel__conflict-btn {
+  padding: 2px 6px;
+  font-size: 10px;
+  font-family: var(--font-sans);
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-surface-container-low);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.git-panel__conflict-btn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface-container);
+}
+
+.git-panel__conflict-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.git-panel__conflict-btn--ours:hover:not(:disabled) {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.git-panel__conflict-btn--theirs:hover:not(:disabled) {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.git-panel__conflict-btn--resolved:hover:not(:disabled) {
+  color: var(--color-success, #22c55e);
+  border-color: var(--color-success, #22c55e);
+}
 
 /* AI Code Review button */
 .git-panel__review-btn {

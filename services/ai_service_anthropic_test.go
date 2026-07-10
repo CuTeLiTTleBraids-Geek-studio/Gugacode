@@ -72,7 +72,7 @@ func TestAnthropicProtocol_Send(t *testing.T) {
 	defer server.Close()
 
 	ai := NewAIService()
-	ai.SetConfig(AIConfig{
+	if err := ai.SetConfig(AIConfig{
 		APIKey:       "anthropic-key",
 		BaseURL:      server.URL,
 		Model:        "claude-3-5-sonnet-20241022",
@@ -80,7 +80,9 @@ func TestAnthropicProtocol_Send(t *testing.T) {
 		Protocol:     "anthropic",
 		Temperature:  0.5,
 		MaxTokens:    1024,
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	resp, err := ai.Send([]ChatMessage{{Role: "user", Content: "hi"}})
 	if err != nil {
@@ -121,12 +123,14 @@ func TestAnthropicProtocol_SendStream(t *testing.T) {
 	defer server.Close()
 
 	ai := NewAIService()
-	ai.SetConfig(AIConfig{
+	if err := ai.SetConfig(AIConfig{
 		APIKey:   "anthropic-key",
 		BaseURL:  server.URL,
 		Model:    "claude-3-5-sonnet-20241022",
 		Protocol: "anthropic",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	var collected string
 	err := ai.SendStream([]ChatMessage{{Role: "user", Content: "hi"}}, func(chunk string) {
@@ -162,16 +166,30 @@ func TestAnthropicProtocol_StartStream_EmitsEvents(t *testing.T) {
 	ai := NewAIService()
 	app := application.New(application.Options{})
 	ai.SetApp(app)
-	ai.SetConfig(AIConfig{
+	if err := ai.SetConfig(AIConfig{
 		APIKey:   "anthropic-key",
 		BaseURL:  server.URL,
 		Model:    "claude-3-5-sonnet-20241022",
 		Protocol: "anthropic",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	var chunks []string
+	var streamIDs []string
 	var doneEmitted bool
 	app.Event.On("ai:chunk", func(e *application.CustomEvent) {
+		// prompt-6 Task 2: payload is {streamId, data}
+		if m, ok := e.Data.(map[string]interface{}); ok {
+			if s, ok := m["data"].(string); ok {
+				chunks = append(chunks, s)
+			}
+			if id, ok := m["streamId"].(string); ok {
+				streamIDs = append(streamIDs, id)
+			}
+			return
+		}
+		// Legacy string payload (should not happen after Task 2).
 		if s, ok := e.Data.(string); ok {
 			chunks = append(chunks, s)
 		}
@@ -180,8 +198,12 @@ func TestAnthropicProtocol_StartStream_EmitsEvents(t *testing.T) {
 		doneEmitted = true
 	})
 
-	if err := ai.StartStream([]ChatMessage{{Role: "user", Content: "hi"}}); err != nil {
+	sid, err := ai.StartStream([]ChatMessage{{Role: "user", Content: "hi"}})
+	if err != nil {
 		t.Fatalf("StartStream failed: %v", err)
+	}
+	if sid == "" {
+		t.Fatal("StartStream should return a non-empty streamId")
 	}
 	// StartStream is async; poll for completion.
 	deadline := time.Now().Add(3 * time.Second)
@@ -194,18 +216,23 @@ func TestAnthropicProtocol_StartStream_EmitsEvents(t *testing.T) {
 	if len(chunks) == 0 || chunks[0] != "streamed-chunk" {
 		t.Errorf("anthropic StartStream: expected chunks ['streamed-chunk'], got %v", chunks)
 	}
+	if len(streamIDs) > 0 && streamIDs[0] != sid {
+		t.Errorf("chunk streamId %q != StartStream return %q", streamIDs[0], sid)
+	}
 }
 
 // TestAnthropicProtocol_Complete_Rejects verifies that inline completion
 // is rejected for Anthropic protocol (current implementation limitation).
 func TestAnthropicProtocol_Complete_Rejects(t *testing.T) {
 	ai := NewAIService()
-	ai.SetConfig(AIConfig{
+	if err := ai.SetConfig(AIConfig{
 		APIKey:   "anthropic-key",
 		BaseURL:  "https://example.com",
 		Model:    "claude-3-5-sonnet-20241022",
 		Protocol: "anthropic",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 	_, err := ai.Complete(CompletionRequest{
 		Prefix:   "func ",
 		Suffix:   "()",
@@ -222,12 +249,14 @@ func TestAnthropicProtocol_Complete_Rejects(t *testing.T) {
 // generation is rejected for Anthropic protocol.
 func TestAnthropicProtocol_GenerateTitleWithAI_Rejects(t *testing.T) {
 	ai := NewAIService()
-	ai.SetConfig(AIConfig{
+	if err := ai.SetConfig(AIConfig{
 		APIKey:   "anthropic-key",
 		BaseURL:  "https://example.com",
 		Model:    "claude-3-5-sonnet-20241022",
 		Protocol: "anthropic",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 	_, err := ai.GenerateTitleWithAI("user message text")
 	if err == nil {
 		t.Error("anthropic: expected GenerateTitleWithAI to reject with error, got nil")
@@ -264,10 +293,10 @@ func TestParseAnthropicSSEStream_EmptyInput(t *testing.T) {
 	}
 }
 
-// TestParseAnthropicSSEStream_IgnoresNonTextDeltas verifies that delta
-// events with non-text_delta types (e.g. input_json_delta for tool use)
-// are silently ignored.
-func TestParseAnthropicSSEStream_IgnoresNonTextDeltas(t *testing.T) {
+// TestParseAnthropicSSEStream_IgnoresOrphanInputJSON verifies that
+// input_json_delta without a prior tool_use content_block_start does not
+// produce text chunks (text still streams).
+func TestParseAnthropicSSEStream_IgnoresOrphanInputJSON(t *testing.T) {
 	body := strings.NewReader(
 		`data: {"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"\"foo\""}}` + "\n\n" +
 			`data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hello"}}` + "\n\n" +
@@ -279,7 +308,42 @@ func TestParseAnthropicSSEStream_IgnoresNonTextDeltas(t *testing.T) {
 		t.Fatalf("parseAnthropicSSEStream failed: %v", err)
 	}
 	if len(chunks) != 1 || chunks[0] != "hello" {
-		t.Errorf("expected only ['hello'] (non-text deltas ignored), got %v", chunks)
+		t.Errorf("expected only ['hello'] (orphan input_json is not text), got %v", chunks)
+	}
+}
+
+// TestParseAnthropicSSEStreamWithTools_ToolUse accumulates tool_use blocks
+// (prompt-6 Task 3 / BUG-H5).
+func TestParseAnthropicSSEStreamWithTools_ToolUse(t *testing.T) {
+	body := strings.NewReader(strings.Join([]string{
+		`data: {"type":"content_block_start","index":0,"content_block":{"type":"text"}}`,
+		`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"I'll read it."}}`,
+		`data: {"type":"content_block_stop","index":0}`,
+		`data: {"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_1","name":"read"}}`,
+		`data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"path\":"}}`,
+		`data: {"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\"a.go\"}"}}`,
+		`data: {"type":"content_block_stop","index":1}`,
+		`data: {"type":"message_stop"}`,
+		"",
+	}, "\n"))
+	var chunks []string
+	calls, err := parseAnthropicSSEStreamWithTools(body, func(c string) {
+		chunks = append(chunks, c)
+	})
+	if err != nil {
+		t.Fatalf("parseAnthropicSSEStreamWithTools: %v", err)
+	}
+	if strings.Join(chunks, "") != "I'll read it." {
+		t.Fatalf("text chunks = %v", chunks)
+	}
+	if len(calls) != 1 {
+		t.Fatalf("expected 1 tool call, got %d: %+v", len(calls), calls)
+	}
+	if calls[0].Name != "read" || calls[0].ID != "toolu_1" {
+		t.Fatalf("unexpected tool call: %+v", calls[0])
+	}
+	if calls[0].Arguments != `{"path":"a.go"}` {
+		t.Fatalf("arguments = %q", calls[0].Arguments)
 	}
 }
 
@@ -412,14 +476,16 @@ func TestAnthropicProtocol_SendIncludesTemperatureAndMaxTokens(t *testing.T) {
 	defer server.Close()
 
 	ai := NewAIService()
-	ai.SetConfig(AIConfig{
+	if err := ai.SetConfig(AIConfig{
 		APIKey:      "anthropic-key",
 		BaseURL:     server.URL,
 		Model:       "claude-3-5-sonnet-20241022",
 		Protocol:    "anthropic",
 		Temperature: 1.2,
 		MaxTokens:   2048,
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	_, err := ai.Send([]ChatMessage{{Role: "user", Content: "hi"}})
 	if err != nil {
@@ -437,12 +503,14 @@ func TestAnthropicProtocol_SendIncludesTemperatureAndMaxTokens(t *testing.T) {
 // also enforces the API key requirement.
 func TestAnthropicProtocol_SendMissingAPIKey(t *testing.T) {
 	ai := NewAIService()
-	ai.SetConfig(AIConfig{
+	if err := ai.SetConfig(AIConfig{
 		APIKey:   "",
 		BaseURL:  "https://example.com",
 		Model:    "claude-3-5-sonnet-20241022",
 		Protocol: "anthropic",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 	_, err := ai.Send([]ChatMessage{{Role: "user", Content: "hi"}})
 	if err == nil {
 		t.Error("anthropic: expected error when API key is missing")
@@ -464,12 +532,14 @@ func TestAnthropicProtocol_SendStreamWithContext(t *testing.T) {
 	defer server.Close()
 
 	ai := NewAIService()
-	ai.SetConfig(AIConfig{
+	if err := ai.SetConfig(AIConfig{
 		APIKey:   "anthropic-key",
 		BaseURL:  server.URL,
 		Model:    "claude-3-5-sonnet-20241022",
 		Protocol: "anthropic",
-	})
+	}); err != nil {
+		t.Fatalf("SetConfig failed: %v", err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()

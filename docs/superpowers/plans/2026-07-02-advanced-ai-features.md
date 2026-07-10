@@ -86,7 +86,7 @@ frontend/
 - Create: `services/ai_prompts.go`
 - Create: `services/ai_prompts_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `services/ai_prompts_test.go`:
 
@@ -166,12 +166,12 @@ func TestBuildPrompt_ReplacesLanguagePlaceholder(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./services/ -run TestDefaultSystemPrompt -v`
 Expected: FAIL — `services.DefaultSystemPrompt` undefined.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `services/ai_prompts.go`:
 
@@ -262,17 +262,17 @@ func BuildPromptWithMeta(template, code, language, filePath string) string {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./services/ -run "TestDefaultSystemPrompt|TestPresetPrompts|TestGetPresetPrompt|TestBuildPrompt" -v`
 Expected: PASS — all 8 prompt tests pass.
 
-- [ ] **Step 5: Verify full suite still passes**
+- [x] **Step 5: Verify full suite still passes**
 
 Run: `go test ./services/ -count=1`
 Expected: all prior tests still pass (41 + 8 new = 49 tests).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add services/ai_prompts.go services/ai_prompts_test.go
@@ -287,7 +287,7 @@ git commit -m "feat: add AI system prompt and preset prompt templates"
 - Modify: `services/ai_service.go`
 - Modify: `services/ai_service_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `services/ai_service_test.go` (add to existing file, do not duplicate imports):
 
@@ -426,12 +426,12 @@ import (
 )
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./services/ -run "TestAIService_Send_includesSystemPrompt|TestAIService_Send_usesDefaultSystemPromptWhenNoneSet|TestAIService_SendStream_isCancellable" -v`
 Expected: FAIL — `AIConfig.SystemPrompt` undefined, `svc.SendStreamWithContext` undefined.
 
-- [ ] **Step 3: Modify `services/ai_service.go`**
+- [x] **Step 3: Modify `services/ai_service.go`**
 
 Replace the entire file content with:
 
@@ -620,17 +620,17 @@ func (a *AIService) SendStreamWithContext(ctx context.Context, messages []ChatMe
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./services/ -run "TestAIService_Send_includesSystemPrompt|TestAIService_Send_usesDefaultSystemPromptWhenNoneSet|TestAIService_SendStream_isCancellable" -v`
 Expected: PASS — all 3 new tests pass.
 
-- [ ] **Step 5: Verify full suite passes**
+- [x] **Step 5: Verify full suite passes**
 
 Run: `go test ./services/ -count=1 && go vet ./... && go build ./...`
 Expected: all tests pass (49 + 3 = 52 tests), vet clean, build clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add services/ai_service.go services/ai_service_test.go
@@ -645,7 +645,7 @@ git commit -m "feat: add system prompt and cancellable streaming to AIService"
 - Create: `services/conversation_service.go`
 - Create: `services/conversation_service_test.go`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `services/conversation_service_test.go`:
 
@@ -812,12 +812,12 @@ func TestConversationService_List_emptyDirReturnsEmpty(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `go test ./services/ -run TestConversationService -v`
 Expected: FAIL — `services.ConversationService` undefined.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `services/conversation_service.go`:
 
@@ -969,17 +969,17 @@ func GenerateTitle(firstMessage string) string {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `go test ./services/ -run "TestConversationService|TestConversationService_GenerateTitleFromMessage" -v`
 Expected: PASS — all 7 conversation tests pass.
 
-- [ ] **Step 5: Verify full suite**
+- [x] **Step 5: Verify full suite**
 
 Run: `go test ./services/ -count=1 && go vet ./... && go build ./...`
 Expected: 52 + 7 = 59 tests pass, vet/build clean.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add services/conversation_service.go services/conversation_service_test.go
@@ -993,7 +993,7 @@ git commit -m "feat: add ConversationService for AI chat persistence"
 **Files:**
 - Modify: `main.go`
 
-- [ ] **Step 1: Edit main.go**
+- [x] **Step 1: Edit main.go**
 
 In `main.go`, add the conversation service instantiation after the searchService line:
 
@@ -1012,7 +1012,7 @@ Then add it to the Services slice (before `&GreetService{}`):
 			application.NewService(&GreetService{}),
 ```
 
-- [ ] **Step 2: Verify build and tests**
+- [x] **Step 2: Verify build and tests**
 
 Run:
 ```bash
@@ -1023,7 +1023,7 @@ go test ./services/ -count=1
 
 Expected: all succeed, 59 tests pass.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add main.go
@@ -1041,7 +1041,7 @@ git commit -m "feat: register ConversationService in main.go"
 - Modify: `frontend/src/types/index.ts`
 - Modify: `frontend/src/api/services.ts`
 
-- [ ] **Step 1: Add new types to `frontend/bindings/changeme/services/models.js`**
+- [x] **Step 1: Add new types to `frontend/bindings/changeme/services/models.js`**
 
 Append these classes after the `SearchResult` class at the end of the file:
 
@@ -1083,7 +1083,7 @@ export class Conversation {
 }
 ```
 
-- [ ] **Step 2: Create `frontend/bindings/changeme/services/conversationservice.js`**
+- [x] **Step 2: Create `frontend/bindings/changeme/services/conversationservice.js`**
 
 ```javascript
 // @ts-check
@@ -1146,7 +1146,7 @@ const $$createType0 = $models.Conversation.createFrom;
 const $$createType1 = $Create.Array($$createType0);
 ```
 
-- [ ] **Step 3: Update `frontend/bindings/changeme/services/index.js`**
+- [x] **Step 3: Update `frontend/bindings/changeme/services/index.js`**
 
 Add the import and re-export for ConversationService and the new model types:
 
@@ -1181,7 +1181,7 @@ export {
 } from "./models.js";
 ```
 
-- [ ] **Step 4: Extend `frontend/src/types/index.ts`**
+- [x] **Step 4: Extend `frontend/src/types/index.ts`**
 
 Append after the `SearchResult` interface:
 
@@ -1215,7 +1215,7 @@ export interface AIContextAttachment {
 }
 ```
 
-- [ ] **Step 5: Extend `frontend/src/api/services.ts`**
+- [x] **Step 5: Extend `frontend/src/api/services.ts`**
 
 Add the import and wrapper. After the `SearchServiceBindings` import:
 
@@ -1264,7 +1264,7 @@ export const aiServiceV2 = {
 };
 ```
 
-- [ ] **Step 6: Verify type check**
+- [x] **Step 6: Verify type check**
 
 Run:
 ```bash
@@ -1274,7 +1274,7 @@ npx vue-tsc --noEmit
 
 Expected: no errors.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/bindings/ frontend/src/types/index.ts frontend/src/api/services.ts
@@ -1289,7 +1289,7 @@ git commit -m "feat: add ConversationService bindings and AI v2 types"
 - Create: `frontend/src/lib/markdown.ts`
 - Create: `frontend/src/lib/markdown.test.ts`
 
-- [ ] **Step 1: Install dependencies**
+- [x] **Step 1: Install dependencies**
 
 Run from `frontend/`:
 ```bash
@@ -1297,7 +1297,7 @@ npm install marked highlight.js
 npm install -D @types/marked
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `frontend/src/lib/markdown.test.ts`:
 
@@ -1376,7 +1376,7 @@ describe("sanitizeHtml", () => {
 });
 ```
 
-- [ ] **Step 3: Run tests to verify they fail**
+- [x] **Step 3: Run tests to verify they fail**
 
 Run:
 ```bash
@@ -1386,7 +1386,7 @@ npx vitest run src/lib/markdown.test.ts
 
 Expected: FAIL — cannot resolve `./markdown`.
 
-- [ ] **Step 4: Write the implementation**
+- [x] **Step 4: Write the implementation**
 
 Create `frontend/src/lib/markdown.ts`:
 
@@ -1428,7 +1428,7 @@ export function renderMarkdown(md: string): string {
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run:
 ```bash
@@ -1438,7 +1438,7 @@ npx vitest run src/lib/markdown.test.ts
 
 Expected: PASS — all 11 markdown tests pass.
 
-- [ ] **Step 6: Verify full suite and type check**
+- [x] **Step 6: Verify full suite and type check**
 
 Run:
 ```bash
@@ -1449,7 +1449,7 @@ npx vitest run
 
 Expected: vue-tsc clean, 60 + 11 = 71 tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add frontend/src/lib/markdown.ts frontend/src/lib/markdown.test.ts frontend/package.json frontend/package-lock.json
@@ -1464,7 +1464,7 @@ git commit -m "feat: add markdown rendering with XSS sanitization"
 - Modify: `frontend/src/stores/ai.ts`
 - Modify: `frontend/src/stores/ai.test.ts`
 
-- [ ] **Step 1: Replace `frontend/src/stores/ai.ts` with the extended version**
+- [x] **Step 1: Replace `frontend/src/stores/ai.ts` with the extended version**
 
 ```typescript
 import { reactive } from "vue";
@@ -1652,7 +1652,7 @@ export async function loadConversation(id: string): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: Add `aiSystemPrompt` to `appState`**
+- [x] **Step 2: Add `aiSystemPrompt` to `appState`**
 
 In `frontend/src/stores/app.ts`, add to the `AppState` interface (after `aiModel`):
 
@@ -1699,7 +1699,7 @@ export interface Settings {
 
 In `services/settings_service.go`, add `AISystemPrompt string` to the `Settings` struct and set `AISystemPrompt: ""` in `defaultSettings()`.
 
-- [ ] **Step 3: Update tests**
+- [x] **Step 3: Update tests**
 
 Replace `frontend/src/stores/ai.test.ts` with:
 
@@ -1805,7 +1805,7 @@ describe("ai store", () => {
 });
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run:
 ```bash
@@ -1815,7 +1815,7 @@ npx vitest run src/stores/ai.test.ts
 
 Expected: PASS — all 7 AI store tests pass.
 
-- [ ] **Step 5: Verify full suite**
+- [x] **Step 5: Verify full suite**
 
 Run:
 ```bash
@@ -1826,7 +1826,7 @@ npx vitest run
 
 Expected: vue-tsc clean, all tests pass (71 - 3 old ai tests + 7 new = 75 tests).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/stores/ai.ts frontend/src/stores/ai.test.ts frontend/src/stores/app.ts frontend/src/types/index.ts services/settings_service.go
@@ -1840,7 +1840,7 @@ git commit -m "feat: extend AI store with context, stop, presets, persistence"
 **Files:**
 - Modify: `frontend/src/components/layout/AiChatPanel.vue`
 
-- [ ] **Step 1: Replace AiChatPanel.vue**
+- [x] **Step 1: Replace AiChatPanel.vue**
 
 Replace the entire file with:
 
@@ -2412,7 +2412,7 @@ watch(
 </style>
 ```
 
-- [ ] **Step 2: Verify type check and tests**
+- [x] **Step 2: Verify type check and tests**
 
 Run:
 ```bash
@@ -2423,7 +2423,7 @@ npx vitest run
 
 Expected: vue-tsc clean, all tests pass.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/layout/AiChatPanel.vue
@@ -2437,11 +2437,11 @@ git commit -m "feat: redesign AiChatPanel with markdown, stop, copy, context chi
 **Files:**
 - Modify: `frontend/src/components/editor/CodeEditor.vue`
 
-- [ ] **Step 1: Read the current CodeEditor.vue**
+- [x] **Step 1: Read the current CodeEditor.vue**
 
 Read `frontend/src/components/editor/CodeEditor.vue` to understand its structure. It uses `vue-monaco-editor` and binds to `editorState`.
 
-- [ ] **Step 2: Add AI action menu**
+- [x] **Step 2: Add AI action menu**
 
 In the `<script setup>` block, add imports and action handlers after the existing setup:
 
@@ -2540,7 +2540,7 @@ Then in the `<template>`, ensure the Monaco component calls `@mount="handleMount
 
 **Note:** Read the existing CodeEditor.vue first to find the exact Monaco editor tag and add the `@mount` handler. If the editor already uses `@mount`, add `registerAIActions(editor)` inside the existing mount handler instead.
 
-- [ ] **Step 3: Verify type check**
+- [x] **Step 3: Verify type check**
 
 Run:
 ```bash
@@ -2550,7 +2550,7 @@ npx vue-tsc --noEmit
 
 Expected: no errors. If `editorState` is not imported, add it to the imports.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add frontend/src/components/editor/CodeEditor.vue
@@ -2566,11 +2566,11 @@ git commit -m "feat: add editor right-click AI actions (explain/refactor/fix/doc
 - Modify: `services/settings_service.go` (if not already done in Task 7)
 - Modify: `frontend/src/stores/app.ts` (if not already done in Task 7)
 
-- [ ] **Step 1: Read current SettingsView.vue**
+- [x] **Step 1: Read current SettingsView.vue**
 
 Read `frontend/src/views/SettingsView.vue` to understand its layout. Find the AI config section.
 
-- [ ] **Step 2: Add system prompt textarea**
+- [x] **Step 2: Add system prompt textarea**
 
 In the AI configuration section of `SettingsView.vue`, add a system prompt textarea after the model selector:
 
@@ -2604,7 +2604,7 @@ function resetSystemPrompt() {
 }
 ```
 
-- [ ] **Step 3: Ensure Go settings_service.go has the field**
+- [x] **Step 3: Ensure Go settings_service.go has the field**
 
 In `services/settings_service.go`, the `Settings` struct must have:
 
@@ -2621,7 +2621,7 @@ And `defaultSettings()` must set:
 	AISystemPrompt: "",
 ```
 
-- [ ] **Step 4: Add a settings test**
+- [x] **Step 4: Add a settings test**
 
 Append to `services/settings_service_test.go`:
 
@@ -2648,7 +2648,7 @@ func TestSettingsService_SaveAndLoadAISystemPrompt(t *testing.T) {
 }
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run:
 ```bash
@@ -2660,7 +2660,7 @@ npx vitest run
 
 Expected: Go test passes, vue-tsc clean, all frontend tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/views/SettingsView.vue services/settings_service.go services/settings_service_test.go
@@ -2674,7 +2674,7 @@ git commit -m "feat: add system prompt configuration in settings"
 **Files:**
 - Modify: `frontend/src/components/layout/AiChatPanel.vue`
 
-- [ ] **Step 1: Add conversation history dropdown**
+- [x] **Step 1: Add conversation history dropdown**
 
 In `AiChatPanel.vue`, add a history button next to the clear button in the header:
 
@@ -2871,7 +2871,7 @@ Add styles:
 
 Also make the `.ai-chat-panel` position relative so the absolute panel anchors correctly — add `position: relative;` to `.ai-chat-panel`.
 
-- [ ] **Step 2: Verify type check and tests**
+- [x] **Step 2: Verify type check and tests**
 
 Run:
 ```bash
@@ -2882,7 +2882,7 @@ npx vitest run
 
 Expected: vue-tsc clean, all tests pass.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add frontend/src/components/layout/AiChatPanel.vue
@@ -2895,7 +2895,7 @@ git commit -m "feat: add conversation history sidebar to AI chat"
 
 **Files:** none (manual testing only)
 
-- [ ] **Step 1: Run full backend test suite**
+- [x] **Step 1: Run full backend test suite**
 
 Run:
 ```bash
@@ -2904,7 +2904,7 @@ go test ./services/ -v
 
 Expected: all tests pass. Count: 52 prior + 8 prompts + 7 conversations + 1 system prompt settings = 68 tests.
 
-- [ ] **Step 2: Run full frontend test suite**
+- [x] **Step 2: Run full frontend test suite**
 
 Run:
 ```bash
@@ -2914,7 +2914,7 @@ npx vitest run
 
 Expected: all tests pass. Count: 60 prior + 11 markdown + 7 new ai = 78 tests.
 
-- [ ] **Step 3: Build verification**
+- [x] **Step 3: Build verification**
 
 Run:
 ```bash
@@ -2925,7 +2925,7 @@ npx vue-tsc --noEmit
 
 Expected: both succeed with no output.
 
-- [ ] **Step 4: Manual GUI verification**
+- [x] **Step 4: Manual GUI verification**
 
 Run `wails3 dev` from the project root. Verify each:
 
@@ -2947,7 +2947,7 @@ Run `wails3 dev` from the project root. Verify each:
 16. **Model selector**: Switch models. The setting should persist.
 17. **Context menu in editor**: Right-click in the editor. The "AI:" actions should appear in the context menu under an "ai" group.
 
-- [ ] **Step 5: Final commit (if fixes needed)**
+- [x] **Step 5: Final commit (if fixes needed)**
 
 If manual testing revealed bugs, commit fixes with descriptive messages.
 

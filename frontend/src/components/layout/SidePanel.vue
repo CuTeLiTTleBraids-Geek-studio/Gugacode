@@ -1,11 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
-import { appState, toggleSidebar } from "@/stores/app";
+import { appState, setExtensionsSubview, toggleSidebar } from "@/stores/app";
 import { Close } from "@element-plus/icons-vue";
 import FileTree from "@/components/explorer/FileTree.vue";
 import GitPanel from "@/components/layout/GitPanel.vue";
 import SearchPanel from "@/components/layout/SearchPanel.vue";
 import AiChatPanel from "@/components/layout/AiChatPanel.vue";
+// G-VSC-04: unified plugin/extension management panel renders in the
+// "extensions" activity tab so native plugins and VS Code extensions
+// coexist in one place with source labeling.
+import PluginManagementPanel from "@/components/layout/PluginManagementPanel.vue";
+// G-VSC-01: marketplace panel (Open VSX search/browse/install) shares the
+// "extensions" tab via a sub-view toggle.
+import MarketplacePanel from "@/components/marketplace/MarketplacePanel.vue";
 import { openFileFromPath } from "@/stores/editor";
 import { gitState, refreshGit } from "@/stores/git";
 import { useI18n } from "@/lib/i18n";
@@ -14,6 +21,9 @@ const { t } = useI18n();
 
 const isCollapsed = computed(() => appState.sidebarCollapsed);
 const currentTab = computed(() => appState.panelTab);
+// G-VSC-01: sub-view of the extensions tab — "installed" (G-VSC-04 management)
+// or "marketplace" (G-VSC-01 Open VSX browse/install).
+const extensionsSubview = computed(() => appState.extensionsSubview);
 const panelTitle = computed(() => {
   switch (currentTab.value) {
     case "search":
@@ -112,6 +122,39 @@ watch(
 
           <!-- Git panel -->
           <GitPanel v-else-if="currentTab === 'git' && projectPath" key="git" />
+
+          <!-- G-VSC-01 / G-VSC-04: extensions tab. A sub-tab toggle switches
+               between installed extension/plugin management (G-VSC-04) and the
+               Open VSX marketplace browse/install panel (G-VSC-01). Always
+               available, even without an open project. -->
+          <div v-else-if="currentTab === 'extensions'" key="extensions" class="side-panel__extensions">
+            <div class="side-panel__subtabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="extensionsSubview === 'installed'"
+                class="side-panel__subtab"
+                :class="{ 'side-panel__subtab--active': extensionsSubview === 'installed' }"
+                @click="setExtensionsSubview('installed')"
+              >
+                {{ t("marketplace.tabInstalled") }}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                :aria-selected="extensionsSubview === 'marketplace'"
+                class="side-panel__subtab"
+                :class="{ 'side-panel__subtab--active': extensionsSubview === 'marketplace' }"
+                @click="setExtensionsSubview('marketplace')"
+              >
+                {{ t("marketplace.tabMarketplace") }}
+              </button>
+            </div>
+            <div class="side-panel__extensions-body">
+              <PluginManagementPanel v-if="extensionsSubview === 'installed'" />
+              <MarketplacePanel v-else />
+            </div>
+          </div>
 
           <!-- AI chat panel (embedded，占用侧边栏空间，不挡住代码) -->
           <AiChatPanel v-else-if="currentTab === 'ai'" key="ai" embedded />
@@ -258,6 +301,53 @@ watch(
   color: var(--color-text-tertiary);
   line-height: 1.43;
   letter-spacing: -0.224px;
+}
+
+/* G-VSC-01: extensions tab wrapper — a sub-tab bar (Installed | Marketplace)
+   above a body region that fills the remaining height so the marketplace
+   panel's internal scroll works correctly. */
+.side-panel__extensions {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.side-panel__subtabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 8px 6px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+}
+
+.side-panel__subtab {
+  padding: 5px 10px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color var(--transition-fast) ease, border-color var(--transition-fast) ease;
+}
+
+.side-panel__subtab:hover {
+  color: var(--color-text-secondary);
+}
+
+.side-panel__subtab--active {
+  color: var(--chrome-text-active);
+  border-bottom-color: var(--chrome-text-active);
+}
+
+.side-panel__extensions-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (prefers-reduced-motion: reduce) {

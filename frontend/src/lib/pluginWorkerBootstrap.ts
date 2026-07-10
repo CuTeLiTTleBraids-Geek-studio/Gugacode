@@ -31,7 +31,6 @@ import type { HostToWorkerMessage, WorkerToHostMessage, RpcMethod } from "./plug
 // State
 // ---------------------------------------------------------------------------
 
-let manifest: PluginManifest | null = null;
 let nextRequestId = 0;
 const pendingRequests = new Map<
   number,
@@ -73,7 +72,6 @@ self.onmessage = async (e: MessageEvent) => {
 // ---------------------------------------------------------------------------
 
 async function handleInit(pluginUrl: string, mfst: PluginManifest): Promise<void> {
-  manifest = mfst;
   try {
     // Dynamic import of the plugin's main.js entry point.
     // The URL is served by the backend's /_plugins/ asset handler.

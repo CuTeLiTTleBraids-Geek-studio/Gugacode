@@ -40,8 +40,12 @@ function makeManifest(overrides?: Partial<PluginManifest>): PluginManifest {
 }
 
 /** Simulate the iframe sending a message to the host. */
-function sendMessageFromIframe(data: unknown, origin = window.location.origin) {
-  const event = new MessageEvent("message", { data, origin });
+function sendMessageFromIframe(
+  data: unknown,
+  source: MessageEventSource | null = null,
+  origin = window.location.origin,
+) {
+  const event = new MessageEvent("message", { data, origin, source });
   for (const listener of messageListeners) {
     listener(event);
   }
@@ -64,7 +68,7 @@ describe("PluginViewIframe (N-36 / Proposal G)", () => {
     expect(iframe.exists()).toBe(true);
     expect(iframe.attributes("src")).toContain("/_plugins/test-plugin/view.html");
     expect(iframe.attributes("src")).toContain("viewId=my-view");
-    expect(iframe.attributes("sandbox")).toBe("allow-scripts allow-same-origin");
+    expect(iframe.attributes("sandbox")).toBe("allow-scripts");
     expect(iframe.attributes("title")).toBe("My View");
   });
 
@@ -84,13 +88,17 @@ describe("PluginViewIframe (N-36 / Proposal G)", () => {
     // Mock the iframe's contentWindow.postMessage
     const postMessageSpy = vi.fn();
     const iframe = wrapper.find("iframe").element as HTMLIFrameElement;
+    const mockContentWindow = { postMessage: postMessageSpy };
     Object.defineProperty(iframe, "contentWindow", {
-      value: { postMessage: postMessageSpy },
+      value: mockContentWindow,
       configurable: true,
     });
 
     // Simulate iframe ready
-    sendMessageFromIframe({ type: "nknk:ready" });
+    sendMessageFromIframe(
+      { type: "nknk:ready" },
+      mockContentWindow as unknown as MessageEventSource,
+    );
 
     await nextTick();
 
@@ -120,17 +128,21 @@ describe("PluginViewIframe (N-36 / Proposal G)", () => {
 
     const postMessageSpy = vi.fn();
     const iframe = wrapper.find("iframe").element as HTMLIFrameElement;
+    const mockContentWindow = { postMessage: postMessageSpy };
     Object.defineProperty(iframe, "contentWindow", {
-      value: { postMessage: postMessageSpy },
+      value: mockContentWindow,
       configurable: true,
     });
 
-    sendMessageFromIframe({
-      type: "nknk:rpc-request",
-      id: 42,
-      method: "workspace.readFile",
-      args: ["src/main.ts"],
-    });
+    sendMessageFromIframe(
+      {
+        type: "nknk:rpc-request",
+        id: 42,
+        method: "workspace.readFile",
+        args: ["src/main.ts"],
+      },
+      mockContentWindow as unknown as MessageEventSource,
+    );
 
     // Wait for async handler
     await new Promise((r) => setTimeout(r, 10));
@@ -167,17 +179,21 @@ describe("PluginViewIframe (N-36 / Proposal G)", () => {
 
     const postMessageSpy = vi.fn();
     const iframe = wrapper.find("iframe").element as HTMLIFrameElement;
+    const mockContentWindow = { postMessage: postMessageSpy };
     Object.defineProperty(iframe, "contentWindow", {
-      value: { postMessage: postMessageSpy },
+      value: mockContentWindow,
       configurable: true,
     });
 
-    sendMessageFromIframe({
-      type: "nknk:rpc-request",
-      id: 1,
-      method: "workspace.readFile",
-      args: ["file.ts"],
-    });
+    sendMessageFromIframe(
+      {
+        type: "nknk:rpc-request",
+        id: 1,
+        method: "workspace.readFile",
+        args: ["file.ts"],
+      },
+      mockContentWindow as unknown as MessageEventSource,
+    );
 
     await new Promise((r) => setTimeout(r, 10));
 
@@ -209,17 +225,21 @@ describe("PluginViewIframe (N-36 / Proposal G)", () => {
 
     const postMessageSpy = vi.fn();
     const iframe = wrapper.find("iframe").element as HTMLIFrameElement;
+    const mockContentWindow = { postMessage: postMessageSpy };
     Object.defineProperty(iframe, "contentWindow", {
-      value: { postMessage: postMessageSpy },
+      value: mockContentWindow,
       configurable: true,
     });
 
-    sendMessageFromIframe({
-      type: "nknk:rpc-request",
-      id: 7,
-      method: "workspace.readFile",
-      args: ["missing.ts"],
-    });
+    sendMessageFromIframe(
+      {
+        type: "nknk:rpc-request",
+        id: 7,
+        method: "workspace.readFile",
+        args: ["missing.ts"],
+      },
+      mockContentWindow as unknown as MessageEventSource,
+    );
 
     await new Promise((r) => setTimeout(r, 10));
 
@@ -233,7 +253,7 @@ describe("PluginViewIframe (N-36 / Proposal G)", () => {
     );
   });
 
-  it("ignores messages from disallowed origins", async () => {
+  it("ignores messages from disallowed sources", async () => {
     const manifest = makeManifest();
     const rpcHandler: RpcHandler = vi.fn();
     const wrapper = mount(PluginViewIframe, {
@@ -248,15 +268,26 @@ describe("PluginViewIframe (N-36 / Proposal G)", () => {
 
     const postMessageSpy = vi.fn();
     const iframe = wrapper.find("iframe").element as HTMLIFrameElement;
+    const mockContentWindow = { postMessage: postMessageSpy };
     Object.defineProperty(iframe, "contentWindow", {
-      value: { postMessage: postMessageSpy },
+      value: mockContentWindow,
       configurable: true,
     });
 
-    // Send from a foreign origin
+    // Send from a foreign source (not the iframe's contentWindow).
+    // A spoofed "null" origin must NOT bypass the source check.
+    const foreignSource = { postMessage: vi.fn() } as unknown as MessageEventSource;
     sendMessageFromIframe(
       { type: "nknk:rpc-request", id: 1, method: "workspace.readFile", args: [] },
-      "https://evil.example.com",
+      foreignSource,
+      "null",
+    );
+
+    // Also send with no source at all (e.g. a spoofed message).
+    sendMessageFromIframe(
+      { type: "nknk:rpc-request", id: 2, method: "workspace.readFile", args: [] },
+      null,
+      "null",
     );
 
     await new Promise((r) => setTimeout(r, 10));
@@ -268,7 +299,7 @@ describe("PluginViewIframe (N-36 / Proposal G)", () => {
   it("logs nknk:log messages to console", async () => {
     const manifest = makeManifest();
     const rpcHandler: RpcHandler = vi.fn();
-    mount(PluginViewIframe, {
+    const wrapper = mount(PluginViewIframe, {
       props: {
         pluginName: "test-plugin",
         viewId: "my-view",
@@ -278,8 +309,18 @@ describe("PluginViewIframe (N-36 / Proposal G)", () => {
       },
     });
 
+    const iframe = wrapper.find("iframe").element as HTMLIFrameElement;
+    const mockContentWindow = { postMessage: vi.fn() };
+    Object.defineProperty(iframe, "contentWindow", {
+      value: mockContentWindow,
+      configurable: true,
+    });
+
     const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
-    sendMessageFromIframe({ type: "nknk:log", level: "info", message: "Hello from iframe" });
+    sendMessageFromIframe(
+      { type: "nknk:log", level: "info", message: "Hello from iframe" },
+      mockContentWindow as unknown as MessageEventSource,
+    );
 
     await nextTick();
 

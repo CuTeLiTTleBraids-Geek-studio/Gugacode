@@ -108,19 +108,19 @@ func (s *ProfileService) ensureProfilesDir() error {
 		defaultSettingsPath := filepath.Join(defaultDir, "settings.json")
 		if data, rerr := os.ReadFile(s.legacyPath); rerr == nil {
 			// Legacy file exists — copy to default profile.
-			if werr := os.WriteFile(defaultSettingsPath, data, 0o644); werr != nil {
+			if werr := atomicWriteFile(defaultSettingsPath, data, 0600); werr != nil {
 				return fmt.Errorf("migrate legacy settings: %w", werr)
 			}
 		} else {
 			// No legacy file — write defaults.
-			if werr := os.WriteFile(defaultSettingsPath, defaultsBytes(), 0o644); werr != nil {
+			if werr := atomicWriteFile(defaultSettingsPath, defaultsBytes(), 0600); werr != nil {
 				return fmt.Errorf("write default profile settings: %w", werr)
 			}
 		}
 	}
 	// Ensure state file exists with "default" as active if missing.
 	if _, err := os.Stat(s.statePath); os.IsNotExist(err) {
-		if werr := os.WriteFile(s.statePath, []byte(`{"activeProfile":"default"}`), 0o644); werr != nil {
+		if werr := atomicWriteFile(s.statePath, []byte(`{"activeProfile":"default"}`), 0600); werr != nil {
 			return fmt.Errorf("create profiles state: %w", werr)
 		}
 	}
@@ -161,14 +161,11 @@ func (s *ProfileService) saveState(name string) error {
 		return fmt.Errorf("config directory is not configured")
 	}
 	state := profileStateFile{ActiveProfile: name}
-	data, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal profiles state: %w", err)
+	// G-SEC-09: atomic write (temp file + rename).
+	if err := atomicWriteJSON(s.statePath, state, 0644); err != nil {
+		return fmt.Errorf("save profiles state: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(s.statePath), 0o755); err != nil {
-		return fmt.Errorf("create state dir: %w", err)
-	}
-	return os.WriteFile(s.statePath, data, 0o644)
+	return nil
 }
 
 // ListProfiles returns all profiles, sorted by name, with the active
@@ -317,23 +314,23 @@ func (s *ProfileService) CreateProfile(name string, fromCurrent bool) error {
 		}
 		if active != "" {
 			if data, rerr := os.ReadFile(active); rerr == nil {
-				if werr := os.WriteFile(settingsPath, data, 0o644); werr != nil {
+				if werr := atomicWriteFile(settingsPath, data, 0600); werr != nil {
 					return fmt.Errorf("copy settings to new profile: %w", werr)
 				}
 			} else {
 				// Fall back to defaults if active profile has no settings.
-				if werr := os.WriteFile(settingsPath, defaultsBytes(), 0o644); werr != nil {
+				if werr := atomicWriteFile(settingsPath, defaultsBytes(), 0600); werr != nil {
 					return fmt.Errorf("write default settings: %w", werr)
 				}
 			}
 		} else {
 			// No active path resolved — write defaults.
-			if werr := os.WriteFile(settingsPath, defaultsBytes(), 0o644); werr != nil {
+			if werr := atomicWriteFile(settingsPath, defaultsBytes(), 0600); werr != nil {
 				return fmt.Errorf("write default settings: %w", werr)
 			}
 		}
 	} else {
-		if werr := os.WriteFile(settingsPath, defaultsBytes(), 0o644); werr != nil {
+		if werr := atomicWriteFile(settingsPath, defaultsBytes(), 0600); werr != nil {
 			return fmt.Errorf("write default settings: %w", werr)
 		}
 	}
@@ -451,11 +448,8 @@ func (s *ProfileService) SetProfileDescription(name, description string) error {
 	}
 	metaPath := filepath.Join(dir, "profile.json")
 	meta := profileMeta{Description: description}
-	data, err := json.MarshalIndent(meta, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal profile meta: %w", err)
-	}
-	if err := os.WriteFile(metaPath, data, 0o644); err != nil {
+	// G-SEC-09: atomic write (temp file + rename).
+	if err := atomicWriteJSON(metaPath, meta, 0644); err != nil {
 		return fmt.Errorf("write profile meta: %w", err)
 	}
 	// Update ModifiedAt on the directory. N-110: this was silently
@@ -541,7 +535,7 @@ func (s *ProfileService) ImportProfile(export ProfileExport) (string, error) {
 		return "", fmt.Errorf("create imported profile directory: %w", err)
 	}
 	settingsPath := filepath.Join(dir, "settings.json")
-	if err := os.WriteFile(settingsPath, []byte(export.Settings), 0o644); err != nil {
+	if err := atomicWriteFile(settingsPath, []byte(export.Settings), 0600); err != nil {
 		return "", fmt.Errorf("write imported settings: %w", err)
 	}
 	// Write description if provided. N-110: the previous implementation
@@ -552,11 +546,8 @@ func (s *ProfileService) ImportProfile(export ProfileExport) (string, error) {
 	// inform the user that the description wasn't saved.
 	if export.Description != "" {
 		meta := profileMeta{Description: export.Description}
-		data, merr := json.MarshalIndent(meta, "", "  ")
-		if merr != nil {
-			return finalName, fmt.Errorf("marshal imported profile meta: %w", merr)
-		}
-		if werr := os.WriteFile(filepath.Join(dir, "profile.json"), data, 0o644); werr != nil {
+		// G-SEC-09: atomic write (temp file + rename).
+		if werr := atomicWriteJSON(filepath.Join(dir, "profile.json"), meta, 0644); werr != nil {
 			return finalName, fmt.Errorf("write imported profile meta: %w", werr)
 		}
 	}

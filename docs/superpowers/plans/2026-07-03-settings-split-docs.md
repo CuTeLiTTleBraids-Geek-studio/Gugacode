@@ -31,7 +31,7 @@
 
 Extracts the "general" section (lines 115-170 of original SettingsView.vue). Contains: language selector, telemetry toggle, auto-update toggle, data folder path picker.
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 Create `frontend/src/components/settings/GeneralSection.vue`:
 
@@ -118,7 +118,7 @@ async function handleBrowseFolder() {
 
 Extracts the "editor" section (lines 173-306). Contains: font size, font family, tab size, word wrap, line numbers, minimap, cursor blinking, cursor style, bracket colorization, auto-save + delay.
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 Create `frontend/src/components/settings/EditorSection.vue`:
 
@@ -279,7 +279,7 @@ import { appState, saveSettings } from "@/stores/app";
 
 Extracts the "ai" section (lines 309-455). Contains: AI provider, API key, base URL, model, temperature, max tokens, system prompt, test connection.
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 Create `frontend/src/components/settings/AiSection.vue`:
 
@@ -470,7 +470,7 @@ async function handleTestConnection() {
 
 Extracts the "terminal" section (lines 458-526).
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 Create `frontend/src/components/settings/TerminalSection.vue`:
 
@@ -560,7 +560,7 @@ import { appState, saveSettings } from "@/stores/app";
 
 Extracts the "shortcuts" section (lines 529-547).
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 Create `frontend/src/components/settings/ShortcutsSection.vue`:
 
@@ -600,7 +600,7 @@ const shortcuts = [
 
 Extracts the "appearance" section (lines 550-619). Contains: theme (dark/light/system), accent color picker, font size scaling, UI density.
 
-- [ ] **Step 1: Create the component**
+- [x] **Step 1: Create the component**
 
 Create `frontend/src/components/settings/AppearanceSection.vue`:
 
@@ -712,7 +712,7 @@ function selectAccent(key: AccentTheme) {
 
 The parent becomes a thin shell with left navigation and dynamic component rendering.
 
-- [ ] **Step 1: Write the new SettingsView.vue**
+- [x] **Step 1: Write the new SettingsView.vue**
 
 Overwrite `frontend/src/views/SettingsView.vue` with:
 
@@ -906,12 +906,12 @@ function selectSection(key: SettingsSection) {
 </style>
 ```
 
-- [ ] **Step 2: Type-check**
+- [x] **Step 2: Type-check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: All tests pass
@@ -923,7 +923,7 @@ Expected: All tests pass
 **Files:**
 - Create: `ARCHITECTURE.md` (project root)
 
-- [ ] **Step 1: Write the file**
+- [x] **Step 1: Write the file**
 
 Create `e:\gugacode\gugacode\gugacode\ARCHITECTURE.md`:
 
@@ -1068,7 +1068,7 @@ cd frontend && npm run dev
 **Files:**
 - Create: `SECURITY.md` (project root)
 
-- [ ] **Step 1: Write the file**
+- [x] **Step 1: Write the file**
 
 Create `e:\gugacode\gugacode\gugacode\SECURITY.md`:
 
@@ -1147,32 +1147,32 @@ No CSRF, ClickJacking, or CORS protections are needed since the app runs in a de
 
 ### Task 10: Full Verification
 
-- [ ] **Step 1: Go tests**
+- [x] **Step 1: Go tests**
 
 Run: `cd e:\gugacode\gugacode\gugacode && go test ./services/...`
 Expected: ok gugacode/services
 
-- [ ] **Step 2: Frontend type-check**
+- [x] **Step 2: Frontend type-check**
 
 Run: `cd frontend && npx vue-tsc --noEmit`
 Expected: exit 0
 
-- [ ] **Step 3: Frontend tests**
+- [x] **Step 3: Frontend tests**
 
 Run: `cd frontend && npx vitest run`
 Expected: All tests pass
 
-- [ ] **Step 4: Verify SettingsView is now a thin shell**
+- [x] **Step 4: Verify SettingsView is now a thin shell**
 
 Run: `(Get-Content frontend\src\views\SettingsView.vue).Count`
 Expected: Less than 200 lines (down from 977)
 
-- [ ] **Step 5: Verify all 6 section components exist**
+- [x] **Step 5: Verify all 6 section components exist**
 
 Run: `Test-Path frontend\src\components\settings\GeneralSection.vue, frontend\src\components\settings\EditorSection.vue, frontend\src\components\settings\AiSection.vue, frontend\src\components\settings\TerminalSection.vue, frontend\src\components\settings\ShortcutsSection.vue, frontend\src\components\settings\AppearanceSection.vue`
 Expected: All True
 
-- [ ] **Step 6: Verify docs exist**
+- [x] **Step 6: Verify docs exist**
 
 Run: `Test-Path ARCHITECTURE.md, SECURITY.md`
 Expected: True, True

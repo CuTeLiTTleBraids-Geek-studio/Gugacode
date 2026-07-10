@@ -36,6 +36,15 @@ export const workflowState = reactive<WorkflowStoreState>({
 
 export const hasWorkflows = computed(() => workflowState.workflows.length > 0);
 
+// G-SEC-03: Startup workflows loaded from the project's .nknk/workflows are
+// untrusted (a cloned repository could contain malicious startup workflows).
+// Instead of auto-running them on project load, the UI lists them as
+// "Pending Confirmation" and the user must explicitly click "Run". This
+// computed exposes the pending list so the UI can render a confirmation prompt.
+export const pendingStartupWorkflows = computed(() =>
+  workflowState.workflows.filter((wf) => wf.runOn?.event === "startup"),
+);
+
 // Load workflows for the given project root. A no-op when root is empty.
 // Errors are surfaced to the store and a notification, but do not throw.
 //
@@ -87,6 +96,84 @@ export async function loadWorkflows(projectRoot: string): Promise<void> {
 // validated. Used by the UI to show error badges and block execution.
 export function getWorkflowValidation(name: string): WorkflowValidationResult | null {
   return workflowState.validation[name] ?? null;
+}
+
+// ---- prompt-4 Task 12: 软件内 CRUD ----
+
+/** 在当前项目创建新工作流并刷新列表。 */
+export async function createWorkflow(name: string, def: WorkflowDef): Promise<boolean> {
+  const root = appState.currentProject;
+  if (!root) {
+    notifyError("No project open");
+    return false;
+  }
+  try {
+    await workflowService.createWorkflow(root, name, def);
+    await loadWorkflows(root);
+    notifySuccess(`Workflow "${name}" created`);
+    return true;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    notifyError(`Create workflow failed: ${msg}`);
+    return false;
+  }
+}
+
+/** 保存（覆盖）工作流定义。 */
+export async function saveWorkflow(name: string, def: WorkflowDef): Promise<boolean> {
+  const root = appState.currentProject;
+  if (!root) {
+    notifyError("No project open");
+    return false;
+  }
+  try {
+    await workflowService.saveWorkflow(root, name, def);
+    await loadWorkflows(root);
+    notifySuccess(`Workflow "${name}" saved`);
+    return true;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    notifyError(`Save workflow failed: ${msg}`);
+    return false;
+  }
+}
+
+/** 删除工作流文件。 */
+export async function deleteWorkflow(name: string): Promise<boolean> {
+  const root = appState.currentProject;
+  if (!root) {
+    notifyError("No project open");
+    return false;
+  }
+  try {
+    await workflowService.deleteWorkflow(root, name);
+    await loadWorkflows(root);
+    notifySuccess(`Workflow "${name}" deleted`);
+    return true;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    notifyError(`Delete workflow failed: ${msg}`);
+    return false;
+  }
+}
+
+/** 重命名工作流。 */
+export async function renameWorkflow(oldName: string, newName: string): Promise<boolean> {
+  const root = appState.currentProject;
+  if (!root) {
+    notifyError("No project open");
+    return false;
+  }
+  try {
+    await workflowService.renameWorkflow(root, oldName, newName);
+    await loadWorkflows(root);
+    notifySuccess(`Workflow renamed to "${newName}"`);
+    return true;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    notifyError(`Rename workflow failed: ${msg}`);
+    return false;
+  }
 }
 
 // N-55: Returns true if the workflow is valid and can be run. A workflow
@@ -817,12 +904,16 @@ export function findTriggeredWorkflows(
 }
 
 /**
- * Proposal J (prompt-4.md): Find workflows that should auto-run on IDE
- * startup. A workflow matches when:
+ * Proposal J (prompt-4.md): Find workflows with a `runOn` trigger of
+ * `event: "startup"`. A workflow matches when:
  *   - it has a `runOn` trigger with `event: "startup"`
  *   - it is not already running
  *
- * This is a pure function extracted from runStartupWorkflows for testing.
+ * G-SEC-03: This is a pure lookup used to list startup workflows for user
+ * confirmation. It does NOT auto-execute them — the UI must present the
+ * returned workflows as "Pending Confirmation" and the user must explicitly
+ * click "Run". This prevents malicious startup workflows in cloned
+ * repositories from auto-running shell commands.
  */
 export function findStartupWorkflows(
   workflows: WorkflowDef[],
@@ -836,22 +927,6 @@ export function findStartupWorkflows(
     result.push(wf);
   }
   return result;
-}
-
-/**
- * Proposal J (prompt-4.md): Run all workflows with `runOn.event === "startup"`.
- * Called once at app startup after loadWorkflows has populated the store.
- * Errors in individual workflows are logged but do not block other startups.
- *
- * Returns the names of workflows that were triggered.
- */
-export async function runStartupWorkflows(projectRoot: string): Promise<string[]> {
-  if (!projectRoot) return [];
-  const triggered = findStartupWorkflows(workflowState.workflows, workflowState.running);
-  for (const wf of triggered) {
-    void runWorkflow(wf, projectRoot);
-  }
-  return triggered.map((wf) => wf.name);
 }
 
 /**
