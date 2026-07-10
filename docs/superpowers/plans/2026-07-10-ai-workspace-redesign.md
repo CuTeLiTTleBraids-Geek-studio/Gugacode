@@ -12,6 +12,7 @@
 
 - Work in the existing checkout because the user explicitly authorized immediate changes and the working tree contains pre-existing overlapping user edits that must remain visible.
 - Preserve all unrelated dirty-worktree changes; stage and commit only files belonging to each task.
+- Because several implementation targets were already modified before this task, do not stage or commit implementation files during Tasks 1–7. Use diff and test checkpoints instead, then let the finishing workflow decide how to integrate the combined dirty-worktree result without claiming ownership of pre-existing hunks.
 - Use test-driven development: each production behavior needs a failing test observed before implementation.
 - AI sidebar width is clamped to 260–380px and is resizable in both pointer directions.
 - Terminal is right-docked only, clamped to 340px–55% of available content width, and never replaces the active AI view.
@@ -148,12 +149,13 @@ Run: `node node_modules/vitest/vitest.mjs run src/stores/aiWindow.test.ts src/st
 
 Expected: PASS.
 
-- [ ] **Step 9: Commit Task 1**
+- [ ] **Step 9: Record the Task 1 diff checkpoint**
 
 ```bash
-git add services/settings_service.go services/settings_service_test.go frontend/src/types/index.ts frontend/src/stores/app.ts frontend/src/stores/app.test.ts frontend/src/stores/aiWindow.ts frontend/src/stores/aiWindow.test.ts
-git commit -m "feat(ai): persist independent window preferences"
+git diff -- services/settings_service.go services/settings_service_test.go frontend/src/types/index.ts frontend/src/stores/app.ts frontend/src/stores/app.test.ts frontend/src/stores/aiWindow.ts frontend/src/stores/aiWindow.test.ts
 ```
+
+Do not stage these files.
 
 ### Task 2: Fix AI-window Visibility Semantics and Editor Highlight
 
@@ -233,12 +235,13 @@ Run both commands from Step 2.
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 2**
+- [ ] **Step 6: Record the Task 2 diff checkpoint**
 
 ```bash
-git add services/window_service.go services/window_service_test.go frontend/src/api/services.ts frontend/src/components/layout/ActivityBar.vue frontend/src/components/layout/ActivityBar.test.ts frontend/bindings/gugacode/services/windowservice.ts
-git commit -m "fix(ai): track companion window visibility"
+git diff -- services/window_service.go services/window_service_test.go frontend/src/api/services.ts frontend/src/components/layout/ActivityBar.vue frontend/src/components/layout/ActivityBar.test.ts frontend/bindings/gugacode/services/windowservice.ts
 ```
+
+Do not stage these files.
 
 ### Task 3: Build the Resizable Permanent AI Sidebar
 
@@ -303,12 +306,13 @@ Run the command from Step 2 plus: `node node_modules/vitest/vitest.mjs run src/s
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 3**
+- [ ] **Step 6: Record the Task 3 diff checkpoint**
 
 ```bash
-git add frontend/src/components/ai-window/AiWorkspaceSidebar.vue frontend/src/components/ai-window/AiWorkspaceSidebar.test.ts frontend/src/components/ai-assistant/ConversationSidebar.vue frontend/src/components/ai-assistant/ConversationSidebar.test.ts frontend/src/views/AiWindowView.vue frontend/src/stores/aiWindow.ts frontend/src/stores/aiWindow.test.ts
-git commit -m "feat(ai): add permanent resizable workspace sidebar"
+git diff -- frontend/src/components/ai-window/AiWorkspaceSidebar.vue frontend/src/components/ai-window/AiWorkspaceSidebar.test.ts frontend/src/components/ai-assistant/ConversationSidebar.vue frontend/src/components/ai-assistant/ConversationSidebar.test.ts frontend/src/views/AiWindowView.vue frontend/src/stores/aiWindow.ts frontend/src/stores/aiWindow.test.ts
 ```
+
+Do not stage these files.
 
 ### Task 4: Dock the Terminal on the Right
 
@@ -371,12 +375,13 @@ Run the Step 2 command and the existing `src/components/layout/TerminalPanel.tes
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 4**
+- [ ] **Step 6: Record the Task 4 diff checkpoint**
 
 ```bash
-git add frontend/src/components/ai-window/AiTerminalDock.vue frontend/src/components/ai-window/AiTerminalDock.test.ts frontend/src/views/AiWindowView.vue frontend/src/stores/aiWindow.ts frontend/src/stores/aiWindow.test.ts
-git commit -m "feat(ai): dock terminal on workspace right"
+git diff -- frontend/src/components/ai-window/AiTerminalDock.vue frontend/src/components/ai-window/AiTerminalDock.test.ts frontend/src/views/AiWindowView.vue frontend/src/stores/aiWindow.ts frontend/src/stores/aiWindow.test.ts
 ```
+
+Do not stage these files.
 
 ### Task 5: Add Skills and Automation Workspace Pages
 
@@ -418,12 +423,13 @@ Run Step 2 plus the existing Skills, plan, goal, and workflow tests selected by 
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 5**
+- [ ] **Step 6: Record the Task 5 diff checkpoint**
 
 ```bash
-git add frontend/src/components/ai-window/AiSkillsView.vue frontend/src/components/ai-window/AiAutomationView.vue frontend/src/components/ai-window/AiAutomationView.test.ts frontend/src/views/AiWindowView.vue
-git commit -m "feat(ai): add skills and automation workspaces"
+git diff -- frontend/src/components/ai-window/AiSkillsView.vue frontend/src/components/ai-window/AiAutomationView.vue frontend/src/components/ai-window/AiAutomationView.test.ts frontend/src/views/AiWindowView.vue
 ```
+
+Do not stage these files.
 
 ### Task 6: Build AI Settings Center and Remove AI Settings from Editor
 
@@ -481,12 +487,13 @@ Run the Step 3 command plus existing tests for migrated settings components.
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit Task 6**
+- [ ] **Step 7: Record the Task 6 diff checkpoint**
 
 ```bash
-git add frontend/src/components/ai-window/AiSettingsView.vue frontend/src/components/ai-window/AiSettingsView.test.ts frontend/src/components/ai-window/AiWindowThemePicker.vue frontend/src/components/ai-window/AiWindowThemePicker.test.ts frontend/src/views/AiWindowView.vue frontend/src/views/SettingsView.vue frontend/src/views/SettingsView.test.ts frontend/src/components/settings/GeneralSection.vue frontend/src/components/settings/GeneralSection.test.ts
-git commit -m "feat(ai): move AI settings into workspace"
+git diff -- frontend/src/components/ai-window/AiSettingsView.vue frontend/src/components/ai-window/AiSettingsView.test.ts frontend/src/components/ai-window/AiWindowThemePicker.vue frontend/src/components/ai-window/AiWindowThemePicker.test.ts frontend/src/views/AiWindowView.vue frontend/src/views/SettingsView.vue frontend/src/views/SettingsView.test.ts frontend/src/components/settings/GeneralSection.vue frontend/src/components/settings/GeneralSection.test.ts
 ```
+
+Do not stage these files.
 
 ### Task 7: Apply Apple/Claude Visual Polish, Motion, and Localized Copy
 
@@ -545,12 +552,13 @@ Run Step 2 plus all new AI window component tests.
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit Task 7**
+- [ ] **Step 7: Record the Task 7 diff checkpoint**
 
 ```bash
-git add frontend/src/views/AiWindowView.vue frontend/src/components/ai-window frontend/src/components/ai-assistant/ConversationSidebar.vue frontend/src/assets/styles/main.css frontend/src/lib/locales/zh.ts frontend/src/lib/locales/en.ts frontend/src/lib/locales/ja.ts frontend/src/lib/i18n.test.ts frontend/src/router/index.ts
-git commit -m "style(ai): polish Apple and Claude workspace themes"
+git diff -- frontend/src/views/AiWindowView.vue frontend/src/components/ai-window frontend/src/components/ai-assistant/ConversationSidebar.vue frontend/src/assets/styles/main.css frontend/src/lib/locales/zh.ts frontend/src/lib/locales/en.ts frontend/src/lib/locales/ja.ts frontend/src/lib/i18n.test.ts frontend/src/router/index.ts
 ```
+
+Do not stage these files.
 
 ### Task 8: Full Verification and Regression Cleanup
 
