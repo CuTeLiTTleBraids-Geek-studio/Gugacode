@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-11
+
+### Added
+- Multi-platform release packages: Linux (deb/rpm/apk/arch/AppImage/offline .run), macOS desktop (arm64/amd64 offline installers), Windows executable.
+- WSL packaging scripts for offline Linux packages and Docker-based macOS desktop cross-compilation (`build/scripts/wsl-*.sh`).
+- Hardened `.gitignore` for build artifacts, generated bindings, and local-only docs.
+
+### Changed
+- README rewritten for GitHub (猫娘语气); project docs cleaned (removed internal `docs/` and DESIGN files from the public tree).
+
 ## [0.5.0] — 2026-07-10
 
 ### Added (prompt-13 — Node CDP panel + eslint_d + v0.5)
