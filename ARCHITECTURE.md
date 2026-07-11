@@ -1,179 +1,115 @@
-# Architecture
+# 架构 / Architecture
 
-## Overview
+## 概述 / Overview
 
-gugacode is a desktop IDE built with **Go (Wails v3)** backend and **Vue 3 + TypeScript** frontend, compiled into a single binary. The backend provides services via Wails IPC bindings; the frontend consumes them through auto-generated TypeScript wrappers.
+**中文：** gugacode 是一款桌面 IDE，后端为 **Go（Wails v3）**，前端为 **Vue 3 + TypeScript**，最终编译为单文件可执行程序。后端通过 Wails IPC 暴露服务；前端通过自动生成的 TypeScript 绑定调用。
 
-## Tech Stack
+**English:** gugacode is a desktop IDE with a **Go (Wails v3)** backend and a **Vue 3 + TypeScript** frontend, compiled into a single binary. The backend exposes services via Wails IPC; the frontend uses auto-generated TypeScript wrappers.
 
-| Layer | Technology |
+## 技术栈 / Tech Stack
+
+| 层级 / Layer | 技术 / Technology |
 |---|---|
-| Backend | Go 1.25, Wails v3 (alpha2.111) |
-| Frontend | Vue 3, TypeScript 5, Vite 8, Tailwind v4 |
-| Editor | Monaco Editor 0.55 |
-| Terminal | ConPTY (Windows) / creack-pty (Unix) |
+| 后端 / Backend | Go 1.25, Wails v3 (alpha2.111) |
+| 前端 / Frontend | Vue 3, TypeScript 5, Vite 8, Tailwind v4 |
+| 编辑器 / Editor | Monaco Editor 0.55 |
+| 终端 / Terminal | ConPTY (Windows) / creack-pty (Unix) |
 | Git | go-git v5.19.1 |
-| UI Components | Element Plus 2.14 |
-| Charts/Markdown | marked, DOMPurify, highlight.js |
+| UI | Element Plus 2.14 |
+| Markdown | marked, DOMPurify, highlight.js |
 
-## Project Structure
+## 项目结构 / Project Structure
 
 ```
 gugacode/
-├── main.go                    # App entry: service registration, event wiring
-├── go.mod                     # Module: gugacode
-├── services/                  # Go backend services (~35+ service types; see registry below)
-│   ├── file_service.go        # File I/O with workspace sandboxing
-│   ├── project_service.go     # Recent projects management
-│   ├── settings_service.go    # XDG-path settings persistence
-│   ├── window_service.go      # Window controls (min/max/close/fullscreen)
-│   ├── terminal_service.go    # ConPTY/pty terminal sessions
-│   ├── ai_service.go          # OpenAI-compatible chat + streaming SSE
-│   ├── ai_prompts.go          # Default system prompt + 10 preset actions
-│   ├── ai_retry.go            # Retry with backoff for transient AI errors
-│   ├── ai_urlsec.go           # URL validation for ListModels (N-73)
-│   ├── conversation_service.go# AI conversation history persistence
-│   ├── git_service.go         # Git status/stage/commit/branch/diff
-│   ├── search_service.go      # Regex content search + replace
-│   ├── agent_service.go       # Autonomous agent with command sandboxing
-│   ├── task_service.go        # Build/test/run task definitions
-│   ├── workflow_service.go    # Multi-step workflow orchestration
-│   ├── rules_service.go       # .cursorrules/AGENTS.md rules loading
-│   ├── preset_service.go      # AI prompt presets (user + project-scoped)
-│   ├── profile_service.go     # Settings profiles (switch/import/export)
-│   ├── layout_service.go      # Persistent layout profiles
-│   ├── plugin_service.go      # Plugin discovery + asset serving
-│   ├── marketplace_service.go # VS Code extension marketplace (Open VSX)
-│   ├── extension_security_service.go # Extension security classification + approval
-│   ├── extension_blacklist.go # Extension blacklist enforcement
-│   ├── lsp_service.go         # LSP client (gopls/tsserver) for completions + diagnostics
-│   ├── toolchain_service.go   # Build/lint/format toolchain (G-FEAT-03)
-│   ├── output_buffer.go       # Thread-safe terminal output buffer
-│   ├── pathsec.go             # Shared path traversal validation
-│   ├── myers_diff.go          # Myers diff algorithm for git diffs
-│   ├── token_estimator.go     # Token count estimation
-│   ├── secrets.go             # API key storage (keyring/DPAPI)
-│   ├── logging.go             # Structured logging setup
-│   └── *_test.go              # Go unit tests
-├── frontend/
-│   ├── src/
-│   │   ├── api/services.ts    # Typed Wails binding wrappers
-│   │   ├── stores/            # Vue reactive state (~50+ store modules)
-│   │   ├── components/
-│   │   │   ├── editor/        # CodeEditor (Monaco), DiffView, TabBar
-│   │   │   ├── explorer/      # FileTree with context menu
-│   │   │   ├── layout/        # MainLayout, TitleBar, ActivityBar, SidePanel, GitPanel, SearchPanel, TerminalPanel, AiChatPanel, StatusBar, CommandPalette, QuickOpen
-│   │   │   └── settings/      # Settings sections (General, Editor, AI, Agent, Presets, Prompts, Terminal, Shortcuts, Appearance, Profiles)
-│   │   ├── views/             # WelcomeView, ProjectsView, EditorView, SettingsView, PluginsView
-│   │   ├── lib/               # monaco-themes, language detection, markdown, i18n, notifications, pluginRegistry, pluginSandbox
-│   │   ├── composables/       # useKeyboard (global shortcuts)
-│   │   └── types/index.ts     # Shared TypeScript interfaces
-│   └── bindings/              # Auto-generated Wails JS bindings
-└── build/                     # Platform-specific build configs (Windows/macOS/Linux/iOS/Android)
+├── main.go                    # 入口：服务注册、事件绑定 / entry, service registration
+├── go.mod                     # 模块名 gugacode
+├── services/                  # Go 后端服务（~35+）
+├── frontend/                  # Vue 前端
+│   ├── src/stores/            # 响应式状态
+│   ├── src/components/        # UI 组件
+│   └── bindings/              # Wails 自动生成绑定
+└── build/                     # 多平台构建配置
 ```
 
-## Service Architecture
+## 服务架构 / Service Architecture
 
-Each backend service is a Go struct registered with `application.NewService()`. Wails v3 computes method-binding IDs using FNV-1a 32-bit hash of `{modulePath}.{TypeName}.{MethodName}`. The frontend calls these via `$Call.ByID(bindingID, ...args)`.
+**中文：** 每个后端服务是一个 Go 结构体，通过 `application.NewService()` 注册。Wails v3 使用 FNV-1a 对 `{modulePath}.{TypeName}.{MethodName}` 计算绑定 ID；前端经 `$Call.ByID(bindingID, ...args)` 调用。
 
-### Service Registry (main.go — core + Plan 11 modules)
+**English:** Each backend service is a Go struct registered with `application.NewService()`. Wails v3 hashes `{modulePath}.{TypeName}.{MethodName}` (FNV-1a) for binding IDs; the frontend calls `$Call.ByID(bindingID, ...args)`.
 
-Core services include File, Project, Settings, Window, Terminal, AI, Conversation, Git, Search, Agent, Task, Workflow, Rules, Preset, Profile, Layout, Plugin, Marketplace, ExtensionSecurity, LSP, Toolchain, Diff, Snapshot, MCP, Skills, ComputerUse (experimental stub), IM, Persona, AIPlan, AIGoal, AIPermission, and related helpers (`pathsec`, `secrets`, `output_buffer`, …). Count grows with Plan 11 modules; treat ARCHITECTURE service list as representative, not a hard number.
+### 服务注册表 / Service Registry
 
-| Service | Responsibility |
+核心服务包括：File、Project、Settings、Window、Terminal、AI、Conversation、Git、Search、Agent、Task、Workflow、Rules、Preset、Profile、Layout、Plugin、Marketplace、ExtensionSecurity、LSP、Toolchain、Diff、Snapshot、MCP、Skills、ComputerUse（实验）、IM、Persona、AIPlan、AIGoal、AIPermission 等。数量随版本增长，本表为代表性列表。
+
+| 服务 / Service | 职责 / Responsibility |
 |---|---|
-| FileService | File CRUD with path sandboxing (prevents traversal outside workspace) |
-| ProjectService | Recent projects list, add/remove, sorted by LastOpened |
-| SettingsService | JSON settings persisted to XDG config dir |
-| WindowService | Window controls: minimise, maximise, close, fullscreen, set title |
-| TerminalService | ConPTY/pty session management, output buffering |
-| AIService | OpenAI-compatible chat (send + stream), preset prompts, config |
-| GitService | Status, stage/unstage, commit, branch CRUD, diff |
-| SearchService | Regex content search + find-and-replace |
-| ConversationService | AI conversation save/load/list/delete/rename |
-| TaskService | Build/test/run task definitions from .tasks.json |
-| WorkflowService | Multi-step workflow orchestration from .workflows.json |
-| AgentService | Autonomous agent with command sandboxing + audit logging |
-| RulesService | .cursorrules/AGENTS.md rules loading + validation |
-| LogLevelService | Runtime log level control |
-| PluginService | Plugin discovery, manifest validation, asset serving |
-| ProfileService | Settings profiles (switch/import/export) |
-| LayoutService | Persistent layout profiles (JSON) |
+| FileService | 工作区沙箱内的文件读写 / sandboxed file I/O |
+| ProjectService | 最近项目 / recent projects |
+| SettingsService | XDG 路径设置持久化 / settings persistence |
+| WindowService | 窗口控制 / window controls |
+| TerminalService | PTY 会话与输出缓冲 / PTY sessions |
+| AIService | OpenAI/Anthropic 对话与 SSE 流 / chat + SSE |
+| GitService | 状态/暂存/提交/分支/diff |
+| SearchService | 正则搜索与替换 / search + replace |
+| AgentService | 自治 Agent + 命令审批 / agent + approval |
+| LSPService | gopls / tsserver 补全与诊断 |
+| ToolchainService | 构建/格式化/测试工具链 |
 
-### Event System
+### 事件系统 / Event System
 
-Wails v3 events are used for streaming data and dual-window sync:
-- `terminal:output` — terminal output chunks (emitted from Go poll loop)
-- `ai:chunk` — AI streaming response chunks (`{streamId, data}`)
-- `ai:done` — AI stream completion (`{streamId, data}`)
-- `ai:error` — AI stream error (`{streamId, data}`)
-- `ai:stream-busy` — process-wide stream mutex (`{streamId, busy}`)
-- `ai:tool_calls` — native OpenAI/Anthropic tool calls (`{streamId, data}`)
-- `ai:selection` — main window selection → AI companion window
-- `ai:apply-to-editor` — AI window apply request → main editor
-- `settings:changed` — settings SSOT sync across webviews (`{origin}`)
-- `conversation:saved` — conversation list/content SSOT (`{origin, id}`)
-- `agent:pending-updated` — agent approval queue summary (`{origin, count}`)
-- `file:saved` — emitted after FileService.WriteFile succeeds
-- `time` — clock tick for status bar
+Wails v3 事件用于流式数据与双窗同步 / used for streaming and dual-window sync：
 
-### Path Sandboxing
+- `terminal:output` — 终端输出
+- `ai:chunk` / `ai:done` / `ai:error` — AI 流式片段
+- `ai:stream-busy` — 全进程流互斥
+- `ai:tool_calls` — 工具调用
+- `settings:changed` / `conversation:saved` / `agent:pending-updated` — 双窗 SSOT（含 `origin` 防环）
+- `file:saved` — 写盘成功后发出
 
-`FileService.SetWorkspaceRoot(path)` sets the allowed directory. Read operations validate against this root when set. **Mutating** operations (`WriteFile` / `CreateFile` / `CreateDirectory` / `DeletePath` / `RenamePath`) **require a non-empty root** (prompt-6 Task 4 / BUG-M5). With a root set, paths are checked via `ValidatePathWithinRoot` (symlink-aware). `TerminalService` has an equivalent `validateWorkingDir()` that ensures the working directory is within the workspace.
+### 路径沙箱 / Path Sandboxing
 
-## Frontend State Management
+**中文：** `FileService.SetWorkspaceRoot` 设定工作区。写操作要求非空 root；路径经 `ValidatePathWithinRoot`（双侧 EvalSymlinks）校验。终端工作目录同样限制在工作区内。
 
-State is managed via Vue 3 `reactive()` singletons in `stores/`:
+**English:** Mutating file ops require a non-empty workspace root. Paths are validated with symlink-aware `ValidatePathWithinRoot`. Terminal CWDs are constrained similarly.
 
-- **appState** — global app settings (theme, editor config, AI config, panel visibility, language)
-- **editorState** — open files, active file, dirty state, auto-save
-- **aiState** — messages, streaming state, conversations, mentioned files
-- **gitState** — changed files, branch info, branches list
-- **searchState** — search results, replace state
-- **terminalState** — terminal sessions, active session, output
-- **agentState** — agent tool calls, approval state
-- **inlineCompletionState** — inline AI completion state
-- **layoutState** — layout tree (leaves, splits), active profile
-- **outputState** — output panel entries, problems/diagnostics
-- **presetsState** — AI prompt presets (user + project)
-- **profilesState** — settings profiles
-- **reviewState** — AI code review results
-- **rulesState** — project rules files
-- **tasksState** — build/test/run tasks
-- **workflowsState** — multi-step workflows
-- **pluginsState** — installed plugins
+## 前端状态 / Frontend State
 
-Settings are persisted to the backend via `saveSettings()` (debounced 500ms) and loaded on startup via `loadSettings()`.
+Vue 3 `reactive()` 模块级单例（非 Pinia），主要包括：`appState`、`editorState`、`aiState`、`gitState`、`searchState`、`terminalState`、`agentState`、`layoutState`、`outputState` 等。设置经 `saveSettings()`（约 500ms 防抖）持久化。
 
-## Theme System
+Vue 3 module-level `reactive()` singletons (not Pinia). Settings persist via debounced `saveSettings()`.
 
-- **Dark/Light mode** — `data-mode` attribute on `<html>` overrides CSS custom properties. Monaco themes are switched between `nknk-{accent}` (dark) and `nknk-light-{accent}` (light) sets.
-- **Accent colors** — 8 accent themes (blue, teal, green, amber, pink, purple, cyan, indigo) via `data-theme` attribute. Each accent has coordinated Monaco editor themes.
-- **System mode** — Listens to `prefers-color-scheme` media query and auto-switches.
+## 主题 / Theme
 
-## AI Integration
+- 明暗：`data-mode` + Monaco 主题切换 / dark-light via `data-mode`
+- 强调色：8 种 `data-theme` / 8 accents
+- 跟随系统：`prefers-color-scheme`
 
-- **Chat** — OpenAI-compatible API (`/v1/chat/completions`). Supports streaming via SSE.
-- **Inline Completion** — Monaco `InlineCompletionItemProvider` calls the AI service with the current file context.
-- **Code Actions** — Right-click context menu in Monaco with 9 preset actions (explain, refactor, fix, generate docs, generate tests, optimize, review, security, commit message).
-- **@-mention** — Chat input supports `@file` mentions to inject file content as context.
-- **Conversation History** — Saved as JSON files in the XDG data directory.
+## AI 集成 / AI Integration
 
-## Testing
+- 双协议 SSE 对话 / dual-protocol streaming chat  
+- Monaco 内联补全 / inline completions  
+- 9 个右键代码动作 / 9 context-menu actions  
+- `@文件` 提及注入上下文 / @-mentions  
+- 会话历史 JSON 持久化 / conversation history JSON  
 
-- **Go** — `go test ./services/...` (unit tests for all services)
-- **Frontend** — `npx vitest run` (Vue component tests + store tests)
-- **Type-check** — `npx vue-tsc --noEmit`
-
-## Build
+## 测试 / Testing
 
 ```bash
-# Development (hot reload)
+go test ./services/...
+cd frontend && npx vitest run
+cd frontend && npx vue-tsc --noEmit
+```
+
+## 构建 / Build
+
+```bash
+# 开发 / Dev
 wails3 dev
 
-# Production build
+# 生产 / Production
 wails3 build
 
-# Frontend only (browser dev)
+# 仅前端 / Frontend only
 cd frontend && npm run dev
 ```

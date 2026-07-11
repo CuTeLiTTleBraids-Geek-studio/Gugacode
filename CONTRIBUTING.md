@@ -1,29 +1,36 @@
-# Contributing to gugacode
+# 贡献指南 / Contributing to gugacode
 
-Thank you for your interest in contributing to gugacode! This document describes how to set up your development environment and the conventions we follow.
+感谢你愿意为 gugacode 贡献力量！本文说明开发环境与协作约定。  
+Thank you for contributing! This document covers setup and project conventions.
 
-## Reporting Issues
+## 反馈问题 / Reporting Issues
 
-- **Bugs:** Open a GitHub issue with the label `bug`. Include OS, gugacode version, steps to reproduce, and expected vs actual behavior.
-- **Feature requests:** Open a GitHub issue with the label `enhancement`. Describe the use case and proposed solution.
-- **Security vulnerabilities:** Do NOT open a public issue. Email the maintainers privately.
+**中文：**
+- **Bug：** 提交带 `bug` 标签的 Issue，写明系统、版本、复现步骤、期望与实际结果。
+- **功能建议：** 使用 `enhancement` 标签，说明场景与方案。
+- **安全漏洞：** **不要**公开 Issue，请私下按 [SECURITY.md](SECURITY.md) 报告。
 
-## Development Setup
+**English:**
+- **Bugs:** open a GitHub issue labeled `bug` (OS, version, repro, expected vs actual).
+- **Features:** label `enhancement` with use case and proposal.
+- **Security:** do **not** open a public issue — see [SECURITY.md](SECURITY.md).
 
-### Prerequisites
+## 开发环境 / Development Setup
 
-- **Go** 1.25 or later
-- **Node.js** 20 or later (with npm)
-- **Wails3 CLI** (optional, only needed for `wails3 dev` / `wails3 build`)
+### 前置条件 / Prerequisites
 
-### Getting the Code
+- **Go** 1.25+
+- **Node.js** 20+（含 npm）
+- **Wails3 CLI**（可选，用于 `wails3 dev` / `wails3 build`）
+
+### 获取代码 / Clone
 
 ```bash
-git clone https://github.com/<your-org>/gugacode.git
+git clone https://github.com/CuTeLiTTleBraids-Geek-studio/Gugacode.git
 cd gugacode
 ```
 
-### One-shot setup（prompt-11 11-N，约 30 分钟）
+### 一键初始化 / One-shot setup
 
 ```bash
 # Unix
@@ -33,168 +40,112 @@ bash scripts/dev-setup.sh
 pwsh -File scripts/dev-setup.ps1
 ```
 
-脚本会：`go mod download`、`npm ci`、`vitest run`、`go test ./services/`，并可选安装 `gopls` / `dlv`。
+脚本会：`go mod download`、`npm ci`、跑基础测试，并可选安装 `gopls` / `dlv`。  
+The scripts download modules, install frontend deps, run basic tests, and optionally install language tools.
 
-### Installing Dependencies
+### 安装依赖 / Dependencies
 
 ```bash
-# Go modules
 go mod download
-
-# Frontend dependencies
-cd frontend
-npm install
+cd frontend && npm install
 ```
 
-### Running in Development
-
-If you have the Wails3 CLI installed:
+### 开发运行 / Running in Development
 
 ```bash
+# 推荐 / recommended
 wails3 dev -config ./build/config.yml -port 9245
 ```
 
-If not, you can run the frontend and backend separately:
+或分终端手动启动 / or two terminals:
 
 ```bash
-# Terminal 1 — frontend dev server
-cd frontend
-npm run dev
-
-# Terminal 2 — Go backend
-go run .
+cd frontend && npm run dev   # 终端 1
+go run .                     # 终端 2
 ```
 
-### Language servers (prompt-8)
-
-For real-project LSP checks (optional, not required for unit tests):
+### 语言服务 / Language servers（可选）
 
 ```bash
-# Go
 go install golang.org/x/tools/gopls@latest
-
-# TypeScript / JavaScript — use an LSP wrapper, NOT raw tsserver
 npm i -D typescript-language-server typescript
-# or: npm i -D @vtsls/language-server
 ```
 
-Unit tests mock LSP over stdio (`TestLSP_syncDocument_DidOpenThenDidChange`). When adding toolchain parsers, put fixtures under `services/` tests and keep commands as argv arrays (no shell).
-
-### Running Tests
+### 测试 / Tests
 
 ```bash
-# Go backend tests
 go test ./services/... -v
-
-# Frontend tests
-cd frontend
-npx vitest run
-
-# Type checking
-cd frontend
-npx vue-tsc --noEmit
+cd frontend && npx vitest run
+cd frontend && npx vue-tsc --noEmit
 ```
 
-All tests must pass before a PR can be merged.
+合并 PR 前测试必须通过。 / All tests must pass before merge.
 
-## Code Style
+## 代码风格 / Code Style
 
 ### Go
-
-- Follow [Effective Go](https://go.dev/doc/effective_go) and `gofmt` / `goimports`.
-- Run `go vet .` before committing — it must report no issues.
-- Service methods receive a pointer receiver (`*ServiceName`).
-- Exported identifiers have doc comments starting with the identifier name.
-- Handle errors at boundaries; never swallow them silently.
+- 遵循 Effective Go，使用 `gofmt` / `goimports`
+- 提交前 `go vet .` 无告警
+- 服务方法使用指针接收者；导出符号写文档注释
+- 边界处处理错误，禁止静默吞掉
 
 ### TypeScript / Vue
-
-- Use `<script setup lang="ts">` for all new components.
-- Follow the existing file structure: `stores/` for reactive state, `components/` for UI, `views/` for route-level pages, `composables/` for reusable logic, `lib/` for pure utilities.
-- Prefer composition API over options API.
-- Use Element Plus components where a matching component exists.
-- Run `npx vue-tsc --noEmit` before committing — it must report no errors.
+- 新组件使用 `<script setup lang="ts">`
+- 结构：`stores/` / `components/` / `views/` / `composables/` / `lib/`
+- 优先 Composition API；有对应组件时用 Element Plus
+- 提交前 `npx vue-tsc --noEmit` 无错误
 
 ### CSS
+- BEM 命名；颜色用 `var(--color-...)`；`<style scoped>`
 
-- Use BEM-style class naming (`block__element--modifier`).
-- Use CSS custom properties (`var(--color-...)`) from `assets/styles/main.css` — never hardcode colors.
-- Scope styles with `<style scoped>` in `.vue` files.
+## 提交信息 / Commit Messages
 
-## Commit Message Conventions
-
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
+遵循 [Conventional Commits](https://www.conventionalcommits.org/)：
 
 ```
 <type>(<scope>): <description>
-
-[optional body]
-
-[optional footer]
 ```
 
-**Types:**
-- `feat` — new feature
-- `fix` — bug fix
-- `docs` — documentation only
-- `style` — formatting, no code change
-- `refactor` — code change that neither fixes a bug nor adds a feature
-- `test` — adding or correcting tests
-- `chore` — build process, auxiliary tools, dependencies
-- `ci` — CI configuration changes
+**类型 / Types：** `feat` · `fix` · `docs` · `style` · `refactor` · `test` · `chore` · `ci`
 
-**Examples:**
+**示例 / Examples：**
 ```
 feat(ai): add conversation history sidebar
 fix(terminal): clear output buffer after read
 docs: update README with AI configuration guide
-test(editor): add saveFile unit tests
 ```
 
-## Pull Request Process
+## Pull Request 流程 / PR Process
 
-1. Fork the repository and create a feature branch from `main`:
-   ```bash
-   git checkout -b feat/my-feature
-   ```
-2. Make your changes. Keep commits focused — one logical change per commit.
-3. Add or update tests for your changes. New code must have test coverage.
-4. Run the full test suite (Go + frontend) and ensure everything passes.
-5. Update the CHANGELOG.md `Unreleased` section with your changes.
-6. Open a pull request. Reference any related issues (`Closes #123`).
-7. Respond to review feedback and update your PR.
+1. Fork 并从 `main` 建分支：`git checkout -b feat/my-feature`
+2. 单次提交保持单一逻辑变更
+3. 补充/更新测试
+4. 跑通 Go + 前端测试
+5. 更新 `CHANGELOG.md` 的 Unreleased（若面向用户）
+6. 开 PR，关联 Issue（如 `Closes #123`）
+7. 根据 Review 修改
 
-### PR Checklist
+### 检查清单 / Checklist
 
-- [ ] Tests pass (`go test ./services/...` and `cd frontend && npx vitest run`)
-- [ ] `go vet .` is clean
-- [ ] `npx vue-tsc --noEmit` is clean
-- [ ] CHANGELOG.md updated (if user-facing change)
-- [ ] Commit messages follow Conventional Commits
-- [ ] No new linting warnings introduced
+- [ ] `go test ./services/...` 与 `npx vitest run` 通过
+- [ ] `go vet .` 干净
+- [ ] `npx vue-tsc --noEmit` 干净
+- [ ] 用户可见变更已写 CHANGELOG
+- [ ] Conventional Commits
+- [ ] 无新增 lint 警告
 
-## Project Structure
+## 项目结构 / Project Structure
 
 ```
 gugacode/
-├── main.go                  # Go entry point, service registration
-├── services/                # Go backend services (file, git, ai, terminal, ...)
+├── main.go
+├── services/
 ├── frontend/
-│   ├── src/
-│   │   ├── api/             # Wails service bindings
-│   │   ├── components/      # Vue UI components
-│   │   ├── composables/     # Vue composables (useKeyboard, etc.)
-│   │   ├── lib/             # Pure utility functions (markdown, language detection)
-│   │   ├── router/          # Vue Router configuration
-│   │   ├── stores/          # Reactive application state
-│   │   ├── types/           # TypeScript type definitions
-│   │   └── views/           # Route-level views
-│   ├── bindings/            # Auto-generated Wails bindings
-│   └── package.json
-├── build/                   # Platform-specific build configs
-└── scripts/                 # Dev setup, SBOM, binding checks
+├── build/
+└── scripts/
 ```
 
-## License
+## 许可证 / License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+贡献内容默认以 **MIT** 协议授权。  
+By contributing, you agree your contributions are licensed under the MIT License.

@@ -2,15 +2,18 @@
 
 <img src="icon.png" alt="gugacode" width="128" height="128">
 
-# 咕咕嘎嘎code
+# 咕咕嘎嘎code / gugacode
 
-**一款专为 Go / TypeScript / JavaScript 而生的桌面 AI IDE**
+**一款专为 Go / TypeScript / JavaScript 而生的桌面 AI IDE**  
+**A desktop AI IDE for Go / TypeScript / JavaScript**
 
-*单文件分发 · 开箱即用 · 离线可用* —— 主人专属的编码猫娘伙伴喵~
+*单文件分发 · 开箱即用 · 离线可用* —— 主人专属的编码猫娘伙伴喵~  
+*Single-binary · ready out of the box · offline-capable*
 
-基于 Go（Wails v3）+ Vue 3 + Monaco Editor 构建
+基于 Go（Wails v3）+ Vue 3 + Monaco Editor 构建 · Built with Go (Wails v3) + Vue 3 + Monaco Editor
 
-集成 AI 助手 · 自治 Agent · 离线 LSP 补全 · 工具链集成 · 项目脚手架 · 插件市场 · 内置终端 · Git 面板
+集成 AI 助手 · 自治 Agent · 离线 LSP · 工具链 · 脚手架 · 插件市场 · 终端 · Git  
+AI assistant · sandboxed Agent · offline LSP · toolchains · scaffolding · marketplace · terminal · Git
 
 ---
 
@@ -22,11 +25,14 @@
 ![Monaco](https://img.shields.io/badge/Editor-Monaco-646CFF?style=flat-square)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey?style=flat-square)
 
-**[功能一览](#功能一览)** · **[下载](#下载)** · **[构建](#从源码构建)** · **[AI 配置](#ai-配置)** · **[安全](#安全)** · **[联系方式](#联系方式)**
+**中文：** [功能一览](#功能一览) · [下载](#下载) · [构建](#从源码构建) · [AI 配置](#ai-配置) · [安全](#安全) · [联系方式](#联系方式)  
+**English:** [Overview](#english--overview) · [Download](#english--download) · [Build](#english--build-from-source) · [AI setup](#english--ai-configuration) · [Security](#english--security) · [Contact](#english--contact)
 
 </div>
 
 ---
+
+# 中文文档
 
 ## 喵～自我介绍一下
 
@@ -637,15 +643,99 @@ go test ./services/... -bench=. -benchmem
 
 ---
 
+# English
+
+## English · Overview
+
+**gugacode** is an offline-first desktop AI IDE for **Go / TypeScript / JavaScript**, built with **Go (Wails v3) + Vue 3 + Monaco Editor**, distributed as a single binary.
+
+| Direction | Capability |
+|---|---|
+| Project scaffolding | Offline templates: Go mono / TS / JS / monorepo / fullstack |
+| Offline LSP | gopls + TS language server (completion, hover, go-to-def, format, rename) |
+| Toolchains | go build/test/vet, gofmt, golangci-lint, tsc, eslint, prettier, vitest |
+| Marketplace | Open VSX client, VSIX install with SHA-256 checks (disabled by default) |
+| Online AI | OpenAI + Anthropic SSE streaming, inline completion, 9 code actions |
+| Dual window | Main + AI companion SSOT sync; agent approval only on origin window |
+
+**Experimental:** Computer Use / IM are optional stubs and not part of core editor acceptance.
+
+Language service correctness is prioritized over stacking more Agent modes. See `SECURITY.md` and `ARCHITECTURE.md`.
+
+## English · Features (summary)
+
+- **Editor:** Monaco, multi-tabs, diff, markdown preview, inline AI ghost text, Ctrl+P quick open  
+- **AI:** multi-provider configs, dual protocol, conversation history, project rules (`.cursorrules` / `AGENTS.md`)  
+- **Agent:** tool use with **mandatory human approval** for commands (no safe auto-run bypass)  
+- **Terminal:** real PTY (ConPTY / Unix pty), multi-tab, xterm.js  
+- **Git:** status, stage, commit, rebase helpers, AI review of uncommitted changes  
+- **Plugins:** worker sandbox + Open VSX marketplace security tiers  
+
+## English · Download
+
+Get packages from [Releases](https://github.com/CuTeLiTTleBraids-Geek-studio/Gugacode/releases) (e.g. **v0.2.0**).
+
+| Platform | Artifacts |
+|---|---|
+| Windows x64 | `gugacode-*-windows-amd64.zip` / `.exe` (WebView2) |
+| Linux x64 | `.deb` / `.rpm` / `.pkg.tar.zst` / `.apk` / `.AppImage` / offline `.run` |
+| macOS arm64 / amd64 | `*-darwin-*-desktop.run` offline installers (unsigned) |
+
+Prefer **AppImage** or **`.run`** for offline Linux. macOS: right-click → Open on first launch. Verify with `SHA256SUMS`.
+
+## English · Build from source
+
+| Tool | Min version |
+|---|---|
+| Go | 1.25 |
+| Node.js | 20 |
+| Wails3 CLI | v3.0.0-alpha2.111+ |
+
+```bash
+go install github.com/wailsapp/wails/v3/cmd/wails3@latest
+git clone https://github.com/CuTeLiTTleBraids-Geek-studio/Gugacode.git
+cd gugacode
+cd frontend && npm install && cd ..
+wails3 dev -config ./build/config.yml -port 9245
+```
+
+Production: `wails3 build -tags production`  
+Cross-compile notes: use GitHub Actions, native hosts, or Docker `wails-cross` (see `build/scripts/`).
+
+## English · AI configuration
+
+Settings → AI. Supports OpenAI-compatible and Anthropic native APIs. Multiple provider profiles (CC Switch style). Local: Ollama / LM Studio. Right-click actions: explain, refactor, fix, docs, tests, optimize, review, security audit, commit message.
+
+## English · Security
+
+API keys encrypted at rest (DPAPI / Keychain / AES). Path sandbox + symlink checks. CSP nonces. Agent commands always need approval. Extension sandbox + SHA-256. Details: [SECURITY.md](SECURITY.md).
+
+## English · Contribute & license
+
+Issues/PRs welcome. Conventional Commits; see [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md). License: [MIT](LICENSE).
+
+## English · Contact
+
+| Channel | |
+|---|---|
+| QQ group | `603299757` |
+| Telegram | https://t.me/nknkmiao |
+| QQ | `3870374387` |
+| Email | dianasoylu423@gmail.com |
+
+Please note “gugacode user” when joining the QQ group.
+
+---
+
 <div align="center">
 
-## 许可证
+## 许可证 / License
 
 [MIT](LICENSE) · Copyright (c) 2026 gugacode contributors
 
 ---
 
-<sub>构建于以下开源项目之上喵～</sub>
+<sub>构建于以下开源项目之上喵～ / Built on open source:</sub>
 
 <sub>
 

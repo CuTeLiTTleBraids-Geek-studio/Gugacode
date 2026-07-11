@@ -1,25 +1,27 @@
-# Changelog
+# 变更日志 / Changelog
 
-All notable changes to gugacode are documented in this file.
+本文记录 gugacode 的重要变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。  
+All notable changes to gugacode are documented here ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/), [SemVer](https://semver.org/)).
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+条目采用 **中文说明 + English** 对照（历史技术条目保留英文关键词，便于检索）。  
+Entries use **Chinese + English** (older technical IDs kept for searchability).
 
-## [Unreleased]
+## [Unreleased] / 未发布
 
 ## [0.2.0] — 2026-07-11
 
-### Added
-- Multi-platform release packages: Linux (deb/rpm/apk/arch/AppImage/offline .run), macOS desktop (arm64/amd64 offline installers), Windows executable.
-- WSL packaging scripts for offline Linux packages and Docker-based macOS desktop cross-compilation (`build/scripts/wsl-*.sh`).
-- Hardened `.gitignore` for build artifacts, generated bindings, and local-only docs.
+### 新增 / Added
+- **多平台发行包 / Multi-platform packages：** Linux（deb / rpm / apk / arch / AppImage / 离线 `.run`）、macOS 桌面（arm64 / amd64 离线安装包）、Windows 可执行文件与 zip。
+- **WSL 打包脚本 / WSL packaging scripts：** 离线 Linux 包与 Docker 交叉编译 macOS 桌面（`build/scripts/wsl-*.sh`）。
+- **强化 `.gitignore` / Hardened `.gitignore`：** 排除构建产物、生成绑定、本地文档等。
 
-### Changed
-- README rewritten for GitHub (猫娘语气); project docs cleaned (removed internal `docs/` and DESIGN files from the public tree).
+### 变更 / Changed
+- **README：** GitHub 展示改为中英双语（含猫娘语气中文区）。
+- **仓库清理 / Repo cleanup：** 移除内部 `docs/` 与 `DESIGN-*`，避免大文件与内部计划进入公开树。
 
 ## [0.5.0] — 2026-07-10
 
-### Added (prompt-13 — Node CDP panel + eslint_d + v0.5)
+### 新增 / Added（prompt-13 — Node CDP 面板 + eslint_d + v0.5）
 
 - **13-A** Node/TS debug via **Chrome DevTools Protocol** in the **same Debug panel** (breakpoints, pause reason, stack, locals, continue/step when CDP connects).
 - **13-B** `EslintService` prefers **eslint_d** daemon; hash-skip + single-flight; CLI fallback.
@@ -34,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.4.0] — 2026-07-10
 
-### Added (prompt-12 — trusted DAP + live lint + release)
+### 新增 / Added（prompt-12 — trusted DAP + live lint + release）
 
 - **12-A** Unverified breakpoint UI (hollow glyph + panel warning) + **Restart** + stop reason display.
 - **12-B** Conditional breakpoints / logpoints + **watch / evaluate**.

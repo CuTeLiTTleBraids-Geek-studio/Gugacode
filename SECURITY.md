@@ -1,156 +1,111 @@
-# Security Policy
+# 安全策略 / Security Policy
 
-## Supported Versions（prompt-11 11-M）
+## 支持版本 / Supported Versions
 
-| Version | Supported | Notes |
+| 版本 / Version | 支持 / Supported | 说明 / Notes |
 |---|---|---|
-| **0.5.x** | ✅ | 当前开发线（prompt-13）；安全修复优先 |
-| **0.4.x** | ✅ | 标签 `v0.4.0`；关键安全视严重性回移 |
-| **0.3.x** | 🟡 | 上一线；仅高危安全 |
-| **0.2.x 及更早** | ❌ | 请升级 |
-| 1.0.x | 规划中 | 正式 1.0 后按 semver 支持窗口更新本表 |
+| **0.5.x** | ✅ | 当前开发线；安全修复优先 / current line |
+| **0.4.x** | ✅ | 标签 `v0.4.0`；高危可回移 / critical backports |
+| **0.3.x** | 🟡 | 仅高危 / high severity only |
+| **0.2.x** | ✅ | 当前发行线含 `v0.2.0` 安装包 / release packages |
+| 更早 / earlier | ❌ | 请升级 / please upgrade |
+| 1.0.x | 规划中 / planned | 正式 1.0 后按 semver 更新本表 |
 
-### 发版周期
+### 发版周期 / Release cadence
 
-- **Patch**（`0.x.Y`）：按需，含安全与回归修复  
-- **Minor**（`0.X.0`）：功能里程碑（如 prompt 轮次）；附 CHANGELOG + Release 资产  
-- **安全响应**：确认后 48h 内 ACK；高危目标 7 日内修复或缓解说明（见下）
+- **Patch**（`0.x.Y`）：按需，含安全与回归修复 / as needed for security & regressions  
+- **Minor**（`0.X.0`）：功能里程碑；附 CHANGELOG 与 Release 资产 / feature milestones + release assets  
+- **安全响应 / Response：** 确认后 48h 内 ACK；高危目标 7 日内修复或缓解说明  
 
-## Reporting a Vulnerability
+## 漏洞报告 / Reporting a Vulnerability
 
-If you discover a security vulnerability in gugacode, please report it responsibly:
+### 中文
+1. **不要**为安全漏洞公开开 GitHub Issue。  
+2. 将描述、复现步骤、影响范围发送至 **security@gugacode.dev**（或维护者私信渠道）。  
+3. 我们将在 **48 小时内**确认收到。  
+4. 在 **7 天内**给出调查结论与修复时间表（视严重性调整）。  
 
-1. **Do NOT open a public GitHub issue** for security vulnerabilities.
-2. Email security@gugacode.dev with a description of the vulnerability, steps to reproduce, and potential impact.
-3. You will receive an acknowledgment within 48 hours.
-4. We will investigate and provide a fix timeline within 7 days.
+请尽量包含：漏洞描述、复现步骤、受影响组件、潜在影响、建议修复（如有）。
 
-Please include:
-- Description of the vulnerability
-- Steps to reproduce
-- Affected components (backend service, frontend component, etc.)
-- Potential impact
-- Suggested fix (if any)
+### English
+1. **Do NOT** open a public GitHub issue for security vulnerabilities.  
+2. Email **security@gugacode.dev** with description, reproduction steps, and impact.  
+3. You will receive an acknowledgment within **48 hours**.  
+4. We aim to provide findings and a fix timeline within **7 days** (severity-dependent).  
 
-## Continuous Integration Security Gates
+Include: description, steps to reproduce, affected components, potential impact, suggested fix (optional).
 
-The CI workflow (`.github/workflows/ci.yml`) enforces the security measures below on every push and pull request to `main`/`master`. What CI actually executes is the source of truth for this document — the gates listed here are run in CI, not just documented.
+## CI 安全门禁 / Continuous Integration Security Gates
 
-| Gate | CI job | Requirement |
+CI（`.github/workflows/ci.yml`）在推送/PR 到 `main` 时执行下列门禁；**以 CI 实际步骤为准**。
+
+| 门禁 / Gate | 要求 / Requirement |
+|---|---|
+| Race detector (G-SEC-04) | `go test -race ./services/... .` |
+| govulncheck (G-SEC-04) | 扫描 Go 依赖已知 CVE |
+| Frontend type check | `npx vue-tsc --noEmit` |
+| go vet / golangci-lint | 静态分析 |
+| ESLint / Vitest | 前端 lint 与测试 |
+| npm audit high | `npm audit --audit-level=high`（阻断） |
+| wails3 build | 生产构建验证 |
+
+跨 Ubuntu / Windows / macOS 运行，以覆盖平台相关代码。
+
+## 安全措施摘要 / Security Measures Summary
+
+| ID | 中文 | English |
 |---|---|---|
-| **Race detector** (G-SEC-04) | `go-test` (ubuntu/windows/macos) | `go test -race ./services/... .` — data-race detection across all three platforms. |
-| **govulncheck** (G-SEC-04) | `govulncheck` (ubuntu) | `go run golang.org/x/vuln/cmd/govulncheck@latest ./services/... .` — scans Go dependencies for known CVEs. |
-| **Frontend type check** (G-QUAL-03) | `frontend-test` (ubuntu/windows/macos) | `npx vue-tsc --noEmit` — TypeScript type safety across all three platforms. |
-| `go vet` | `go-test` | Static analysis on `./services/... .`. |
-| `golangci-lint` | `go-lint` | Additional linters (errcheck, ineffassign, staticcheck, unused). |
-| ESLint | `frontend-test` | `npm run lint` on the frontend. |
-| Vitest | `frontend-test` | `npx vitest run` across all three platforms. |
-| `wails3 build` | `wails-build` | Full production build (frontend bundling + asset embedding + bindings). |
-| **npm audit high** | `frontend-test` / `npm-audit` | `npm audit --audit-level=high`（阻断） |
+| G-SEC-01 | AI BaseURL 校验，防 SSRF / 禁 userinfo；非回环强制 HTTPS | BaseURL validation; SSRF / credential-leak prevention |
+| G-SEC-02 | Agent 命令强制人工审批，无 run 自动批准 | All agent shell commands require manual approval |
+| G-SEC-03 | 项目级工作流不可信，启动类不自动执行 | Untrusted workflows never auto-run on load |
+| G-SEC-04 | CI 启用 race + govulncheck | Race detector + govulncheck in CI |
+| G-SEC-05 | iframe `sandbox="allow-scripts"`，无 allow-same-origin | Extension iframes without same-origin |
+| G-SEC-06 | 路径双侧 EvalSymlinks，防符号链接逃逸 | Symlink-aware path sandbox |
+| G-SEC-07 | API Key 加密存储且不回传前端明文 | Encrypted API keys; never returned to frontend |
+| G-SEC-08 | 错误响应体限制 64KB | Error body limited to 64 KB |
+| G-SEC-09 | 关键 JSON 原子写 + 0600 | Atomic JSON writes, 0600 perms |
+| G-SEC-10 | CSP nonce 使用 crypto/rand，无弱回退 | CSP nonces from crypto/rand only |
+| G-SEC-11 | Markdown 外链强制 noopener | Links forced `rel=noopener` |
+| G-SEC-12 | 扩展 SHA-256、默认禁用、权限分级与黑名单 | VSIX hash, default-disabled, classification, blacklist |
 
-CI runs Go build/test **and** frontend checks on Ubuntu, Windows, and macOS so that platform-specific code (`pty_windows.go`, `secrets_windows.go`, etc.) is verified on its target platform.
+### 路径沙箱 / Path Sandboxing
+所有文件操作限制在工作区根内；`pathsec` 防止目录遍历与符号链接逃逸。终端与 Agent CWD 同样校验。
 
-## Security Measures
+All file operations are sandboxed to the workspace root with symlink evaluation. Terminal and agent CWDs are validated similarly.
 
-### BaseURL validation — SSRF prevention (G-SEC-01)
-`services/ai_urlsec.go` validates every user-supplied AI BaseURL before it is stored or used:
-- Scheme must be `http` or `https` (rejects `file:`, `data:`, `ftp:`, `gopher:`, `javascript:`, etc.).
-- No embedded userinfo (`http://user:pass@host`) is allowed — a credential-leakage vector.
-- Non-loopback hosts MUST use `https`. Loopback (`localhost`, `127.0.0.0/8`, `::1`, `*.localhost`) may use plain `http` to support local LLM servers (Ollama, LM Studio, llama.cpp).
-- The AI HTTP client disables redirects (`CheckRedirect: noRedirectPolicy`) so a malicious provider cannot redirect the API key to a different host.
+### XSS 防护 / XSS Prevention
+Markdown 经 DOMPurify 清洗；Vue 模板默认转义用户输入。  
+Markdown is sanitized with DOMPurify; Vue escapes other UI input by default.
 
-### Agent commands require manual approval (G-SEC-02)
-Every non-empty agent/shell command requires explicit user approval before execution — there is **no auto-approve** path for `run`. The `Safe` risk level is reserved for the empty-command no-op; all real commands return at minimum `RiskElevated`. Dangerous-command patterns (e.g. `rm -rf`, deletes targeting root/home/wildcards) are flagged for extra scrutiny, but the primary protection is always mandatory manual approval.
+### API Key
+静态加密（Windows DPAPI / macOS Keychain / Linux AES 或 Secret Service），仅发往用户配置的 AI 端点；不记入日志。  
+Keys are encrypted at rest and only sent to the user-configured AI provider; never logged.
 
-**Write tools (prompt-5 Task E / BUG-M4):** `write` is also **never auto-approved**, regardless of `toolApprovalConfig.write`. Only safer tools such as `read` and `search` may use `auto-approve`. The Settings → Agent UI hides the auto-approve option for `run` and `write`. Without an open project workspace, `write`/`run` refuse to execute (no empty-root sandbox bypass).
+### 依赖安全 / Dependency Security
+CI 跑 `govulncheck`；发版前建议 `frontend/` 下 `npm audit`。  
+`govulncheck` in CI; run `npm audit` before releases.
 
-### Untrusted workflows do not auto-execute (G-SEC-03)
-Project-level workflows loaded from `.nknk/workflows/` are treated as untrusted because they ship with the repository and may be malicious. `RequiresConfirmation` is **forced to `true`** for project sources regardless of what the workflow file declares, so a cloned repo cannot bypass the confirmation gate by setting `requiresConfirmation: false`. Startup-trigger workflows in particular are never auto-executed on project load; the UI lists them as "Pending Confirmation" and the user must click "Run".
+## 安全响应头 / Security Headers
 
-### Race detector + govulncheck in CI (G-SEC-04)
-See the table above. `go test -race` catches data races in concurrent backend code; `govulncheck` catches known CVEs in `go.mod` transitively-resolved modules that `go vet` and `golangci-lint` do not detect.
-
-### iframe sandbox uses `allow-scripts` only (G-SEC-05)
-Extension webviews and plugin views render in an `<iframe sandbox="allow-scripts">`:
-- **No `allow-same-origin`** — the iframe gets an opaque origin and cannot access the parent's DOM, `localStorage`, cookies, or `window.go` bindings.
-- No `allow-forms`, `allow-top-navigation`, `allow-popups`, `allow-pointer-lock`.
-- Every `postMessage` is validated by `event.source` equality (not `event.origin`, which is `"null"` for sandboxed iframes and can be spoofed).
-- Every RPC from the iframe is permission-gated by the same `METHOD_PERMISSIONS` map as the Worker sandbox.
-
-### Symlink path validation via EvalSymlinks (G-SEC-06)
-`services/pathsec.go` centralizes path-traversal defense. `ValidatePathWithinRoot` resolves symlinks on **both** the target and the workspace root before checking the relative path, so a symlink inside the workspace that points outside is rejected. For not-yet-existing targets (e.g. a file about to be created), the parent directory's symlinks are resolved and the basename is re-joined. `IsRelativePathSafe` rejects `..`, absolute paths, Windows drive paths, UNC paths, and volume-relative forms (`C:foo`).
-
-### API key encrypted, not returned to frontend (G-SEC-07)
-`services/secrets*.go` encrypts the AI API key at rest:
-- **Windows**: DPAPI (`CryptProtectData`), machine-bound — stored as a `"dpapi:"`-prefixed blob in `settings.json`.
-- **macOS / Linux**: AES-256-GCM with a per-install 32-byte key file (`~/.config/gugacode/secret.key`, `0600`), or the platform keychain (Keychain / libsecret) via a `"keyring:"` marker.
-- Legacy plaintext keys are auto-migrated to encrypted form on first `LoadSettings`.
-
-`LoadSettings` clears `AIApiKey` to `""` before returning across the Wails binding, so the plaintext never lives in the frontend JS heap. The frontend receives only `AIApiKeyConfigured` (bool) and `AIApiKeyStorageMethod` (`"dpapi"`/`"aes"`/`"keyring"`/`"plain"`/`"none"`). The decrypted key is available to the backend only via `GetDecryptedAPIKey`. Unrelated saves that arrive with an empty key + `AIApiKeyConfigured=true` preserve the existing on-disk key so unrelated settings edits don't wipe the stored key.
-
-### HTTP response body limited to 64 KB (G-SEC-08)
-`services/ai_service.go` `parseAIError` reads error-response bodies with `io.LimitReader(resp.Body, 64*1024)` so a malicious or misconfigured provider cannot exhaust memory with a huge error payload.
-
-### Atomic JSON writes (G-SEC-09)
-`services/atomic_write.go` writes settings (and other JSON state) atomically: marshal → temp file in the same directory → `fsync` → `chmod 0600` → `rename`. A crash mid-write cannot leave a half-written `settings.json`. The settings file is `0600` because it holds an (encrypted) API key.
-
-### CSP nonce uses crypto/rand, no fallback (G-SEC-10)
-`main.go` `generateNonce` produces a fresh 16-byte hex nonce per HTML response using `crypto/rand.Read`. If `crypto/rand.Read` fails, the request is refused (HTTP 500) — there is **no fallback** to a predictable time-derived nonce. A predictable nonce would defeat CSP, so the page is not served rather than shipped with a weak nonce. Each response gets its own nonce; nonces are not reused. This lets `script-src` use `'nonce-<N>'` instead of `'unsafe-inline'`.
-
-### Markdown links forced to `target=_blank rel=noopener` (G-SEC-11)
-`frontend/src/lib/markdown.ts` registers a DOMPurify `afterSanitizeAttributes` hook that forces every `<a href>` to `target="_blank" rel="noopener noreferrer"`. Markdown is rendered with `marked`, syntax-highlighted with `highlight.js`, and sanitized with DOMPurify (allow-listed tags/attributes, `ALLOW_DATA_ATTR: false`) before insertion. Vue's template engine escapes all other user input by default.
-
-### Extension security — SHA-256 verification, default disabled, permission classification (G-SEC-12)
-`services/extension_security_service.go` + `services/extension_blacklist.go` implement VS Code-style extension security (a separate code path from the native plugin system):
-- **Signature verification**: VSIX files are verified via SHA-256 hash against the marketplace-published hash. Unverified extensions cannot be enabled (`ErrNotVerified`).
-- **Default disabled + pending review**: newly installed extensions start `Enabled=false, PendingReview=true`. The first enable attempt surfaces a popup listing the requested API permissions.
-- **Permission classification**: each extension is classified `Trusted` / `Reviewed` / `Restricted` from its declared permissions. Enabling a `Restricted` extension requires explicit approval (`ErrRestrictedRequiresApproval`).
-- **Blacklist**: known-malicious extension IDs (e.g. `anabarban.anabarban`, `esbenp.prettier-vscode-stolen`) are blocked from installation and enablement. The built-in list cannot be removed at runtime; users can add entries via `<configDir>/gugacode/extension-blacklist.json`.
-- **API surface restriction**: the `vscode`-compatible API shim (`frontend/src/lib/extensionHost/apiSurface.ts`) is deny-by-default — only listed methods are exposed, and dangerous commands (`workbench.action.terminal.sendSequence`, `workbench.action.files.save`, `_workbench.*`) always require confirmation regardless of security level. Extensions never receive `appState` or `window.go` bindings directly.
-
-Extension security: Trusted / Reviewed / Restricted classification, SHA-256 VSIX verification, blacklist, and permission approval are enforced in `services/extension_security_service.go` and related frontend host code.
-
-### Path Sandboxing
-All file operations are sandboxed to the workspace root. `FileService.validatePath()` (and the shared `services/pathsec.go` helpers) prevent directory traversal attacks by checking that the resolved path is within the workspace root, with symlinks evaluated on both sides. Terminal sessions and agent CWDs validate their working directory similarly.
-
-### Input Validation
-- Project IDs and flat-namespace names are validated as safe relative paths (no separators, no `..`, no absolute paths) to prevent path traversal via filenames.
-- AI API responses are checked for non-2xx status codes and parsed for structured error messages (body capped at 64 KB).
-- HTTP clients disable redirects to prevent SSRF.
-
-### XSS Prevention
-- Markdown rendering uses DOMPurify to sanitize HTML before rendering, with links forced to `target="_blank" rel="noopener noreferrer"`.
-- All user input displayed in the UI is escaped by Vue's template engine by default.
-
-### API Key Storage
-- API keys are encrypted at rest (DPAPI on Windows, AES-256-GCM / keychain elsewhere) and never transmitted to any server except the user-configured AI provider.
-- The decrypted API key is never returned to the frontend across the Wails binding (G-SEC-07).
-- API keys are not logged or included in error messages.
-
-### Dependency Security
-- `govulncheck ./services/... .` runs in CI on every push/PR (G-SEC-04).
-- `npm audit` should be run in the `frontend/` directory before releases.
-- `golangci-lint` and `go vet` run in CI to catch issues `govulncheck` does not cover.
-
-## Security Headers
-
-The Wails v3 webview's asset middleware injects the following headers on every response (`main.go`):
-- `Content-Security-Policy` — `script-src 'nonce-<N>'` (per-response nonce from `crypto/rand`, no `'unsafe-inline'`); `connect-src` restricted to `'self'` because all AI/network calls are made from Go, not from the webview.
+Wails 资源中间件注入：
+- `Content-Security-Policy`（`script-src 'nonce-...'`，无 `unsafe-inline`）
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
 - `Referrer-Policy: no-referrer`
 
-The desktop app makes external network requests only for AI provider API calls (to the user-configured BaseURL, validated per G-SEC-01). Link clicks in the Help menu open in the external browser. No CSRF, ClickJacking, or CORS protections are needed beyond the headers above since the app runs in a desktop webview, not a browser tab.
+桌面 WebView 场景下不额外做浏览器 CSRF/CORS 方案；外链在系统浏览器打开。
 
-## Disclosure Timeline
+## 披露时间线 / Disclosure Timeline
 
-- **Day 0**: Vulnerability reported
-- **Day 1-2**: Acknowledgment and initial assessment
-- **Day 3-7**: Fix development and testing
-- **Day 7-14**: Patch release (severity-dependent)
-- **Day 30**: Public disclosure (if applicable)
+| 时间 / Day | 动作 / Action |
+|---|---|
+| 0 | 报告 / Report received |
+| 1–2 | 确认与初评 / ACK + assessment |
+| 3–7 | 修复开发与测试 / Fix & test |
+| 7–14 | 视严重性发补丁 / Patch release |
+| 30 | 视情况公开披露 / Public disclosure if applicable |
 
-## Contact
+## 联系 / Contact
 
-- Security email: security@gugacode.dev
-- General issues: [GitHub Issues](https://github.com/gugacode/gugacode/issues)
+- 安全邮箱 / Security: security@gugacode.dev  
+- 一般问题 / General: [GitHub Issues](https://github.com/CuTeLiTTleBraids-Geek-studio/Gugacode/issues)  
