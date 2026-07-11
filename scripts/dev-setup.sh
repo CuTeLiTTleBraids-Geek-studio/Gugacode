@@ -21,4 +21,4 @@ if ! command -v dlv >/dev/null 2>&1; then
   echo "==> install dlv"
   go install github.com/go-delve/delve/cmd/dlv@latest
 fi
-echo "Done. See CONTRIBUTING.md for wails3 dev."
+echo "Done. See .github/CONTRIBUTING.md for wails3 dev."

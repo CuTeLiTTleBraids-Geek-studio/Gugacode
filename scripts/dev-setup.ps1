@@ -25,4 +25,4 @@ Write-Host "==> optional: install dlv for debug"
 if (-not (Get-Command dlv -ErrorAction SilentlyContinue)) {
   go install github.com/go-delve/delve/cmd/dlv@latest
 }
-Write-Host "Done. See CONTRIBUTING.md for wails3 dev."
+Write-Host "Done. See .github/CONTRIBUTING.md for wails3 dev."

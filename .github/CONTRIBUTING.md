@@ -8,12 +8,12 @@ Thank you for contributing! This document covers setup and project conventions.
 **中文：**
 - **Bug：** 提交带 `bug` 标签的 Issue，写明系统、版本、复现步骤、期望与实际结果。
 - **功能建议：** 使用 `enhancement` 标签，说明场景与方案。
-- **安全漏洞：** **不要**公开 Issue，请私下按 [SECURITY.md](SECURITY.md) 报告。
+- **安全漏洞：** **不要**公开 Issue，请私下按 [SECURITY.md](SECURITY.md)（本目录）报告。
 
 **English:**
 - **Bugs:** open a GitHub issue labeled `bug` (OS, version, repro, expected vs actual).
 - **Features:** label `enhancement` with use case and proposal.
-- **Security:** do **not** open a public issue — see [SECURITY.md](SECURITY.md).
+- **Security:** do **not** open a public issue — see [SECURITY.md](SECURITY.md) in this folder.
 
 ## 开发环境 / Development Setup
 
@@ -121,7 +121,7 @@ docs: update README with AI configuration guide
 2. 单次提交保持单一逻辑变更
 3. 补充/更新测试
 4. 跑通 Go + 前端测试
-5. 更新 `CHANGELOG.md` 的 Unreleased（若面向用户）
+5. 更新 `docs/CHANGELOG.md` 的 Unreleased（若面向用户）
 6. 开 PR，关联 Issue（如 `Closes #123`）
 7. 根据 Review 修改
 
@@ -130,7 +130,7 @@ docs: update README with AI configuration guide
 - [ ] `go test ./services/...` 与 `npx vitest run` 通过
 - [ ] `go vet .` 干净
 - [ ] `npx vue-tsc --noEmit` 干净
-- [ ] 用户可见变更已写 CHANGELOG
+- [ ] 用户可见变更已写 `docs/CHANGELOG.md`
 - [ ] Conventional Commits
 - [ ] 无新增 lint 警告
 

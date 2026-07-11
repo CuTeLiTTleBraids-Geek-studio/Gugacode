@@ -3,9 +3,8 @@ name: Release
 # N-147: Tag-triggered release pipeline. When a version tag (v*.*.*) is
 # pushed, this workflow builds production artifacts for Windows, Linux, and
 # macOS, generates SHA256 checksums, and creates a GitHub Release with the
-# artifacts attached. The CHANGELOG.md "Unreleased" section is used as the
-# release notes body (no automated changelog generation — we keep a single
-# hand-maintained CHANGELOG.md as the source of truth).
+# artifacts attached. The docs/CHANGELOG.md section for the tag version is used
+# as the release notes body (hand-maintained changelog is the source of truth).
 #
 # Triggering:
 #   git tag v0.2.0
@@ -268,7 +267,7 @@ jobs:
           # [Unreleased] section if no matching version section is found.
           python3 - <<'PY'
           import os, re, pathlib
-          md = pathlib.Path("CHANGELOG.md").read_text(encoding="utf-8")
+          md = pathlib.Path("docs/CHANGELOG.md").read_text(encoding="utf-8")
           tag = os.environ.get("GITHUB_REF_NAME", "")
           version = tag.lstrip("v") if tag else ""
           body = ""

@@ -49,7 +49,7 @@ AI assistant · sandboxed Agent · offline LSP · toolchains · scaffolding · m
 | AI 在线增强 | 双协议（OpenAI + Anthropic）SSE 流式对话、streamId 路由、内联补全、9 个右键代码动作 |
 | 双窗 SSOT | 主窗 + AI 伴侣窗设置/会话同步、CAS 冲突处理、Agent 审批仅发起窗（见 docs） |
 
-> 演进目标、验收门禁与安全基线见 `SECURITY.md`、`ARCHITECTURE.md` 喵～
+> 演进目标、验收门禁与安全基线见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、[.github/SECURITY.md](.github/SECURITY.md) 喵～
 
 > **Experimental（实验性）**：Computer Use、IM 集成等默认收在设置「实验性功能」分组，可能为 stub / 平台受限，不计入核心编辑器验收。
 
@@ -234,7 +234,7 @@ AI assistant · sandboxed Agent · offline LSP · toolchains · scaffolding · m
 | 单实例锁 | 命名锁文件，防多实例竞争 settings.json |
 | 原子写 | 关键配置 temp + rename 原子写，敏感文件 0600 权限 |
 
-详见 [SECURITY.md](SECURITY.md)。
+详见 [.github/SECURITY.md](.github/SECURITY.md)。
 
 ### 无障碍
 
@@ -421,7 +421,7 @@ gugacode 支持任何 OpenAI 兼容 API 与 Anthropic 原生 API。在 **设置 
 gugacode/
 ├── main.go                          # Go 入口：服务注册、事件绑定、CSP nonce 注入、资源嵌入
 ├── go.mod                           # 模块名：gugacode（Go 1.25）
-├── services/                        # Go 后端服务（~35+，与 ARCHITECTURE.md 一致）
+├── services/                        # Go 后端服务（~35+，见 docs/ARCHITECTURE.md）
 │   ├── ai_service.go                # AI 对话（OpenAI + Anthropic 双协议，SSE 流式）
 │   ├── ai_prompts.go                # 系统提示词 + 10 个内置预设操作
 │   ├── ai_retry.go                  # 瞬时错误重试与退避
@@ -481,7 +481,8 @@ gugacode/
 │   ├── bindings/                    # Wails 自动生成的绑定
 │   └── package.json
 ├── build/                           # 平台构建配置（windows/linux/darwin）
-└── .github/workflows/               # CI + Release
+├── docs/                            # 架构与变更日志等文档
+└── .github/                         # CI/CD + 贡献/安全/行为准则
 ```
 
 </details>
@@ -494,7 +495,7 @@ gugacode/
 
 **后端**（Go）
 
-- ~35+ 服务通过 Wails v3 FNV-1a 哈希绑定 ID 暴露给前端（见 ARCHITECTURE.md）
+- ~35+ 服务通过 Wails v3 FNV-1a 哈希绑定 ID 暴露给前端（见 docs/ARCHITECTURE.md）
 - 服务间通过依赖注入解耦
 - 平台特定代码通过构建标签分离
 - 安全工具集中化：`pathsec` / `atomic_write` / `ai_urlsec` / `secrets`
@@ -587,7 +588,7 @@ go test ./services/... -bench=. -benchmem
 - 提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/)
 - Go：`gofmt` + `golangci-lint`（配置见 `.golangci.yml`）
 - TypeScript/Vue：ESLint（配置见 `frontend/eslint.config.js`）
-- 安全漏洞：请按 [SECURITY.md](SECURITY.md) 流程私下报告，勿公开 Issue
+- 安全漏洞：请按 [.github/SECURITY.md](.github/SECURITY.md) 流程私下报告，勿公开 Issue
 
 <details>
 <summary><b>贡献流程</b></summary>
@@ -660,7 +661,7 @@ go test ./services/... -bench=. -benchmem
 
 **Experimental:** Computer Use / IM are optional stubs and not part of core editor acceptance.
 
-Language service correctness is prioritized over stacking more Agent modes. See `SECURITY.md` and `ARCHITECTURE.md`.
+Language service correctness is prioritized over stacking more Agent modes. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [.github/SECURITY.md](.github/SECURITY.md).
 
 ## English · Features (summary)
 
@@ -708,11 +709,11 @@ Settings → AI. Supports OpenAI-compatible and Anthropic native APIs. Multiple 
 
 ## English · Security
 
-API keys encrypted at rest (DPAPI / Keychain / AES). Path sandbox + symlink checks. CSP nonces. Agent commands always need approval. Extension sandbox + SHA-256. Details: [SECURITY.md](SECURITY.md).
+API keys encrypted at rest (DPAPI / Keychain / AES). Path sandbox + symlink checks. CSP nonces. Agent commands always need approval. Extension sandbox + SHA-256. Details: [.github/SECURITY.md](.github/SECURITY.md).
 
 ## English · Contribute & license
 
-Issues/PRs welcome. Conventional Commits; see [CONTRIBUTING.md](CONTRIBUTING.md). Security reports: [SECURITY.md](SECURITY.md). License: [MIT](LICENSE).
+Issues/PRs welcome. Conventional Commits; see [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md). Security reports: [.github/SECURITY.md](.github/SECURITY.md). License: [MIT](LICENSE).
 
 ## English · Contact
 
