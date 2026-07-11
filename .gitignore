@@ -1,11 +1,13 @@
 # ============================================
-# 不纳入仓库的文档 / Local-only docs
+# 本地/内部草稿（公开文档放在 docs/ 与 .github/）
+# Local drafts only — public docs live in docs/ and .github/
 # ============================================
 
-docs/
+# 旧版内部设计稿文件名（勿提交）
 DESIGN-*.md
-DESIGN-apple.md
-DESIGN-claude.md
+**/superpowers/
+docs/prompts/
+docs/superpowers/
 
 # ============================================
 # 构建产物 / Build artifacts
