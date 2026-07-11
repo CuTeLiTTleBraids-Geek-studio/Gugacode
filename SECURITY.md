@@ -108,7 +108,7 @@ Extension webviews and plugin views render in an `<iframe sandbox="allow-scripts
 - **Blacklist**: known-malicious extension IDs (e.g. `anabarban.anabarban`, `esbenp.prettier-vscode-stolen`) are blocked from installation and enablement. The built-in list cannot be removed at runtime; users can add entries via `<configDir>/gugacode/extension-blacklist.json`.
 - **API surface restriction**: the `vscode`-compatible API shim (`frontend/src/lib/extensionHost/apiSurface.ts`) is deny-by-default — only listed methods are exposed, and dangerous commands (`workbench.action.terminal.sendSequence`, `workbench.action.files.save`, `_workbench.*`) always require confirmation regardless of security level. Extensions never receive `appState` or `window.go` bindings directly.
 
-See [`docs/extension-security.md`](docs/extension-security.md) for the full extension security model.
+Extension security: Trusted / Reviewed / Restricted classification, SHA-256 VSIX verification, blacklist, and permission approval are enforced in `services/extension_security_service.go` and related frontend host code.
 
 ### Path Sandboxing
 All file operations are sandboxed to the workspace root. `FileService.validatePath()` (and the shared `services/pathsec.go` helpers) prevent directory traversal attacks by checking that the resolved path is within the workspace root, with symlinks evaluated on both sides. Terminal sessions and agent CWDs validate their working directory similarly.

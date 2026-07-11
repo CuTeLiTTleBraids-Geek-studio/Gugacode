@@ -192,7 +192,7 @@ gugacode/
 │   ├── bindings/            # Auto-generated Wails bindings
 │   └── package.json
 ├── build/                   # Platform-specific build configs
-└── docs/                    # Documentation and implementation plans
+└── scripts/                 # Dev setup, SBOM, binding checks
 ```
 
 ## License

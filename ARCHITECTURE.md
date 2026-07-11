@@ -69,8 +69,7 @@ gugacode/
 │   │   ├── composables/       # useKeyboard (global shortcuts)
 │   │   └── types/index.ts     # Shared TypeScript interfaces
 │   └── bindings/              # Auto-generated Wails JS bindings
-├── build/                     # Platform-specific build configs (Windows/macOS/Linux/iOS/Android)
-└── docs/                      # Documentation and plans
+└── build/                     # Platform-specific build configs (Windows/macOS/Linux/iOS/Android)
 ```
 
 ## Service Architecture
@@ -103,7 +102,7 @@ Core services include File, Project, Settings, Window, Terminal, AI, Conversatio
 
 ### Event System
 
-Wails v3 events are used for streaming data and dual-window sync (see `docs/ai-windows.md`):
+Wails v3 events are used for streaming data and dual-window sync:
 - `terminal:output` — terminal output chunks (emitted from Go poll loop)
 - `ai:chunk` — AI streaming response chunks (`{streamId, data}`)
 - `ai:done` — AI stream completion (`{streamId, data}`)

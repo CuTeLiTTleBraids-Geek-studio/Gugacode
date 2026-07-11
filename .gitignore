@@ -1,20 +1,34 @@
 # ============================================
+# 不纳入仓库的文档 / Local-only docs
+# ============================================
+
+docs/
+DESIGN-*.md
+DESIGN-apple.md
+DESIGN-claude.md
+
+# ============================================
 # 构建产物 / Build artifacts
 # ============================================
 
-# Go 二进制文件 / Go binaries
+# Go 二进制 / 安装包（仅根目录可执行文件名，避免误伤源码目录）
 bin/
 *.exe
+*.exe~
 *.run
-gugacode.exe
-gugacode
-gugacode.app
+*.dll
+*.so
+*.dylib
+/gugacode
+/gugacode.exe
+/gugacode.app
+/gugacode-console
+/gugacode-console.exe
 gugacode-server*
-gugacode-server-linux-amd64
-miaomiaocode
-miaomiaocode.exe
-nknk-coding
-nknk-coding.exe
+/miaomiaocode
+/miaomiaocode.exe
+/nknk-coding
+/nknk-coding.exe
 
 # Windows 资源文件（构建时生成）/ Windows syso (generated)
 *.syso
@@ -23,14 +37,24 @@ wails_windows_*.syso
 # 前端构建产物 / Frontend build output
 frontend/dist/
 
-# Wails 绑定生成临时目录 / Wails binding temp dirs
+# Wails 绑定：项目服务绑定由 dev/build 时生成，勿提交
+# （框架侧 bindings/github.com/wailsapp 等仍跟踪）
+frontend/bindings/gugacode/
 frontend/.bindings-tmp*
+
+# Vite / TS 缓存
+.vite/
+frontend/.vite/
+*.tsbuildinfo
 
 # 移动平台生成文件（含机器特定路径）/ Mobile generated
 build/ios/xcode/overlay.json
 build/ios/xcode/gen/
 build/android/overlay.json
 build/android/gen/
+build/android/.gradle/
+build/android/**/build/
+build/android/local.properties
 
 # Linux AppImage 构建目录
 build/linux/appimage/build
@@ -41,15 +65,25 @@ build/windows/nsis/MicrosoftEdgeWebview2Setup.exe
 # Taskfile 缓存 / Taskfile cache
 .task/
 
+# 启动日志（本机调试残留）
+startup-err.txt
+startup-out.txt
+bin/startup-err.txt
+bin/startup-out.txt
+
 # ============================================
-# 用户数据 / User data (绝不提交)
+# 用户数据 / User data（绝不提交）
 # ============================================
 
-# 应用运行时生成的用户数据目录 / Runtime user data
+# 应用运行时生成的用户数据目录
 services/gugacode/
 
-# AI 对话历史文件（根目录时间戳 JSON）/ AI conversation history
+# AI 对话历史文件（根目录时间戳 JSON）
 [0-9]*-*.json
+
+# 本地测试写盘残留
+.test_write*
+.test_write*.tmp
 
 # ============================================
 # 依赖 / Dependencies
@@ -58,15 +92,15 @@ services/gugacode/
 # Node.js
 node_modules/
 
-# Go vendor（如使用）/ Go vendor (if used)
+# Go vendor（如使用）
 vendor/
 
-# Go workspace（如使用）/ Go workspace (if used)
+# Go workspace（如使用）
 go.work
 go.work.sum
 
 # ============================================
-# IDE / 编辑器 / IDE & editors
+# IDE / 编辑器
 # ============================================
 
 .vscode/
@@ -76,12 +110,15 @@ go.work.sum
 *~
 *.sublime-workspace
 *.sublime-project
+*.code-workspace
 
 # ============================================
 # 操作系统文件 / OS files
 # ============================================
 
 .DS_Store
+.AppleDouble
+.LSOverride
 Thumbs.db
 desktop.ini
 ehthumbs.db
@@ -92,12 +129,17 @@ $RECYCLE.BIN/
 # ============================================
 
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.*.example
 *.pem
 *.key
 *.p12
 *.pfx
+*.jks
+credentials.json
+secrets.json
+**/secrets.local.*
 
 # ============================================
 # 日志与临时文件 / Logs & temp files
@@ -108,23 +150,54 @@ $RECYCLE.BIN/
 *.temp
 *.bak
 *.cache
+*.orig
+*.swp
 
 # ============================================
-# 测试覆盖率 / Test coverage
+# 测试覆盖率与性能分析 / Coverage & profiling
 # ============================================
 
 coverage/
+frontend/coverage/
 *.lcov
 *.out
 *.prof
+*.pprof
+cpu.out
+mem.out
+block.out
+mutex.out
 
 # ============================================
-# 调试工具 / Debug tools (可选保留)
+# 调试工具 / Debug tools
 # ============================================
 
-# 哈希测试调试工具 / Hash debug tool
+# Delve / go test 调试产物
+__debug_bin*
+debug.test
+*.test
+*.pdb
+
+# 哈希测试调试工具
 tools/hashtest6/
 
 # Local lint dumps
 frontend/eslint_output.json
 
+# ============================================
+# SBOM / 本地打包残留（脚本可能生成）
+# 发布物请走 GitHub Releases，勿把安装包提交进仓库
+# ============================================
+
+sbom*.json
+bom.json
+*.spdx.json
+*.spdx
+/dist/
+/release/
+*.zip
+*.tar.gz
+*.msi
+*.msix
+*.appimage
+*.dmg

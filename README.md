@@ -6,7 +6,7 @@
 
 **一款专为 Go / TypeScript / JavaScript 而生的桌面 AI IDE**
 
-*单文件分发 · 开箱即用 · 离线可用* —— 主人专属的编码伙伴咕嘎~
+*单文件分发 · 开箱即用 · 离线可用* —— 主人专属的编码猫娘伙伴喵~
 
 基于 Go（Wails v3）+ Vue 3 + Monaco Editor 构建
 
@@ -28,11 +28,13 @@
 
 ---
 
-## 项目定位
+## 喵～自我介绍一下
 
-gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / JavaScript 而生的桌面 AI IDE**。本企鹅不仅会写代码，还懂主人的工具链咕咕嘎嘎~
+主人好，本喵是 **gugacode** 的 README 喵娘小助手～  
+本喵不只是会「写代码的编辑器」，而是正在从「通用轻量 AI 编辑器」进化成 **专为 Go / TypeScript / JavaScript 而生的桌面 AI IDE** 喵！  
+工具链懂、离线也能补全、Agent 会乖乖请示主人再动手——尾巴尖尖都竖起来保证安全喵～
 
-| 演进方向 | 能力 |
+| 演进方向 | 本喵会的事 |
 |---|---|
 | 一站式项目脚手架 | Go 单体 / TS / JS / Monorepo / 全栈 五类模板，离线生成，开箱即用 |
 | 离线 LSP 补全 | 集成 gopls / tsserver，断网仍可补全、悬停、跳转、签名、格式化 |
@@ -41,9 +43,9 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 | AI 在线增强 | 双协议（OpenAI + Anthropic）SSE 流式对话、streamId 路由、内联补全、9 个右键代码动作 |
 | 双窗 SSOT | 主窗 + AI 伴侣窗设置/会话同步、CAS 冲突处理、Agent 审批仅发起窗（见 docs） |
 
-> 演进目标、验收门禁与安全基线见 `SECURITY.md`、`ARCHITECTURE.md`、`docs/` 与 **`docs/prompts/`**（prompt-5/6/7 活文档归档）。
+> 演进目标、验收门禁与安全基线见 `SECURITY.md`、`ARCHITECTURE.md` 喵～
 
-> **Experimental（实验性）**：Computer Use、IM 集成等默认收在设置「实验性功能」分组，可能为 stub / 平台受限，不计入核心编辑器验收。双窗协议与手工清单见 `docs/ai-windows.md`、`docs/qa-dual-window.md`。
+> **Experimental（实验性）**：Computer Use、IM 集成等默认收在设置「实验性功能」分组，可能为 stub / 平台受限，不计入核心编辑器验收。
 
 ### 语言能力矩阵（prompt-8，诚实表）
 
@@ -64,7 +66,7 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 | 多根 go.work / pnpm | 🟡 切换 root → `SetWorkspaceRoot` + LSP 重启 | 🟡 package workspaces + 切换 |
 
 > *Offline-first desktop IDE for Go and TypeScript/JavaScript, with sandboxed AI agents.*  
-> AI 是加速器；**语言服务正确性优先于再堆 Agent 模式**（见 `docs/prompts/prompt-8.md`）。
+> AI 是加速器；**语言服务正确性优先于再堆 Agent 模式**。本喵不吹牛，诚实表就是这样喵～
 
 ---
 
@@ -74,25 +76,25 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 
 | 特性 | 说明 |
 |---|---|
-| Monaco 内核 | 与 VS Code 同款编辑器，支持 20+ 语言语法高亮（Go、TypeScript、Python、Rust、Java、C/C++、JSON、YAML、Markdown 等）咕咕嘎嘎~ |
-| 多标签页 | 脏状态跟踪（● 指示器）、未保存提示、Ctrl+S 全局保存，主人不会丢失工作成果咕嘎 |
+| Monaco 内核 | 与 VS Code 同款编辑器，支持 20+ 语言语法高亮（Go、TypeScript、Python、Rust、Java、C/C++、JSON、YAML、Markdown 等）喵 |
+| 多标签页 | 脏状态跟踪（● 指示器）、未保存提示、Ctrl+S 全局保存，主人的劳动成果本喵护得紧紧的 |
 | 查找替换 | Ctrl+F 调用 Monaco 原生查找面板 |
 | Diff 视图 | Myers diff 算法，逐行对比，Git 冲突解决 |
 | Markdown 预览 | 分栏渲染，代码块语法高亮（highlight.js 50+ 语言，80+ 别名映射） |
-| 内联 AI 补全 | 幽灵文本代码补全，基于当前文件上下文，debounce + AbortSignal 取消，像有只小企鹅在旁边帮主人写代码咕嘎 |
+| 内联 AI 补全 | 幽灵文本代码补全，基于当前文件上下文，debounce + AbortSignal 取消，像有只小猫趴在键盘边帮主人补完喵～ |
 | 快速打开 | Ctrl+P 模糊搜索工作区文件 |
-| 文件切换动画 | 标签页切换时编辑器淡入脉冲，不重新挂载 Monaco，丝滑得像企鹅跳跃 |
+| 文件切换动画 | 标签页切换时编辑器淡入脉冲，不重新挂载 Monaco，丝滑得像本喵伸懒腰 |
 
 ### AI 助手
 
 | 特性 | 说明 |
 |---|---|
-| 多 Provider 配置 | CC Switch 风格，无限保存多套 AI 配置，一键切换，想用哪家就用哪家咕嘎 |
-| 双协议原生支持 | OpenAI（`/v1/chat/completions`）与 Anthropic（`/v1/messages`），两种协议本企鹅都懂咕嘎 |
-| SSE 流式响应 | 实时打字机效果，事件驱动（`ai:chunk` / `ai:done` / `ai:error`），文字像企鹅踩键盘一样一个个蹦出来咕嘎 |
+| 多 Provider 配置 | CC Switch 风格，无限保存多套 AI 配置，一键切换，想用哪家就用哪家喵 |
+| 双协议原生支持 | OpenAI（`/v1/chat/completions`）与 Anthropic（`/v1/messages`），两种协议本喵都懂 |
+| SSE 流式响应 | 实时打字机效果，事件驱动（`ai:chunk` / `ai:done` / `ai:error`），文字像小猫踩键盘一样一个个蹦出来喵 |
 | 9 个右键代码操作 | 解释代码 · 重构 · 修复 Bug · 生成文档 · 生成测试 · 优化 · 代码审查 · 安全审计 · 提交信息 |
 | 代码上下文注入 | 选中代码自动随提示词发送 |
-| 对话历史 | 保存、加载、删除、重命名历史会话，主人的每段回忆本企鹅都好好保存 |
+| 对话历史 | 保存、加载、删除、重命名历史会话，主人的每段回忆本喵都好好收进爪垫里 |
 | 自定义系统提示词 | 全局默认 + 每会话独立覆盖 |
 | 项目规则 | 自动加载 `.cursorrules` / `AGENTS.md` 追加到系统提示词 |
 | Markdown 渲染 | XSS 防护（DOMPurify）+ 语法高亮（VS Code Dark+/Light+ 配色）+ 外链强制 `rel="noopener noreferrer"` |
@@ -103,8 +105,8 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 
 | 特性 | 说明 |
 |---|---|
-| 工具调用 | 读文件、写文件、运行命令、搜索代码、Git 操作，本企鹅是主人的全能小助手咕嘎 |
-| 命令审批 | **所有命令强制人工审批，无 Safe 自动批准旁路**（G-SEC-02），危险操作本企鹅会先问主人咕嘎 |
+| 工具调用 | 读文件、写文件、运行命令、搜索代码、Git 操作，本喵是主人的全能小爪手喵～ |
+| 命令审批 | **所有命令强制人工审批，无 Safe 自动批准旁路**（G-SEC-02），危险操作会先歪头问主人一声喵 |
 | 风险分级 | Safe / Elevated / Dangerous，逐工具审批策略 |
 | 审批循环 | Pending → Approved/Rejected → Executed，支持拒绝后继续对话 |
 | 观测反馈 | 工具执行结果回灌给 AI 形成多轮自治 |
@@ -113,19 +115,19 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 
 ### 离线 LSP 补全（G-FEAT-02）
 
-> 断网也能补全，本企鹅不会让主人卡壳咕咕嘎嘎~
+> 断网也能补全，本喵不会让主人卡壳喵～
 
 | 特性 | 说明 |
 |---|---|
 | Go LSP | 集成 gopls，自动发现/提示安装，提供补全、悬停、定义跳转、签名 |
 | TS/JS LSP | 集成 tsserver（内置于 typescript npm 包，无需联网），补全、快速修复、JSX/TSX |
 | 协同策略 | LSP 给符号补全，AI 给行/块级意图补全，不冲突 |
-| 断网检测 | `navigator.onLine` + 心跳 BaseURL；断网时 UI 显示"离线补全"徽标 |
+| 断网检测 | `navigator.onLine` + 心跳 BaseURL；断网时 UI 显示「离线补全」徽标 |
 | 本地模型 | 配置 Ollama / LM Studio（`http://localhost:*`），断外网仍可用本地 AI |
 
 ### 工具链集成（G-FEAT-03）
 
-> 命令面板与右键菜单一键调用，输出到 Output 面板，错误解析为 Problem 面板诊断咕嘎
+> 命令面板与右键菜单一键调用，输出到 Output 面板，错误解析为 Problem 面板诊断喵
 
 | 语言 | 工具 |
 |---|---|
@@ -136,7 +138,7 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 
 ### 项目脚手架（G-FEAT-01）
 
-> 命令面板 `gugacode: New Project`，向导式生成，离线可用咕咕嘎嘎~
+> 命令面板 `gugacode: New Project`，向导式生成，离线可用喵～
 
 | 模板 | 内容 |
 |---|---|
@@ -154,12 +156,12 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 
 | 特性 | 说明 |
 |---|---|
-| 完整 PTY 支持 | Windows ConPTY / Unix pty，真终端不是假的咕咕嘎嘎~ |
+| 完整 PTY 支持 | Windows ConPTY / Unix pty，真终端不是假的喵～ |
 | 多标签终端 | 创建、切换、关闭多个会话 |
-| ANSI 颜色渲染 | xterm.js，花花绿绿的本企鹅喜欢咕嘎 |
+| ANSI 颜色渲染 | xterm.js，花花绿绿的本喵喜欢喵 |
 | 可配置 Shell | PowerShell、bash、zsh |
 | 输出缓冲 | 1MiB 上限，防止大量输出卡 UI |
-| 弹出动画 | 高度 + 透明度过渡，像企鹅从盒子里探头一样咕嘎 |
+| 弹出动画 | 高度 + 透明度过渡，像小猫从纸箱里探头一样喵 |
 
 ### Git 集成
 
@@ -168,7 +170,7 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 - 单文件暂存 / 取消暂存（路径校验，防 `..` 逃逸）
 - 提交（带消息）
 - Rebase 与冲突解决
-- **AI 代码审查** — 分析未提交变更，逐文件输出结构化审查意见，本企鹅帮主人挑 Bug 咕咕嘎
+- **AI 代码审查** — 分析未提交变更，逐文件输出结构化审查意见，本喵帮主人挑 Bug 喵～
 
 ### 全文搜索
 
@@ -199,25 +201,25 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 
 | 特性 | 说明 |
 |---|---|
-| 三套设计语言 | Material You · Apple HIG · Claude 风格，主人喜欢哪种就换哪种咕咕嘎嘎~ |
+| 三套设计语言 | Material You · Apple HIG · Claude 风格，主人喜欢哪种就换哪种喵～ |
 | 8 种强调色 | Blue · Teal · Green · Amber · Pink · Purple · Cyan · Indigo |
 | 明暗模式 | Dark / Light / System 跟随系统 |
 | 国际化 | English · 简体中文 · 日本語 |
 | 设置配置文件 | 多配置文件切换、导入、导出 |
 | 布局引擎 | 拖拽分屏、持久化布局配置文件 |
-| 丝滑过渡动画 | 侧边栏 Tab 切换、设置页导航、编辑器文件切换、终端弹出，尊重 `prefers-reduced-motion`，每个动画都像企鹅伸懒腰一样流畅咕咕嘎嘎~ |
+| 丝滑过渡动画 | 侧边栏 Tab 切换、设置页导航、编辑器文件切换、终端弹出，尊重 `prefers-reduced-motion`，每个动画都像本喵甩尾巴一样流畅喵～ |
 
 ---
 
 ## 安全
 
-> 安全姿态显著高于同类项目，本企鹅对主人的代码与密钥守口如瓶咕咕嘎嘎~
+> 安全姿态显著高于同类项目，本喵对主人的代码与密钥守口如瓶喵～
 
 | 特性 | 说明 |
 |---|---|
-| API Key 加密存储 | AES-256-GCM（随机 nonce）+ Windows DPAPI / macOS Keychain / Linux Secret Service，主人的钥匙本企鹅锁得严严实实咕咕嘎嘎~ |
+| API Key 加密存储 | AES-256-GCM（随机 nonce）+ Windows DPAPI / macOS Keychain / Linux Secret Service，主人的钥匙本喵锁进保险箱喵 |
 | 路径遍历防护 | `pathsec.ValidatePathWithinRoot` 双侧 `EvalSymlinks`，ConversationService / PresetService / FileService / GitService / SearchService / AgentService / TerminalService 共享 |
-| 工作区沙箱 | 所有服务限制在工作区根目录内，符号链接逃逸拒绝，本企鹅不会乱跑咕咕嘎嘎~ |
+| 工作区沙箱 | 所有服务限制在工作区根目录内，符号链接逃逸拒绝，本喵不会乱跑喵 |
 | CSP 头注入 | 每请求 16 字节 hex nonce，`script-src 'self' 'nonce-<N>'`，无 `unsafe-inline` |
 | URL 校验 | AI BaseURL 经 SSRF 与 API Key 外泄检测（scheme/userinfo/https/loopback） |
 | 不可信工作流 | `.nknk/workflows` 的 `runOn: startup` 不自动执行，列入待确认列表 |
@@ -226,7 +228,7 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 | 单实例锁 | 命名锁文件，防多实例竞争 settings.json |
 | 原子写 | 关键配置 temp + rename 原子写，敏感文件 0600 权限 |
 
-详见 [SECURITY.md](SECURITY.md) 与 [docs/extension-security.md](docs/extension-security.md)。
+详见 [SECURITY.md](SECURITY.md)。
 
 ### 无障碍
 
@@ -240,7 +242,7 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 
 ## 下载
 
-主人请前往 [Releases](https://github.com/CuTeLiTTleBraids-Geek-studio/Gugacode/releases) 下载对应平台压缩包咕咕嘎嘎~
+主人请前往 [Releases](https://github.com/CuTeLiTTleBraids-Geek-studio/Gugacode/releases) 下载对应平台压缩包喵～
 
 | 平台 | 文件 | 备注 |
 |---|---|---|
@@ -249,7 +251,7 @@ gugacode 正从"通用轻量 AI 编辑器"演进为**专为 Go / TypeScript / Ja
 | macOS x64 | `gugacode-<version>-darwin-amd64.zip` | Intel 芯片 |
 | macOS ARM64 | `gugacode-<version>-darwin-arm64.zip` | Apple Silicon（M1/M2/M3） |
 
-每个发布包均附带 `.sha256` 校验文件，建议下载后校验完整性咕咕嘎嘎~
+每个发布包均附带 `.sha256` 校验文件，建议下载后校验完整性喵～
 
 <details>
 <summary><b>Linux 依赖</b></summary>
@@ -270,7 +272,7 @@ sudo pacman -S gtk3 webkit2gtk pkgconf
 <details>
 <summary><b>macOS 注意事项</b></summary>
 
-首次打开可能提示"无法验证开发者"。右键点击应用 → 选择"打开" → 在弹窗中确认"打开"即可咕咕嘎嘎~ 或执行：
+首次打开可能提示「无法验证开发者」。右键点击应用 → 选择「打开」 → 在弹窗中确认「打开」即可喵～ 或执行：
 
 ```bash
 xattr -cr /path/to/gugacode
@@ -313,7 +315,7 @@ wails3 dev -config ./build/config.yml -port 9245
 <details>
 <summary><b>未安装 Wails3 CLI 的替代方案</b></summary>
 
-可分两个终端手动启动咕咕嘎嘎~
+可分两个终端手动启动喵～
 
 ```bash
 # 终端 1 — 前端
@@ -336,7 +338,7 @@ go run .
 <details>
 <summary><b>跨平台构建说明</b></summary>
 
-**无法从 Windows 主机交叉编译 Linux/macOS 二进制** —— 这是 Wails v3 alpha 阶段的已知限制咕咕嘎嘎，不是本企鹅的锅咕咕嘎嘎~
+**无法从 Windows 主机交叉编译 Linux/macOS 二进制** —— 这是 Wails v3 alpha 阶段的已知限制喵，不是本喵偷懒喵～
 
 1. **构建约束 Bug** — `pkg/application` 中的 Linux/macOS 平台文件引用了被构建标签排除的 `pointer` 类型，交叉编译时报 `undefined: pointer`
 2. **Taskfile 使用 Unix 命令** — `mkdir -p`、`uname` 等在 Windows PowerShell 上不可用
@@ -356,16 +358,16 @@ go run .
 
 ## AI 配置
 
-gugacode 支持任何 OpenAI 兼容 API 与 Anthropic 原生 API。在 **设置 → AI** 中配置咕咕嘎嘎~
+gugacode 支持任何 OpenAI 兼容 API 与 Anthropic 原生 API。在 **设置 → AI** 中配置喵～
 
 ### 多 Provider 配置管理
 
-采用 CC Switch 风格咕咕嘎嘎：
+采用 CC Switch 风格喵：
 
 - **无限制配置数量** — 保存任意多套 Provider 配置
 - **一键切换** — 聊天面板头部下拉框 + 设置页面，两处入口均可切换
 - **每套配置独立** — apiKey / baseUrl / model / temperature / maxTokens / systemPrompt / protocol
-- **旧配置自动迁移** — 首次加载时将旧的单配置打包为"Default"配置，主人不用担心旧设置丢失咕嘎~
+- **旧配置自动迁移** — 首次加载时将旧的单配置打包为「Default」配置，主人不用担心旧设置丢失喵～
 
 ### 兼容 Provider
 
@@ -388,7 +390,7 @@ gugacode 支持任何 OpenAI 兼容 API 与 Anthropic 原生 API。在 **设置 
 
 ### 内置 AI 操作
 
-编辑器中右键即可访问咕咕嘎嘎~
+编辑器中右键即可访问喵～
 
 | 操作 | 说明 |
 |---|---|
@@ -454,32 +456,26 @@ gugacode/
 │   ├── shell_windows.go             # Windows Shell
 │   ├── shell_unix.go                # Unix Shell
 │   ├── logging.go                   # 结构化日志（slog）
-│   └── *_test.go                    # Go 单元测试（41 文件）
+│   └── *_test.go                    # Go 单元测试
 ├── frontend/
 │   ├── src/
 │   │   ├── api/services.ts          # Wails 服务绑定（类型安全）
-│   │   ├── stores/                  # Vue 响应式状态（19 个 store）
+│   │   ├── stores/                  # Vue 响应式状态
 │   │   ├── components/
 │   │   │   ├── editor/              # CodeEditor、DiffView、TabBar
 │   │   │   ├── explorer/            # FileTree
-│   │   │   ├── layout/              # MainLayout、AiChatPanel、TerminalPanel、PluginViewIframe 等
+│   │   │   ├── layout/              # MainLayout、AiChatPanel、TerminalPanel 等
 │   │   │   ├── marketplace/         # MarketplacePanel
 │   │   │   ├── modals/              # ExtensionPermissionDialog、NewProjectWizard
-│   │   │   └── settings/            # 10 个设置分区组件
+│   │   │   └── settings/            # 设置分区组件
 │   │   ├── composables/             # useKeyboard、useDragResize
-│   │   ├── lib/                     # markdown、i18n、Monaco 主题、插件系统、扩展主机
-│   │   │   ├── extensionHost/       # VS Code 兼容层 + 权限模型
-│   │   │   ├── pluginSandbox.ts     # Web Worker 沙箱
-│   │   │   ├── markdown.ts          # DOMPurify + highlight.js
-│   │   │   ├── connectivity.ts      # 离线检测
-│   │   │   └── i18n.ts              # en/zh/ja 国际化
+│   │   ├── lib/                     # markdown、i18n、Monaco 主题、插件系统
 │   │   ├── types/index.ts           # TypeScript 类型定义
-│   │   └── views/                   # 5 个路由视图
+│   │   └── views/                   # 路由视图
 │   ├── bindings/                    # Wails 自动生成的绑定
 │   └── package.json
 ├── build/                           # 平台构建配置（windows/linux/darwin）
-├── .github/workflows/               # CI（race + govulncheck + vue-tsc + vitest）+ Release
-└── docs/                            # 设计文档、安全声明、隐私声明、离线支持
+└── .github/workflows/               # CI + Release
 ```
 
 </details>
@@ -503,7 +499,7 @@ gugacode/
 
 **前端**（Vue 3）
 
-- 19 个模块级单例 store（非 Pinia）
+- 模块级单例 store（非 Pinia）
 - AI 流式响应通过 Wails 事件系统驱动（`app.Event.On`）
 - 避免 IPC 回调限制
 - 插件 Web Worker 沙箱 + iframe sandbox 隔离
@@ -543,7 +539,7 @@ go test ./services/... -race -v
 # Go 漏洞扫描
 go run golang.org/x/vuln/cmd/govulncheck@latest ./services/... .
 
-# 前端测试（842+ 测试）
+# 前端测试
 cd frontend && npx vitest run
 
 # TypeScript 类型检查
@@ -580,7 +576,7 @@ go test ./services/... -bench=. -benchmem
 
 ## 贡献
 
-欢迎 Issue 与 PR 咕咕嘎嘎~ (*^▽^*)
+欢迎 Issue 与 PR 喵～ (*^ω^*)ノ
 
 - 提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/)
 - Go：`gofmt` + `golangci-lint`（配置见 `.golangci.yml`）
@@ -602,7 +598,7 @@ go test ./services/... -bench=. -benchmem
 
 ## 联系方式
 
-如果主人觉得这个项目对你有帮助，欢迎通过以下渠道联系本企鹅咕咕嘎嘎~ 
+如果主人觉得这个项目有帮助，欢迎通过以下渠道找本喵玩喵～
 
 <table>
 <tr>
@@ -637,7 +633,7 @@ go test ./services/... -bench=. -benchmem
 </tr>
 </table>
 
-> 加群请注明"gugacode 用户"，方便本企鹅认出主人咕咕嘎嘎~
+> 加群请注明「gugacode 用户」，方便本喵认出主人喵～
 
 ---
 
@@ -649,7 +645,7 @@ go test ./services/... -bench=. -benchmem
 
 ---
 
-<sub>构建于以下开源项目之上咕咕嘎嘎~</sub>
+<sub>构建于以下开源项目之上喵～</sub>
 
 <sub>
 
@@ -659,6 +655,6 @@ go test ./services/... -bench=. -benchmem
 
 ---
 
-<sub>Made with love by gugacode contributors · Gugu Gaga~</sub>
+<sub>Made with love & cat ears by gugacode contributors · 喵喵～</sub>
 
 </div>
